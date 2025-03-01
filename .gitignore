@@ -1,0 +1,10 @@
+# directories ignored
+build/
+dist/
+tests/
+__pycache__/
+pyweber.egg-info
+
+# files ignored
+setup.py
+upload_lib.py
