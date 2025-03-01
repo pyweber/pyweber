@@ -2,7 +2,7 @@
 
 <img src="https://pyweber.readthedocs.io/en/latest/images/pyweber.png" alt="PyWeber Logo">
 
-[![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![Coverage Status](https://coveralls.io/repos/github/webtechmoz/pyweber/badge.svg?branch=master)](https://coveralls.io/github/webtechmoz/pyweber?branch=master) [![License](https://img.shields.io/pypi/l/pyweber.svg)](https://github.com/webtechmoz/pyweber/blob/master/LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master) [![License](https://img.shields.io/pypi/l/pyweber.svg)](https://github.com/pyweber/pyweber/blob/master/LICENSE)
 
 PyWeber is a Python library for creating and managing HTML templates dynamically, as well as providing a simple routing system for web applications. With PyWeber, you can create, manipulate, and render HTML elements programmatically, in addition to managing routes and redirects.
 
