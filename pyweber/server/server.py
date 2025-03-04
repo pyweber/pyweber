@@ -4,7 +4,7 @@ from threading import Thread
 from pyweber.router.router import Router
 from pyweber.content_type.content_types import ContentTypes
 from pyweber.static_files.static_files import LoadStaticFiles
-from pyweber.template_codes.template_codes import WS_CODE, PAGE_NOT_FOUND
+from pyweber.template_codes.template_codes import WS_CONNECT, PAGE_NOT_FOUND, WS_EVENTS, WS_RELOAD
 
 class Server:
     def __init__(self, router: Router):
@@ -18,11 +18,28 @@ class Server:
         self.server_running = False
         self.server_thread = None
     
-    def add_template_code(self, template: str):
+    def add_webserver_code(self, template: str):
+        if '</script>' not in template:
+            template = template.replace(
+                '</body>',
+                WS_CONNECT
+            ).replace(
+                '//replace here',
+                WS_EVENTS
+            )
+
+            if self.reload:
+                return self.add_reload_code(
+                    template=template
+                )
+            
+        return template
+    
+    def add_reload_code(self, template: str):
         if self.reload:
             return template.replace(
-                '</body>',
-                WS_CODE
+                '//replace here',
+                WS_RELOAD
             )
         
         return template
@@ -39,7 +56,7 @@ class Server:
                 else:
                     code: str = '200 OK'
                 self.route = route
-                html = self.add_template_code(
+                html = self.add_webserver_code(
                     template=self.router.get_route(route=self.route).rebuild_html
                 )
             
@@ -53,7 +70,7 @@ class Server:
             
             else:
                 code: str = '404 Not Found'
-                html = self.add_template_code(
+                html = self.add_webserver_code(
                     template=PAGE_NOT_FOUND
                 )
             

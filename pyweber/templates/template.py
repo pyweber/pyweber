@@ -1,32 +1,13 @@
 import os
 import re
+from pyweber.elements.elements import Element
 
-class Element:
-    def __init__(
-        self,
-        name: str,
-        id: str = None,
-        class_name: str = None,
-        content: str = None,
-        attributes: dict[str, str] = None,
-        parent: 'Element' = None,
-        childs: list['Element'] = None
-    ):
-        self.name = name
-        self.id = id
-        self.class_name = class_name
-        self.content = content
-        self.attributes = attributes if attributes else {}
-        self.parent = parent
-        self.childs = childs if childs else []
-    
-    def __repr__(self):
-        return f"Element(name={self.name}, id={self.id}, class_name={self.class_name}, content={self.content}, attributes={self.attributes}, childs={len(self.childs)})"
-        
 class Template:
     def __init__(self, template: str):
         self.template = template
         self.__root = self.parse
+        self.events = {}
+        self.modified_elements: dict[str, Element] = {}
     
     @property
     def read_file(self):
@@ -85,11 +66,20 @@ class Template:
                 inner_html = match.group(3).strip()
 
                 attributes = self.__parse_attributes(tag_attributes)
+                custom_events = {}
+
+                for key in list(attributes.keys()):
+                    if key.startswith('_'):
+                        custom_events[key] = attributes.pop(key)
+                        attributes.pop(key)
+
                 element = Element(
                     name=name,
+                    uuid=attributes.pop('uuid', None),
                     class_name=attributes.pop('class', None),
                     id=attributes.pop('id', None),
                     attributes=attributes,
+                    events=custom_events
                 )
 
                 if inner_html:
@@ -112,11 +102,20 @@ class Template:
                 tag_attributes = match.group(5)
 
                 attributes = self.__parse_attributes(tag_attributes)
+                custom_events = {}
+
+                for key in list(attributes.keys()):
+                    if key.startswith('_'):
+                        custom_events[key] = attributes.pop(key)
+                        attributes.pop(key)
+                
                 element = Element(
                     name=name,
+                    uuid=attributes.pop('uuid', None),
                     class_name=attributes.pop('class', None),
                     id=attributes.pop('id', None),
-                    attributes={key: (True if value is None else value) for key, value in attributes.items()}
+                    attributes={key: (True if value is None else value) for key, value in attributes.items()},
+                    events=custom_events
                 )
 
             elements.append(element)
@@ -128,7 +127,6 @@ class Template:
             return elements  # Retorna a lista diretamente se houver múltiplos elementos
         else:
             raise ValueError("No elements found in the HTML")
-
 
     def __parse_attributes(self, tag_attributes: str) -> dict:
         attributes = {}
@@ -149,28 +147,43 @@ class Template:
             html += f' id="{element.id}"'
         if element.class_name:
             html += f' class="{element.class_name}"'
+        
+        if element.uuid:
+            html += f' uuid="{element.uuid}"'
 
         # Adiciona os atributos
         if element.attributes:
             for key, value in element.attributes.items():
                 html += f' {key}="{value}"' if not isinstance(value, bool) else f' {key}'
+        
+        if element.events:
+            for event, handler in element.events.items():
+                html += f' _{event}="{self.regirty_events(handler)}"'
 
         # Se for uma tag auto-fechada e não tem filhos ou conteúdo
         if not element.content and not element.childs:
             html += ">\n"
         else:
-            html += ">\n"
+            if element.content:
+                html += ">"
+            
+            else:
+                html += ">\n"
 
             # Adiciona o conteúdo (se houver)
             if element.content:
-                html += f"{indent}    {element.content.strip()}\n"
+                html += f"{element.content.strip()}"
 
             # Adiciona os filhos (recursivamente)
             for child in element.childs:
                 html += self.__build_html(child, indent_level + 1)
 
             # Fecha a tag corretamente
-            html += f"{indent}</{element.name}>\n"
+            if element.content:
+                html += f"</{element.name}>\n"
+            
+            else:
+                html += f"{indent}</{element.name}>\n"
 
         return html
 
@@ -182,6 +195,17 @@ class Template:
     def getElementById(self, id: str) -> Element | None:
         def search(element: Element):
             if element.id == id:
+                return element
+            for child in element.childs:
+                found = search(child)
+                if found:
+                    return found
+            return None
+        return search(self.__root)
+    
+    def getElementByUUID(self, uuid: str) -> Element | None:
+        def search(element: Element):
+            if element.uuid == uuid:
                 return element
             for child in element.childs:
                 found = search(child)
@@ -221,3 +245,8 @@ class Template:
     
     def find_parent(self, element: Element) -> Element | None:
         return element.parent
+    
+    def regirty_events(self, event):
+        key = f'event_{id(event)}'
+        self.events[key] = event
+        return key
