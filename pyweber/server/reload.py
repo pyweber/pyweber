@@ -1,21 +1,23 @@
+import json
+import asyncio
+import websockets
+from time import time
+from threading import Thread
+from base64 import b64decode, b64encode
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from threading import Thread
-import websockets
-import asyncio
-from time import time
-import json
 from pyweber.router.router import Router
-from pyweber.events.events import EventConstrutor
-from pyweber.elements.elements import Element
-from pyweber.globals.globals import MODIFIED_ELEMENTS
+from pyweber.utils.events import EventConstrutor
+from pyweber.core.template import Template
+from pyweber.core.elements import Element
 
 class ReloadServer:
-    def __init__(self, port: int = 8765, event = None):
+    def __init__(self, port: int = 8765, event = None, reload: bool = False):
         self.websocket_clients: set[websockets.WebSocketClientProtocol] = set()
         self.port = port
         self.host = 'localhost'
         self.event = event
+        self.reload = reload
         self.router: Router = None
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
@@ -45,41 +47,47 @@ class ReloadServer:
         """Processa uma mensagem recebida do navegador."""
         try:
             event_json = json.loads(message)
-            event = EventConstrutor(event=event_json).build_event
+            last_template = self.update_template_root(event=event_json)
+            event_handler = EventConstrutor(
+                event=self.update_event(
+                    event=event_json,
+                    template=last_template
+                )
+            ).build_event
 
-            if event.route in self.router.list_routes:
-                template = self.router.get_route(event.route)
-                self.event_funcs = template.events
-
-                event_type = f'_on{event.event_type}'
-
-                if event_type in event.element.events:
-                    event_id = event.element.events[event_type]
-                    
-
-                    if event_id in self.event_funcs:
-                        self.event_funcs[event_id](event)
-
-                        response = json.dumps({key: value.to_json() for key, value in MODIFIED_ELEMENTS.items()}, ensure_ascii=False, indent=4)
-                        MODIFIED_ELEMENTS.clear()
-
-                        await websocket.send(response)
-
+            if event_handler.element:
+                event_id = event_handler.element.events.__dict__.get(f'on{event_handler.event_type}', None)
+                
+                if event_id:
+                    if event_id in last_template.events:
+                        try:
+                            last_template.events.get(event_id)(event_handler)
+                            new_html = b64encode(last_template.build_html().encode('utf-8')).decode('utf-8')
+                            await websocket.send(json.dumps({'template': new_html}, ensure_ascii=False, indent=4))
+                        
+                        except Exception as e:
+                            await websocket.send(json.dumps({'Error': str(e)}))
+        
         except json.JSONDecodeError:
             print(f"Mensagem inválida recebida: {message}")
     
-    def get_parent(self, element: Element):
-        while element.parent:
-            element = element.parent
-            self.get_parent(element)
-        
-        return element
+    def update_template_root(self, event: dict[str, None]) -> Template:
+        html = b64decode(event['template']).decode('utf-8')
+        values: dict[str, None] = json.loads(b64decode(event['values']).decode('utf-8'))
+        last_template = self.router.get_route(route=event['route'])
+        new_root_element = last_template.parse_html(html=html)
+        self.insert_values(root_Element=new_root_element, values=values)
+        last_template.root = new_root_element
+        return last_template
     
-    def update_root(self, root_element: Element, event_element: Element):
-        root_element = event_element
-        print(event_element)
-        for i, child in enumerate(event_element.childs):
-            self.update_root(root_element.childs[i], child)
+    def update_event(self, event: dict[str, None], template: Template):
+        event['template'] = template
+        return event
+    
+    def insert_values(self, root_Element: Element, values: dict[str, None]):
+        root_Element.value = values.get(root_Element.uuid, None)
+        for child in root_Element.childs:
+            self.insert_values(child, values)
     
     async def ws_start(self):
         try:
@@ -92,8 +100,9 @@ class ReloadServer:
     def run(self):
         Thread(target=self.loop.run_until_complete, args=(self.ws_start(),), daemon=True).start()
 
-        watchdog = WatchDogFiles(self)
-        asyncio.run(watchdog.start())
+        if self.reload:
+            watchdog = WatchDogFiles(self)
+            asyncio.run(watchdog.start())
 
 class WatchDogFiles:
     def __init__(self, reload_server: ReloadServer):

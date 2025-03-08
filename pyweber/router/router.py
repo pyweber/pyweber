@@ -1,9 +1,11 @@
-from pyweber.templates.template import Template
+from pyweber.core.template import Template
+from pyweber.utils.load import StaticTemplates
 
 class Router:
     def __init__(self):
         self.__routes: dict[str, Template] = {}
         self.__redirects: dict[str, str] = {}
+        self.__page_not_found = Template(template=StaticTemplates.PAGE_NOT_FOUND())
     
     @property
     def list_routes(self) -> list[str]:
@@ -12,6 +14,17 @@ class Router:
     @property
     def clear_routes(self) -> None:
         self.__routes.clear()
+    
+    @property
+    def page_not_found(self):
+        return self.__page_not_found
+    
+    @page_not_found.setter
+    def page_not_found(self, template: Template):
+        if not isinstance(template, Template):
+            raise TypeError('O template deve ser da classe Template')
+
+        self.__page_not_found = template
     
     def add_route(self, route: str, template: Template) -> None:
 
@@ -52,7 +65,7 @@ class Router:
             route = self.__redirects[route]
         
         if route not in self.__routes:
-            raise ValueError(f'A rota {route} não existe. Use add_route() para criar')
+            return self.__page_not_found
         
         return self.__routes[route]
     

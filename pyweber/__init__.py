@@ -1,43 +1,52 @@
-import sys, os, importlib
+import sys, os, importlib, json
 from threading import Thread
-from pyweber.templates.template import Template
-from pyweber.elements.elements import Element
-from pyweber.events.events import EventHandler
-from pyweber.router.router import Router
-from pyweber.server.server import Server
-from pyweber.reload_server.reload_server import ReloadServer
+from pathlib import Path
+from .utils.types import Events
+from .utils.events import EventHandler
+from .core.elements import Element
+from .core.template import Template
+from .server.server import Server
+from .server.reload import ReloadServer
+from .router.router import Router
 
 """A powerfull framework do create and manage a web page"""
 
-__version__ = '0.3.2'
+__all__ = [
+    'Template',
+    'Element',
+    'Events',
+    'EventHandler',
+    'Router',
+    'run'
+]
+
+__version__ = '0.4.0'
 
 class run:
-    def __init__(self, target, route: str = '/', reload: bool = True, port: int = 8800):
-        self.route = route
-        self.reload = reload
-        self.port = port
+    def __init__(self, target, route: str = '/', port: int = 8800, host: str='localhost'):
+        self.__route = route
+        self.__port = port
+        self.__host = host
         self.__target_function = target
         self.__target_module = os.path.splitext(os.path.basename(sys.argv[0]))[0]
         self.__router: Router = Router()
         self.__server: Server = None
-        self.__reload_server = ReloadServer(event=self.update)
+        self.__reload_server = ReloadServer(event=self.update, reload=self.__reload_mode)
         self.__run()
 
 
     def __run(self):
-        self.load_target()
-
-        if self.reload:
-            self.__reload_server.router = self.__router
-            Thread(target=self.__reload_server.run, daemon=True).start()
+        self.__load_target()
+        self.__reload_server.router = self.__router
+        Thread(target=self.__reload_server.run, daemon=True).start()
 
         self.__server.run(
-            route=self.route,
-            port=self.port,
-            reload=self.reload
+            route=self.__route,
+            port=self.__port,
+            host=self.__host
         )
     
-    def load_target(self):
+    def __load_target(self):
         self.__router.clear_routes
         module = importlib.import_module(self.__target_module)
         importlib.reload(module=module)
@@ -48,5 +57,16 @@ class run:
     
     def update(self):
         print('♻  Actualizando as rotas no servidor...')
-        self.load_target()
+        self.__load_target()
         self.__server.router = self.__router
+    
+    @property
+    def __reload_mode(self) -> bool:
+        project_name = Path('.pyweber')
+        if Path.exists(Path.joinpath(project_name, 'config.json')):
+            with open(Path.joinpath(project_name, 'config.json'), 'r+') as f:
+                d: dict[str, bool] = json.load(f)
+
+                return d.get('reload_mode', False)
+        else:
+            return False

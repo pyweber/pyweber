@@ -1,78 +1,58 @@
 import socket
 import select
+import requests
 from threading import Thread
 from pyweber.router.router import Router
-from pyweber.content_type.content_types import ContentTypes
-from pyweber.static_files.static_files import LoadStaticFiles
-from pyweber.template_codes.template_codes import WS_CONNECT, PAGE_NOT_FOUND, WS_EVENTS, WS_RELOAD
+from pyweber.utils.types import ContentTypes
+from pyweber.utils.load import LoadStaticFiles
 
 class Server:
     def __init__(self, router: Router):
         self.router = router
         self.connections: list[socket.socket] = []
-        self.route = '/'
-        self.port = 8800
-        self.reload = True
-        self.host = 'localhost'
+        self.route = None
+        self.port = None
+        self.host = None
         self.no_kill = True
-        self.server_running = False
-        self.server_thread = None
-    
-    def add_webserver_code(self, template: str):
-        if '</script>' not in template:
-            template = template.replace(
-                '</body>',
-                WS_CONNECT
-            ).replace(
-                '//replace here',
-                WS_EVENTS
-            )
-
-            if self.reload:
-                return self.add_reload_code(
-                    template=template
-                )
-            
-        return template
-    
-    def add_reload_code(self, template: str):
-        if self.reload:
-            return template.replace(
-                '//replace here',
-                WS_RELOAD
-            )
-        
-        return template
     
     def serve_file(self, request: str):
         route = request.split(' ')[1]
         content_type = ContentTypes.html
 
         try:
-            if self.router.exists(route) or self.router.is_redirected(route):
-                if self.router.is_redirected(route=route):
-                    code = f"302 Found\r\nLocation: {self.router.get_redirected_route(route)}"
-
-                else:
+            if '.' in route:
+                if route.startswith('/'):
+                    extension = route.split('.')[-1].lower().strip()
+                    if extension in ContentTypes.content_list():
+                        content_type: ContentTypes = getattr(ContentTypes, extension, ContentTypes.html)
+                    
+                    html = LoadStaticFiles(route).load
                     code: str = '200 OK'
-                self.route = route
-                html = self.add_webserver_code(
-                    template=self.router.get_route(route=self.route).rebuild_html
-                )
-            
-            elif '.' in route:
-                extension = route.split('.')[-1].lower().strip()
-                if extension in ContentTypes.content_list():
-                    content_type: ContentTypes = getattr(ContentTypes, extension)
+                
+                else:
+                    ext_request = requests.request(method='get', url=route)
 
-                html = LoadStaticFiles(route).load
-                code: str = '200 OK'
+                    if ext_request.status_code != 200:
+                        code = ext_request.status_code
+                        html = ''
+                    
+                    else:
+                        code: str = '200 OK'
+                        html = ext_request.content
             
             else:
-                code: str = '404 Not Found'
-                html = self.add_webserver_code(
-                    template=PAGE_NOT_FOUND
-                )
+                if self.router.exists(route) or self.router.is_redirected(route):
+                    if self.router.is_redirected(route=route):
+                        code = f"302 Found\r\nLocation: {self.router.get_redirected_route(route)}"
+
+                    else:
+                        code: str = '200 OK'
+                    
+                else:
+                    code: str = '404 Not Found'
+                
+                self.route = route
+                html = self.router.get_route(route=route).build_html()
             
         except FileNotFoundError:
             code: str = '404 Not Found'
@@ -121,8 +101,6 @@ class Server:
             url = f'http://{self.host}:{self.port}{self.route}'
             print(f'🌐 Servidor rodando em {url}')
 
-            self.server_running = True
-
             while self.no_kill:
                 try:
                     rlist, _, _ = select.select([client_server], [], [], 1)
@@ -138,6 +116,6 @@ class Server:
                     print('Servidor desligado')
                     break
             
-    def run(self, route: str, port: int, reload: bool):
-        self.route, self.port, self.reload = route, port, reload
+    def run(self, route: str, port: int, host: str):
+        self.route, self.port, self.host = route, port, host
         self.create_server()
