@@ -1,7 +1,9 @@
 import sys, os, importlib, json
 from threading import Thread
 from pathlib import Path
-from .utils.types import Events
+from .utils.types import Events, EventType
+from .utils.defaults import SERVER, SESSION, CONFIGFILE
+from .utils.exceptions import *
 from .utils.events import EventHandler
 from .core.elements import Element
 from .core.template import Template
@@ -14,26 +16,30 @@ from .router.router import Router
 __all__ = [
     'Template',
     'Element',
+    'EventType'
     'Events',
     'EventHandler',
     'Router',
     'run'
 ]
 
-__version__ = '0.4.1'
+__version__ = '0.5.0'
 
 class run:
-    def __init__(self, target, route: str = '/', port: int = 8800, host: str='localhost'):
-        self.__route = route
-        self.__port = port
-        self.__host = host
+    def __init__(self, target: callable):
+        self.__configs = CONFIGFILE.config_file()
+        self.__route = self.__configs['server'].get('route', SERVER.ROUTE.value)
+        self.__port = self.__configs['server'].get('port', SERVER.PORT.value)
+        self.__host = self.__configs['server'].get('host', SERVER.HOST.value)
         self.__target_function = target
         self.__target_module = os.path.splitext(os.path.basename(sys.argv[0]))[0]
-        self.__router: Router = Router()
+        self.__router: Router = Router(update_handler=self.update)
         self.__server: Server = None
-        self.__reload_server = ReloadServer(event=self.update, reload=self.__reload_mode)
+        self.__reload_server = ReloadServer(
+            event=self.update,
+            reload=self.__configs['session'].get('reload_mode', SESSION.RELOAD_MODE.value)
+        )
         self.__run()
-
 
     def __run(self):
         self.__load_target()
@@ -43,7 +49,8 @@ class run:
         self.__server.run(
             route=self.__route,
             port=self.__port,
-            host=self.__host
+            host=self.__host,
+            secret_key=self.__configs['session'].get('secret_key', SESSION.SECRET_KEY.value)
         )
     
     def __load_target(self):
@@ -59,14 +66,3 @@ class run:
         print('♻  Actualizando as rotas no servidor...')
         self.__load_target()
         self.__server.router = self.__router
-    
-    @property
-    def __reload_mode(self) -> bool:
-        project_name = Path('.pyweber')
-        if Path.exists(Path.joinpath(project_name, 'config.json')):
-            with open(Path.joinpath(project_name, 'config.json'), 'r+') as f:
-                d: dict[str, bool] = json.load(f)
-
-                return d.get('reload_mode', False)
-        else:
-            return False

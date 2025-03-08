@@ -1,0 +1,30 @@
+{
+    "app": {
+        "name": "",
+        "version": "",
+        "description": "",
+        "icon": ""
+    },
+    "server": {
+        "host": "",
+        "port": "",
+        "route": ""
+    },
+    "database": {
+        "type": "",
+        "name": "",
+        "username": "",
+        "host": "",
+        "password": "",
+        "port": ""
+    },
+    "api_keys": {
+
+    },
+    "session": {
+        "secret_key": "",
+        "timeout": 3600,
+        "reload_mode": "",
+        "env": "development"
+    }
+}

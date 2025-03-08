@@ -3,12 +3,14 @@ import lxml.html as HTMLPARSER
 from lxml.etree import Element as LXML_Element
 from pyweber.core.elements import Element, Events
 from pyweber.utils.load import LoadStaticFiles, StaticTemplates
+from pyweber.utils.defaults import APP, CONFIGFILE
 
 class Template:
     def __init__(self, template: str):
         self.__template = self.__read_file(file_path=template)
-        self.__root = self.parse_html()
         self.__events: dict[str, object] = {}
+        self.__icon: str = CONFIGFILE.config_file()['app'].get('icon', str(APP.ICON.value))
+        self.__root = self.parse_html()
     
     @property
     def template(self):
@@ -44,6 +46,22 @@ class Template:
                     content=StaticTemplates.JS_STATIC()
                 )
             )
+        
+        for i, child in enumerate(root.childs[0].childs):
+            if child.name == 'link':
+                if 'icon' in list(child.attrs.values()):
+                    break
+            
+            if i == len(root.childs[0].childs) - 1:
+                root.childs[0].childs.append(
+                    Element(
+                        name='link',
+                        attrs={
+                            'rel': 'icon',
+                            'href': f'/{self.__icon if self.__icon.strip() else APP.ICON.value}'.replace('\\', '/'),
+                        }
+                    )
+                )
         
         return root
 
@@ -182,7 +200,6 @@ class Template:
             if gettail(HTMLElement.tail):
                 parent.content = parent.content if parent.content else ''
                 parent.content += f" «{element.uuid}»{gettail(HTMLElement.tail)}"
-                print(parent.content)
 
         for child in childrens:
             element.childs.append(self.__create_element(child, element))

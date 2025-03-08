@@ -10,6 +10,7 @@ from pyweber.router.router import Router
 from pyweber.utils.events import EventConstrutor
 from pyweber.core.template import Template
 from pyweber.core.elements import Element
+from pyweber.utils.exceptions import RouteNotFoundError
 
 class ReloadServer:
     def __init__(self, port: int = 8765, event = None, reload: bool = False):
@@ -72,12 +73,17 @@ class ReloadServer:
             print(f"Mensagem inválida recebida: {message}")
     
     def update_template_root(self, event: dict[str, None]) -> Template:
-        html = b64decode(event['template']).decode('utf-8')
-        values: dict[str, None] = json.loads(b64decode(event['values']).decode('utf-8'))
-        last_template = self.router.get_route(route=event['route'])
-        new_root_element = last_template.parse_html(html=html)
-        self.insert_values(root_Element=new_root_element, values=values)
-        last_template.root = new_root_element
+        try:
+            last_template = self.router.get_route(route=event['route'])
+            html = b64decode(event['template']).decode('utf-8')
+            values: dict[str, None] = json.loads(b64decode(event['values']).decode('utf-8'))
+            new_root_element = last_template.parse_html(html=html)
+            self.insert_values(root_Element=new_root_element, values=values)
+            last_template.root = new_root_element
+            
+        except RouteNotFoundError:
+            last_template = self.router.page_not_found
+        
         return last_template
     
     def update_event(self, event: dict[str, None], template: Template):

@@ -1,10 +1,8 @@
 import os
-import importlib.util
-from pyweber.utils.types import ContentTypes
-
-LIB_ABSOUTE_PATH = importlib.util.find_spec('pyweber').submodule_search_locations[0]
+from pyweber.utils.types import ContentTypes, StaticFilePath
 
 class LoadStaticFiles:
+    
     def __init__(self, path: str):
         self.path = path[1:] if path.startswith('/') else path
     
@@ -35,29 +33,41 @@ class StaticTemplates:
     @staticmethod
     def BASE_HTML() -> str:
         return LoadStaticFiles(
-            path=os.path.join(LIB_ABSOUTE_PATH, 'static', 'html.py')
-        ).load.replace('# ', '')
+            path=str(StaticFilePath.html_base.value)
+        ).load
 
     @staticmethod
     def BASE_CSS() -> str:
         return LoadStaticFiles(
-            path=os.path.join(LIB_ABSOUTE_PATH, 'static', 'css.py')
-        ).load.replace('# ', '')
+            path=str(StaticFilePath.css_base.value)
+        ).load
     
     @staticmethod
     def BASE_MAIN() -> str:
         return LoadStaticFiles(
-            path=os.path.join(LIB_ABSOUTE_PATH, 'static', 'main.py')
-        ).load.replace('# ', '')
+            path=str(StaticFilePath.main_base.value)
+        ).load
     
     @staticmethod
     def JS_STATIC() -> str:
         return LoadStaticFiles(
-            path=os.path.join(LIB_ABSOUTE_PATH, 'static', 'js.py')
-        ).load.replace('# ', '')
+            path=str(StaticFilePath.js_base.value)
+        ).load
     
     @staticmethod
     def PAGE_NOT_FOUND() -> str:
         return LoadStaticFiles(
-            path=os.path.join(LIB_ABSOUTE_PATH, 'static', 'html404.py')
-        ).load.replace('# ', '')
+            path=str(StaticFilePath.html_404.value)
+        ).load
+    
+    @staticmethod
+    def PAGE_UNAUTHORIZED() -> str:
+        return LoadStaticFiles(
+            path=str(StaticFilePath.html_401.value)
+        ).load
+    
+    @staticmethod
+    def FAVICON() -> bytes:
+        return LoadStaticFiles(
+            path=str(os.path.join(StaticFilePath.favicon_path.value, 'favicon.ico'))
+        ).load

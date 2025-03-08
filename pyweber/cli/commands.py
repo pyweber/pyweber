@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 import argparse
 import subprocess
 from time import sleep
@@ -7,6 +8,7 @@ from pathlib import Path
 from datetime import datetime
 from pyweber import __version__
 from pyweber.utils.load import StaticTemplates
+from pyweber.utils.defaults import APP, SERVER, SESSION
 
 class CLI:
     def __init__(self):
@@ -61,21 +63,22 @@ class CLI:
             
             elif args.command == 'run':
                 self.commands_funcs.run_app(file=args.file, reload=args.reload)
+            
+            else:
+                self.parser.print_help()
+                exit(code=1)
         
         except KeyboardInterrupt:
             pass
 
 class CommandFunctions:
     def __init__(self):
-        self.project_name = None
+        self.project_name: Path = None
 
     def create(self, project_name: str):
-        # Caminho onde o novo projeto será criado
-        base_path = Path(project_name)
-        self.project_name = base_path
+        self.project_name = Path(project_name)
 
-        # Verificar se o diretório já existe
-        if base_path.exists():
+        if self.project_name.exists():
             self.log_message(
                 message=f'❌ O diretório {project_name} já existe!',
                 level='error'
@@ -83,49 +86,52 @@ class CommandFunctions:
             return
 
         try:
-            # Criar as pastas do projeto
-            os.makedirs(base_path / 'src' / 'style')  # pasta para CSS
-            os.makedirs(base_path / 'templates')  # pasta para HTML
-            
-            # Criar o arquivo main.py com a estrutura básica
-            main_py_content = StaticTemplates.BASE_MAIN()
+            project_paths = [
+                self.project_name, # Main project
+                self.project_name / 'src' / 'style', # for style sheet
+                self.project_name / 'templates', # for templates
+                self.project_name / 'src' / 'assets', # for assets
+                self.project_name / '.pyweber' # for config file
+            ]
 
-            with open(base_path / 'main.py', 'w', encoding='utf-8') as f:
-                f.write(main_py_content)
-            
-            # Criar o arquivo template index.html
-            index_html_content = StaticTemplates.BASE_HTML()
+            file_contents = [
+                ['main.py', StaticTemplates.BASE_MAIN()],
+                ['style.css', StaticTemplates.BASE_CSS()],
+                ['index.html', StaticTemplates.BASE_HTML()],
+                ['favicon.ico', StaticTemplates.FAVICON()],
+                ['config.json', '']
+            ]
 
-            with open(base_path / 'templates' / 'index.html', 'w', encoding='utf-8') as f:
-                f.write(index_html_content)
-            
-            # Criar o arquivo CSS style.css
-            style_css_content = StaticTemplates.BASE_CSS()
-
-            with open(base_path / 'src' / 'style' / 'style.css', 'w', encoding='utf-8') as f:
-                f.write(style_css_content)
+            for i, path in enumerate(project_paths):
+                self.create_path(path=path)
+                
+                if i == len(project_paths) - 1:
+                    self.create_config_file(str(path / file_contents[i][0]))
+                
+                else:
+                    self.create_static_file(str(path / file_contents[i][0]), file_contents[i][1])
 
             self.log_message(
                 message=f'✅ Projeto {project_name} criado com sucesso!',
                 level='success'
             )
 
-        except Exception as e:
+        except FileNotFoundError as e:
             self.log_message(
                 message=f'❌ Erro ao criar o projeto: {e}',
                 level='error'
             )
+            shutil.rmtree(path=self.project_name, ignore_errors=True)
 
-    def run_app(self, file: str = 'main.py', reload: bool = None):
-        command = f'python {file}'
-        self.create_json_config(value=reload)
+    def run_app(self, file: str = 'main.py', reload: bool = False):
 
         try:
             self.log_message(
                 message=f'✨ Tentando iniciar o projecto',
                 level='warning'
             )
-            subprocess.run(command, shell=True, check=True)
+            self.update_reload_mode(file_path=os.path.join('.pyweber', 'config.json'), value=reload)
+            subprocess.run(['python', file], shell=True, check=True)
         
         except subprocess.CalledProcessError as e:
             self.log_message(
@@ -148,22 +154,73 @@ class CommandFunctions:
                 level='error'
             )
     
-    def create_json_config(self, value: bool = False):
-        project_name = Path('.pyweber')
-        if Path.exists(Path.joinpath(project_name, 'config.json')):
-            with open(Path.joinpath(project_name, 'config.json'), 'r+') as f:
-                d = json.load(f)
-                d['reload_mode'] = value
-                f.seek(0)
-                json.dump(d, f, indent=4)
-                f.truncate()
-        else:
-            os.makedirs(Path(project_name), exist_ok=True)
-            with open(Path.joinpath(project_name, 'config.json'), 'w', encoding='utf-8') as f:
-                json.dump({'reload_mode': value}, f, indent=4)
+    def inserting_config_info(self, file_path: str):
+        config = self.read_config_file(file_path=file_path)
+        config['app'] = {
+            'name': self.project_name.name,
+            'version': APP.VERSION.value,
+            'description': f'A powerful {self.project_name.name} made with pyweber',
+            'icon': ''
+        }
+        config['server'] = {
+            'host': SERVER.HOST.value,
+            'port': SERVER.PORT.value,
+            "route": SERVER.ROUTE.value
+        }
+        config['database'] = {
+            'type': 'sqlite',
+            'name': 'database',
+            'username': '',
+            'password': '',
+            'host': '',
+            'port': ''
+        }
+        config['session'] = {
+            'secret_key': SESSION.SECRET_KEY.value,
+            'timeout': SESSION.TIME_OUT.value,
+            'reload_mode': SESSION.RELOAD_MODE.value,
+            'enviroment': SESSION.ENVIROMENT.value
+        }
 
+        with open(file_path, 'w') as file:
+            json.dump(config, file, indent=4, ensure_ascii=False)
+    
+    def update_reload_mode(self, file_path: str, value: bool):
+        config = self.read_config_file(file_path=file_path)
+        config['session']['reload_mode'] = value
+
+        with open(file_path, 'w') as file:
+            json.dump(config, fp=file, indent=4, ensure_ascii=False)
+    
+    def read_config_file(self, file_path: str) -> dict[str, str]:
+        try:
+            with open(file_path, 'r') as file:
+                return json.load(file)
+        
+        except:
+            return {}
+    
+    def create_config_file(self, file_path: str):
+        with open(file_path, 'w') as file:
+            json.dump({}, fp=file, indent=4, ensure_ascii=False)
+        
+        self.inserting_config_info(file_path=file_path)
+    
+    def create_path(self, path: str):
+        os.makedirs(path, exist_ok=True)
+    
+    def create_static_file(self, file_path: str, content: str | bytes):
+        encoding='utf-8'
+        mode = 'w'
+
+        if isinstance(content, bytes):
+            mode = 'wb'
+            encoding = None
+
+        with open(file_path, mode=mode, encoding=encoding) as file:
+            file.write(content)
+    
     def log_message(self, message: str, level: str = 'info'):
-        # Exibir as messagens durante a execução do CLI
         time = datetime.now().strftime('%H:%M:%S')
 
         colors = {
@@ -172,8 +229,7 @@ class CommandFunctions:
             'warning': '\033[93m',
             'error': '\033[91m'
         }
-
-        reset = '\033[0m'  # Reset da cor no terminal
+        reset = '\033[0m'
         print(f'{colors.get(level, "")}[{time}] {message}{reset}')
         sleep(0.25)
 
