@@ -4,4 +4,4 @@
 #     app.add_route(route='/', template=pw.Template(template='index.html'))
 
 # if __name__ == '__main__':
-#     pw.run(target=main, reload=True)
+#     pw.run(target=main)

@@ -20,7 +20,7 @@ __all__ = [
     'run'
 ]
 
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 
 class run:
     def __init__(self, target, route: str = '/', port: int = 8800, host: str='localhost'):
