@@ -47,21 +47,23 @@ class Template:
                 )
             )
         
-        for i, child in enumerate(root.childs[0].childs):
+        not_icon = False
+        for child in root.childs[0].childs:
             if child.name == 'link':
                 if 'icon' in list(child.attrs.values()):
+                    not_icon = True
                     break
-            
-            if i == len(root.childs[0].childs) - 1:
-                root.childs[0].childs.append(
-                    Element(
-                        name='link',
-                        attrs={
-                            'rel': 'icon',
-                            'href': f'/{self.__icon if self.__icon.strip() else APP.ICON.value}'.replace('\\', '/'),
-                        }
-                    )
+        
+        if not not_icon:
+            root.childs[0].childs.append(
+                Element(
+                    name='link',
+                    attrs={
+                        'rel': 'icon',
+                        'href': f'/{self.__icon if self.__icon.strip() else APP.ICON.value}'.replace('\\', '/'),
+                    }
                 )
+            )
         
         return root
 

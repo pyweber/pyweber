@@ -210,7 +210,7 @@ class Server:
             except:
                 pass
 
-            url = f'http://{self.host}:{self.port}{self.route}'
+            url = f'http://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}'
             print(f'🌐 Servidor rodando em {url}')
             session_id = str(uuid4())
             self.sessions.append(session_id)
