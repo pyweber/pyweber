@@ -7,6 +7,7 @@ from base64 import b64decode, b64encode
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from pyweber.router.router import Router
+from pyweber.utils.request import Request
 from pyweber.utils.events import EventConstrutor
 from pyweber.core.template import Template
 from pyweber.core.elements import Element
@@ -74,13 +75,13 @@ class ReloadServer:
     
     def update_template_root(self, event: dict[str, None]) -> Template:
         try:
-            last_template = self.router.get_route(route=event['route'])
+            last_template = self.router.get_template(route=event['route'])
             html = b64decode(event['template']).decode('utf-8')
             values: dict[str, None] = json.loads(b64decode(event['values']).decode('utf-8'))
             new_root_element = last_template.parse_html(html=html)
             self.insert_values(root_Element=new_root_element, values=values)
             last_template.root = new_root_element
-            
+
         except RouteNotFoundError:
             last_template = self.router.page_not_found
         

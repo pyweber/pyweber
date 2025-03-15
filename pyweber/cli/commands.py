@@ -187,10 +187,10 @@ class CommandFunctions:
     
     def update_reload_mode(self, file_path: str, value: bool):
         config = self.read_config_file(file_path=file_path)
-        config['session']['reload_mode'] = value
-
-        with open(file_path, 'w') as file:
-            json.dump(config, fp=file, indent=4, ensure_ascii=False)
+        if config:
+            config['session']['reload_mode'] = value
+            with open(file_path, 'w') as file:
+                json.dump(config, fp=file, indent=4, ensure_ascii=False)
     
     def read_config_file(self, file_path: str) -> dict[str, str]:
         try:

@@ -2,9 +2,24 @@ from enum import Enum
 import os
 from importlib.resources import files
 
+class JWTAlgorithms(Enum):
+    HS256 = 'HS256'
+    HS384 = 'HS384'
+    HS512 = 'HS512'
+    RS256 = 'RS256'
+    RS384 = 'RS384'
+    RS512 = 'RS512'
+    ES256 = 'ES256'
+    ES384 = 'ES384'
+    ES512 = 'ES512'
+    PS256 = 'PS256'
+    PS384 = 'PS384'
+    PS512 = 'PS512'
+
 class ContentTypes(Enum):
     html = "text/html"
     css = "text/css"
+    unkown = 'application/octet-stream'
     js = "application/javascript"
     json = "application/json"
     png = "image/png"
@@ -25,6 +40,8 @@ class ContentTypes(Enum):
     mov = "video/quicktime"
     flv = "video/x-flv"
     mkv = "video/x-matroska"
+    zip = 'application/zip'
+    zip7 = 'application/x-7z-compressed'
 
     def content_list() -> list[str]:
         return [value.name for value in ContentTypes]
@@ -133,9 +150,12 @@ class HTTPStatusCode(Enum):
     def code_list() -> list[int]:
         return [int(value.value.split(' ')[0]) for value in HTTPStatusCode]
     
-    def search_by_code(code: int):
+    def search_by_code(code: int) -> str:
         for value in HTTPStatusCode:
-            return value.value if str(code) in value.value else HTTPStatusCode.NOT_FOUND.value
+            if str(code) in value.value:
+                return value.value
+        
+        return HTTPStatusCode.NOT_FOUND.value
 
 class EventType(Enum):
     # Mouse Events

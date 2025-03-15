@@ -3,78 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Unauthorized Access</title>
+    <title>Not Authorized</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f8d7da;
-            color: #721c24;
+            background-color: #f4f4f4;
+            color: #333;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
+        }
+        .error-container {
             text-align: center;
-        }
-
-        .container {
-            background-color: white;
-            border-radius: 8px;
+            background-color: #fff;
             padding: 40px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            width: 80%;
-            max-width: 500px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
-
         h1 {
-            font-size: 2.5em;
-            margin-bottom: 20px;
-            color: #721c24;
+            font-size: 48px;
+            margin: 0;
+            color: #d9534f;
         }
-
         p {
-            font-size: 1.2em;
-            margin-bottom: 20px;
-        }
-
-        .error-code {
-            font-size: 4em;
-            font-weight: bold;
-            color: #721c24;
+            font-size: 18px;
             margin: 20px 0;
         }
-
-        .button {
-            background-color: #f5c6cb;
-            border: 1px solid #f1b0b7;
-            color: #721c24;
-            padding: 12px 24px;
-            text-decoration: none;
-            font-size: 1.2em;
+        .login-button {
+            display: flex;
+            justify-content: center;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #5bc0de;
+            border: none;
             border-radius: 5px;
-            display: inline-block;
-            margin-top: 20px;
-            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
         }
-
-        .button:hover {
-            background-color: #f1b0b7;
-            border-color: #f5c6cb;
-        }
-
-        .button:active {
-            background-color: #f8d7da;
-            border-color: #f1b0b7;
+        .login-button:hover {
+            background-color: #31b0d5;
+            text-decoration: none;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Unauthorized Access</h1>
-        <div class="error-code">401</div>
-        <p>Your authentication token is invalid or expired. Please log in again to continue.</p>
-        <a href="/login" class="button">Go to Login Page</a>
+    <div class="error-container">
+        <h1>401</h1>
+        <p>You're not authorized to acess this page.<br>Clear cookies and try again</p>
+        <a href="/login" class="login-button">Try Again</a>
     </div>
 </body>
 </html>

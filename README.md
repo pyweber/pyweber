@@ -74,7 +74,7 @@ The Template class is responsible for loading and manipulating HTML templates. I
 - `read_file`: Reads the content of an HTML file.
 - `parse`: Parses the HTML and returns the element structure.
 - `rebuild_html`: Rebuilds the HTML from the element structure.
-- `getElementById`, `getElementByClass`, `querySelector`, `querySelectorAll`: Methods for finding elements in the template.
+- `getElementById`, `getElementById`, `getElementByClass`, `querySelector`, `querySelectorAll`: Methods for finding elements in the template.
 
 ### Router
 The Router class manages the application's routes. It allows:
@@ -85,9 +85,6 @@ The Router class manages the application's routes. It allows:
 ### run
 The `run` function starts the server and runs the application. It accepts the following parameters:
 - `target`: Function that defines the routes.
-- `route`: Initial route (default: `/`).
-- `reload`: Whether to automatically reload on changes (default: `True`).
-- `port`: Server port (default: `8800`).
 
 ## Contribution
 Contributions are welcome! Feel free to open issues and pull requests in the PyWeber repository.

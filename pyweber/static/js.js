@@ -9,8 +9,8 @@ function connectWebSocket() {
         console.log('Connected to WebSocket!');
         socketReady = true;
         while (messageQueue.length > 0) {
-            const message = messageQueue.shift(); // Remove a primeira mensagem da fila
-            socket.send(message); // Envia a mensagem
+            const message = messageQueue.shift();
+            socket.send(message);
         }
     };
 
@@ -53,14 +53,11 @@ function sendEvent(type, event) {
         const encoded = encoder.encode(string);
         let binary = '';
         encoded.forEach(byte => binary += String.fromCharCode(byte));
-        return btoa(binary); // Codifica em base64
+        return btoa(binary);
     }
 
-    // Função para capturar os valores dos campos de entrada e aplicar atributos
     function getFormValues() {
         const values = {};
-
-        // Captura todos os elementos de entrada
         const inputs = document.querySelectorAll('input, textarea, select');
         inputs.forEach(input => {
             const id = input.getAttribute('uuid');
@@ -86,7 +83,6 @@ function sendEvent(type, event) {
                         values[id] = option.value;
                     });
                 } else {
-
                     values[id] = input.value;
                 }
             }
@@ -95,19 +91,15 @@ function sendEvent(type, event) {
         return values;
     }
 
-    // Captura o HTML atual da página
     const DOMBase64 = toBase64(document.documentElement.outerHTML);
-
-    // Obtém o elemento alvo do evento
     const target = event.target instanceof HTMLElement ? event.target : null;
 
-    // Cria o objeto eventData
     const eventData = {
         type: type,
         route: window.location.pathname,
         target_uuid: target ? target.getAttribute("uuid") : null,
-        template: DOMBase64, // HTML já com os atributos atualizados
-        values: toBase64(JSON.stringify(getFormValues())), // Valores dos campos
+        template: DOMBase64,
+        values: toBase64(JSON.stringify(getFormValues())),
         event_data: {
             clientX: event.clientX || null,
             clientY: event.clientY || null,
@@ -120,10 +112,8 @@ function sendEvent(type, event) {
     };
 
     if (socket.readyState === WebSocket.OPEN) {
-        // Se o WebSocket estiver aberto, envia a mensagem diretamente
         socket.send(JSON.stringify(eventData));
     } else {
-        // Se o WebSocket estiver conectando, armazena a mensagem na fila
         messageQueue.push(JSON.stringify(eventData));
         console.log('Aguardando conexão...');
     }

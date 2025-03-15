@@ -4,13 +4,15 @@ from lxml.etree import Element as LXML_Element
 from pyweber.core.elements import Element, Events
 from pyweber.utils.load import LoadStaticFiles, StaticTemplates
 from pyweber.utils.defaults import APP, CONFIGFILE
+from pyweber.utils.types import HTTPStatusCode
 
 class Template:
-    def __init__(self, template: str):
+    def __init__(self, template: str, status_code: int = 200):
         self.__template = self.__read_file(file_path=template)
-        self.__events: dict[str, object] = {}
-        self.__icon: str = CONFIGFILE.config_file()['app'].get('icon', str(APP.ICON.value))
+        self.__events: dict[str, callable] = {}
+        self.__icon: str = self.get_icon()
         self.__root = self.parse_html()
+        self.__status_code = status_code
     
     @property
     def template(self):
@@ -28,8 +30,30 @@ class Template:
         self.__root = value
     
     @property
+    def status_code(self):
+        return self.__status_code
+    
+    @status_code.setter
+    def status_code(self, code: int):
+        if code not in HTTPStatusCode.code_list():
+            raise ValueError(f'The code {code} is not a HttpStatusCode')
+        
+        self.__status_code = code
+
+    @property
     def events(self):
         return self.__events
+
+    def get_icon(self):
+        config = CONFIGFILE.read_file()
+
+        if config:
+            app = config.get('app', None)
+
+            if app:
+                return app.get('icon', None) or str(APP.ICON.value)
+        
+        return str(APP.ICON.value)
     
     def parse_html(self, html: str = None):
         if not html:

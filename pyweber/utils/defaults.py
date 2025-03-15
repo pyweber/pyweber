@@ -30,9 +30,10 @@ class SESSION(Enum):
 
 class CONFIGFILE:
     @staticmethod
-    def config_file() -> dict[str, dict[str, str]]:
+    def read_file(path: str = Path('.pyweber', 'config.json')) -> dict[str, dict[str, str]]:
         try:
-            with open(Path('.pyweber') / 'config.json', 'r') as file:
+            with open(file=path, mode='r', encoding='utf-8') as file:
                 return json.load(file)
+        
         except:
-            return {'app': {}, 'server': {}, 'session': {}}
+            return {}
