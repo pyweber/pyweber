@@ -1,9 +1,9 @@
 from pyweber.core.template import Template
 from pyweber.router.response import ResponseBuilder
 from pyweber.utils.load import StaticTemplates, LoadStaticFiles
-from pyweber.utils.request import Request
+from pyweber.router.request import Request
 from pyweber.utils.exceptions import *
-from pyweber.utils.request import Request
+from pyweber.router.request import Request
 from pyweber.utils.types import HTTPStatusCode, ContentTypes
 import webbrowser
 import requests

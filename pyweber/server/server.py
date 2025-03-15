@@ -3,7 +3,7 @@ import select
 from uuid import uuid4
 from threading import Thread
 from pyweber.router.router import Router
-from pyweber.utils.request import Request
+from pyweber.router.request import Request
 
 class Server:
     def __init__(self, router: Router):

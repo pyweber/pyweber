@@ -3,7 +3,7 @@ import lxml.html as HTMLPARSER
 from lxml.etree import Element as LXML_Element
 from pyweber.core.elements import Element, Events
 from pyweber.utils.load import LoadStaticFiles, StaticTemplates
-from pyweber.utils.defaults import APP, CONFIGFILE
+from pyweber.config.config import config
 from pyweber.utils.types import HTTPStatusCode
 
 class Template:
@@ -45,15 +45,7 @@ class Template:
         return self.__events
 
     def get_icon(self):
-        config = CONFIGFILE.read_file()
-
-        if config:
-            app = config.get('app', None)
-
-            if app:
-                return app.get('icon', None) or str(APP.ICON.value)
-        
-        return str(APP.ICON.value)
+        return str(config['app'].get('icon'))
     
     def parse_html(self, html: str = None):
         if not html:
@@ -84,7 +76,7 @@ class Template:
                     name='link',
                     attrs={
                         'rel': 'icon',
-                        'href': f'/{self.__icon if self.__icon.strip() else APP.ICON.value}'.replace('\\', '/'),
+                        'href': f'/{self.__icon.strip()}'.replace('\\', '/'),
                     }
                 )
             )

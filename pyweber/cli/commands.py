@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime
 from pyweber import __version__
 from pyweber.utils.load import StaticTemplates
-from pyweber.utils.defaults import APP, SERVER, SESSION
+from pyweber.config.config import config
 
 class CLI:
     def __init__(self):
@@ -106,6 +106,8 @@ class CommandFunctions:
                 self.create_path(path=path)
                 
                 if i == len(project_paths) - 1:
+                    config['app']['name'] = project_name
+                    config['app']['description'] = f'A {project_name} builded with pyweber framework'
                     self.create_config_file(str(path / file_contents[i][0]))
                 
                 else:
@@ -155,50 +157,13 @@ class CommandFunctions:
             )
     
     def inserting_config_info(self, file_path: str):
-        config = self.read_config_file(file_path=file_path)
-        config['app'] = {
-            'name': self.project_name.name,
-            'version': APP.VERSION.value,
-            'description': f'A powerful {self.project_name.name} made with pyweber',
-            'icon': ''
-        }
-        config['server'] = {
-            'host': SERVER.HOST.value,
-            'port': SERVER.PORT.value,
-            "route": SERVER.ROUTE.value
-        }
-        config['database'] = {
-            'type': 'sqlite',
-            'name': 'database',
-            'username': '',
-            'password': '',
-            'host': '',
-            'port': ''
-        }
-        config['session'] = {
-            'secret_key': SESSION.SECRET_KEY.value,
-            'timeout': SESSION.TIME_OUT.value,
-            'reload_mode': SESSION.RELOAD_MODE.value,
-            'enviroment': SESSION.ENVIROMENT.value
-        }
-
         with open(file_path, 'w') as file:
-            json.dump(config, file, indent=4, ensure_ascii=False)
+            json.dump(config.config, file, indent=4, ensure_ascii=False)
     
     def update_reload_mode(self, file_path: str, value: bool):
-        config = self.read_config_file(file_path=file_path)
-        if config:
-            config['session']['reload_mode'] = value
-            with open(file_path, 'w') as file:
-                json.dump(config, fp=file, indent=4, ensure_ascii=False)
-    
-    def read_config_file(self, file_path: str) -> dict[str, str]:
-        try:
-            with open(file_path, 'r') as file:
-                return json.load(file)
-        
-        except:
-            return {}
+        config['session']['reload_mode'] = value
+        with open(file_path, 'w') as file:
+            json.dump(config.config, fp=file, indent=4, ensure_ascii=False)
     
     def create_config_file(self, file_path: str):
         with open(file_path, 'w') as file:

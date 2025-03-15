@@ -1,5 +1,6 @@
 from pyweber.utils.types import ContentTypes, HTTPStatusCode
-from pyweber.utils.request import Request
+from pyweber.router.request import Request
+from pyweber.config.config import config
 
 class ResponseBuilder:
     def __init__(self, request: Request, response_content: bytes, code: int, cookies: list[str], response_type: ContentTypes, route: str):
@@ -38,7 +39,7 @@ class ResponseBuilder:
         
         if http_code.startswith('4'):
             if http_code.startswith('401'):
-                return f'{http_code}\r\nWWW-Authenticate: Basic realm=PyweberApp'
+                return f'{http_code}\r\nWWW-Authenticate: Basic realm={config['app'].get('name')}'
             
             if http_code.startswith('405'):
                 return f'{http_code}\r\nAllow: GET, POST, PUT, DELETE'
