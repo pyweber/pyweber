@@ -25,7 +25,7 @@ __all__ = [
     'run'
 ]
 
-__version__ = '0.5.2'
+__version__ = '0.6.0'
 
 class run:
     def __init__(self, target: callable = None):
