@@ -61,7 +61,7 @@ class CLI:
             elif args.command == 'create-new':
                 self.commands_funcs.create(args.project_name)
             
-            elif args.command == 'run':
+            elif args.command in ['run', '-r']:
                 self.commands_funcs.run_app(file=args.file, reload=args.reload)
             
             else:

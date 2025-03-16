@@ -78,7 +78,7 @@ class PyweberConfig:
                 'name': 'Pyweber App',
                 'version': '0.1.0',
                 'description': 'A powerfull app made with pyweber framework',
-                'icon': str(Path('src', 'assets', 'favicon.ico'))
+                'icon': '/_pyweber/static/favicon.ico'
             },
             'server': {
                 'host': '0.0.0.0',

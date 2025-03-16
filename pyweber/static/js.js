@@ -3,7 +3,10 @@ let socketReady = false;
 let messageQueue = [];
 
 function connectWebSocket() {
-    socket = new WebSocket('ws://localhost:8765');
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.hostname;
+    const wsPort = window.PYWEBER_WS_PORT || 8765;
+    socket = new WebSocket(`${wsProtocol}//${wsHost}:${wsPort}`);
 
     socket.onopen = function() {
         console.log('Connected to WebSocket!');

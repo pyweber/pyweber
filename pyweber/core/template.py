@@ -2,7 +2,7 @@ import os
 import lxml.html as HTMLPARSER
 from lxml.etree import Element as LXML_Element
 from pyweber.core.elements import Element, Events
-from pyweber.utils.load import LoadStaticFiles, StaticTemplates
+from pyweber.utils.load import LoadStaticFiles
 from pyweber.config.config import config
 from pyweber.utils.types import HTTPStatusCode
 
@@ -53,30 +53,45 @@ class Template:
         
         root = self.__parse_html(html=html)
 
-        if (not self.querySelector(selector='script', element=root.childs[-1])
-            or 'ws://localhost:8765' not in self.querySelector(selector='script', element=root.childs[-1]).content
-        ):
-            root.childs[-1].childs.append(
-                Element(
-                    name='script',
-                    content=StaticTemplates.JS_STATIC()
-                )
-            )
-        
-        not_icon = False
+        has_websocket_script, has_icon = False, False
         for child in root.childs[0].childs:
+            if child.name == 'script' and child.attrs.get('src', None) == '/_pyweber/static/js.js':
+                has_websocket_script = True
+
             if child.name == 'link':
                 if 'icon' in list(child.attrs.values()):
-                    not_icon = True
-                    break
+                    has_icon = True
+            
+            if has_icon and has_websocket_script:
+                break
         
-        if not not_icon:
+        if not has_websocket_script:
+            root.childs[0].childs.extend(
+                [
+                    Element(
+                        name='script',
+                        content=f"window.PYWEBER_WS_PORT = {config['websocket'].get('port')}",
+                        attrs={
+                            'type': 'text/javascript'
+                        }
+                    ),
+                    Element(
+                        name='script',
+                        attrs={
+                            'src': '/_pyweber/static/js.js',
+                            'type': 'text/javascript'
+                        }
+                    )
+                ]
+            )
+
+        if not has_icon:
             root.childs[0].childs.append(
                 Element(
                     name='link',
                     attrs={
                         'rel': 'icon',
-                        'href': f'/{self.__icon.strip()}'.replace('\\', '/'),
+                        'href': f'{self.__icon.strip()}'.replace('\\', '/'),
                     }
                 )
             )
@@ -123,7 +138,7 @@ class Template:
 
         results = []
 
-        if element.class_name and class_name in element.class_name.split():
+        if element.classes and class_name in element.classes:
             results.append(element)
 
         for child in element.childs:
@@ -163,7 +178,7 @@ class Template:
         if selector.startswith('#'):
             return element.id == selector[1:]
         elif selector.startswith('.'):
-            return element.class_name and selector[1:] in element.class_name.split()
+            return element.classes and selector[1:] in element.classes
         else:
             return element.name == selector
     
@@ -189,7 +204,21 @@ class Template:
         
         name = HTMLElement.tag
         id = HTMLElement.attrib.pop('id', None)
-        class_name = HTMLElement.attrib.pop('class', None)
+
+        class_str = HTMLElement.attrib.pop('class', None)
+        classes = class_str.split() if class_str else []
+
+        style_str: str = HTMLElement.attrib.pop('style', None)
+        style_dict = {}
+
+        if style_str:
+            style_pair = [s.strip() for s in style_str.split(';') if s.strip()]
+
+            for pair in style_pair:
+                if ':' in pair:
+                    key, value = pair.split(':', 1)
+                    style_dict[key.strip()] = value.strip()
+
         parent = parent
         value = HTMLElement.attrib.pop('value', None)
         uuid = HTMLElement.attrib.pop('uuid', None)
@@ -205,12 +234,13 @@ class Template:
         element = Element(
             name=name,
             id=id,
-            class_name=class_name,
+            classes=classes,
             parent=parent,
             value=value,
             content=content,
             events=event_obj,
             uuid=uuid,
+            style=style_dict,
             attrs=HTMLElement.attrib
         )
 
@@ -230,11 +260,15 @@ class Template:
 
         if element.id:
             html += f' id="{element.id}"'
-        if element.class_name:
-            html += f' class="{element.class_name}"'
+        if element.classes and len(element.classes) > 0:
+            html += f' class="{" ".join(element.classes)}"'
         if element.value:
             html += f' value="{element.value}"'
 
+        if element.style and len(element.style) > 0:
+            style_str = '; '.join([f"{key}: {value}" for key, value in element.style.items()])
+            html += f' style="{style_str}"'
+            
         for key, value in element.attrs.items():
             html += f' {key}{f'="{value}"' if value else ''}'
 
@@ -251,7 +285,7 @@ class Template:
         
         html += '>'
         
-        final_content = (element.content or '').strip()
+        final_content = str((element.content or '')).strip()
         has_children = bool(element.childs)
         
         if has_children or '\n' in final_content:

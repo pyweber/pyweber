@@ -4,10 +4,10 @@ from pyweber.utils.load import StaticTemplates, LoadStaticFiles
 from pyweber.router.request import Request
 from pyweber.utils.exceptions import *
 from pyweber.router.request import Request
-from pyweber.utils.types import HTTPStatusCode, ContentTypes
+from pyweber.utils.types import ContentTypes, StaticFilePath
 import webbrowser
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
 class Router:
     def __init__(self, update_handler: callable):
@@ -18,10 +18,11 @@ class Router:
         self.__page_unauthorized = Template(template=StaticTemplates.PAGE_UNAUTHORIZED(), status_code=401)
         self.__middleware: list[callable] = []
         self.__cookies: list[str] = []
+        self.__serve_static_framework_files
     
     @property
     def list_routes(self) -> list[str]:
-        return list(self.__routes.keys())
+        return [key for key in self.__routes if '_pyweber' not in key]
     
     @property
     def clear_routes(self) -> None:
@@ -131,7 +132,10 @@ class Router:
         
         if '.' in request.path.split('/')[-1]:
             try:
-                resp = LoadStaticFiles(request.path).load
+                if request.path in self.__routes:
+                    resp = LoadStaticFiles(self.__routes.get(request.path)).load
+                else:
+                    resp = LoadStaticFiles(request.path).load
 
                 return ResponseBuilder(
                     request=request,
@@ -257,3 +261,8 @@ class Router:
     
     def update(self):
         return self.__update_handler()
+    
+    @property
+    def __serve_static_framework_files(self):
+        self.__routes['/_pyweber/static/js.js'] = str(StaticFilePath.js_base.value)
+        self.__routes['/_pyweber/static/favicon.ico'] = str(StaticFilePath.favicon_path.value.joinpath('favicon.ico'))
