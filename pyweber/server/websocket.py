@@ -76,10 +76,14 @@ class WsManager:
             values = json.loads(b64decode(self.__event['values']).decode())
             last_template = self.__router.get_template(route=self.__event['route'])
 
+            # Criar o novo elemento raiz
             new_element = last_template.parse_html(html=html)
             self.insert_values(values=values, element=new_element)
+            self.update_template_reference(template=last_template, element=new_element)
+
+            # Atualizar o template
             last_template.root = new_element
-        
+
         except RouteNotFoundError:
             last_template = self.__router.page_not_found
 
@@ -94,6 +98,12 @@ class WsManager:
     def update_event(self, event: dict[str, (str, dict, list)], template: Template):
         event['template'] = template
         return event
+    
+    def update_template_reference(self, template: Template, element: Element):
+        element.template = template
+
+        for child in element.childs:
+            child.template = template
     
     def event_handler(self):
         return EventConstrutor(

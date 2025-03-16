@@ -241,7 +241,8 @@ class Template:
             events=event_obj,
             uuid=uuid,
             style=style_dict,
-            attrs=HTMLElement.attrib
+            attrs=dict(HTMLElement.attrib),
+            template=self
         )
 
         if parent:

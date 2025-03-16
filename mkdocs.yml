@@ -1,0 +1,32 @@
+site_name: PyWeber Documentation
+theme:
+  name: material
+  features:
+    - navigation.instant  # Enables fast page loading
+    - navigation.tracking # Keeps track of active section
+    - navigation.sections # Groups sections
+    - navigation.expand   # Expands menu by default
+    - toc.integrate       # Integrates TOC in the sidebar
+    - search.suggest      # Suggests results while typing
+    - search.highlight    # Highlights search terms
+    - content.code.copy   # Adds copy button to code blocks
+  extra:
+    favicon: images/favicon.ico
+
+nav:
+  - Introdution: index.md
+  - Getting started: installation.md
+  - Router: router.md
+  - Template: template.md
+  - Element: element.md
+  - Event Handlers: events.md
+  - CLI: cli.md
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - pymdownx.highlight  # Syntax highlighting for code
+  - pymdownx.emoji      # Enables emojis
+  - pymdownx.superfences # Supports advanced code block formatting
+  - admonition          # Enables note, warning, and tip boxes
+  - pymdownx.details    # Allows collapsible details sections

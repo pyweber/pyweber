@@ -2,6 +2,7 @@ import uuid as UUID
 from pyweber.utils.types import Events, EventType
 
 class Element:
+
     def __init__(
         self,
         name: str,
@@ -15,10 +16,11 @@ class Element:
         childs: list['Element'] = None,
         events: Events = None,
         uuid: str = None,
+        template = None
     ):
+        self.__uuid = uuid or str(UUID.uuid4())
         self.__name = name
         self.__id = id
-        self.__uuid = uuid or str(UUID.uuid4())
         self.__content = content
         self.__value = value
         self.__parent = parent
@@ -27,7 +29,16 @@ class Element:
         self.__childs = childs if childs else []
         self.__classes = classes if classes else []
         self.__events = events if events else Events()
-
+        self.__template = template
+    
+    @property
+    def template(self):
+        return self.__template
+    
+    @template.setter
+    def template(self, template):
+        self.__template = template
+    
     # Name property
     @property
     def name(self) -> str:
@@ -63,7 +74,6 @@ class Element:
             raise TypeError("UUID must be a string")
         if not value.strip():
             raise ValueError("UUID cannot be empty")
-        self.__uuid = value
 
     @property
     def classes(self) -> list:
@@ -138,7 +148,7 @@ class Element:
     @value.setter
     def value(self, value):
         if value is None:
-            self.__value = None
+            self.__value = value
         else:
             # Converter automaticamente para string
             try:
@@ -282,10 +292,10 @@ class Element:
 
     @events.setter
     def events(self, value: Events):
-        if not isinstance(value, Events):
+        if value and not isinstance(value, Events):
             raise TypeError('Events must be an Events instance')
 
-        self.__events = value
+        self.__events = value or Events()
 
     def add_event(self, event_type: EventType, event: callable):
         """Adds an event listener to the element."""
