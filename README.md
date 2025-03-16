@@ -158,10 +158,10 @@ PyWeber bridges the gap between backend and frontend development by allowing Pyt
 
 ## Next Steps
 
-- [Installation Guide](installation.md)
-- [CLI Documentation](cli.md)
-- [Template System](template.md)
-- [Router Documentation](router.md)
+- [Installation Guide](docs/installation.md)
+- [CLI Documentation](docs/cli.md)
+- [Template System](docs/template.md)
+- [Router Documentation](docs/router.md)
 - [Examples](https://github.com/pyweber/pyweber-examples.git)
 
 ## Community and Support
