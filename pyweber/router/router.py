@@ -4,6 +4,7 @@ from pyweber.utils.load import StaticTemplates, LoadStaticFiles
 from pyweber.router.request import Request
 from pyweber.utils.exceptions import *
 from pyweber.router.request import Request
+from pyweber.core.window import Window
 from pyweber.utils.types import ContentTypes, StaticFilePath
 import webbrowser
 import requests
@@ -14,11 +15,12 @@ class Router:
         self.__routes: dict[str, Template] = {}
         self.__redirects: dict[str, str] = {}
         self.__update_handler = update_handler
-        self.__page_not_found = Template(template=StaticTemplates.PAGE_NOT_FOUND(), status_code=404)
-        self.__page_unauthorized = Template(template=StaticTemplates.PAGE_UNAUTHORIZED(), status_code=401)
         self.__middleware: list[callable] = []
         self.__cookies: list[str] = []
         self.__serve_static_framework_files
+        self.page_unauthorized = Template(template=StaticTemplates.PAGE_UNAUTHORIZED(), status_code=401)
+        self.page_not_found = Template(template=StaticTemplates.PAGE_NOT_FOUND(), status_code=404)
+        self.window = Window()
     
     @property
     def list_routes(self) -> list[str]:
@@ -37,14 +39,14 @@ class Router:
         return self.__page_unauthorized
     
     @page_unauthorized.setter
-    def page_unauthorized(self, template: Template):
+    def page_unauthorized(self, template: Template = None):
         if not isinstance(template, Template):
             raise InvalidTemplateError()
 
-        self.page_unauthorized = template
+        self.__page_unauthorized = template
     
     @page_not_found.setter
-    def page_not_found(self, template: Template):
+    def page_not_found(self, template: Template = None):
         if not isinstance(template, Template):
             raise InvalidTemplateError()
 

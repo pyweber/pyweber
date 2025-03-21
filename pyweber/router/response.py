@@ -1,6 +1,7 @@
 from pyweber.utils.types import ContentTypes, HTTPStatusCode
 from pyweber.router.request import Request
 from pyweber.config.config import config
+from pyweber.utils.utils import print_line, Colors
 
 class ResponseBuilder:
     def __init__(self, request: Request, response_content: bytes, code: int, cookies: list[str], response_type: ContentTypes, route: str):
@@ -26,7 +27,7 @@ class ResponseBuilder:
         
         response += '\r\n'
 
-        print(f'{self.request._get_line_method_} {self.status_code}')
+        print_line(text=f'{self.request._get_line_method_} {self.status_code}')
 
         return response.encode() + self.response_content
     

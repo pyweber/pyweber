@@ -1,3 +1,4 @@
 websockets
 watchdog
 lxml
+requests

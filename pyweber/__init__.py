@@ -12,7 +12,7 @@ import importlib
 from threading import Thread
 
 # core components
-from .core.elements import Element
+from .core.element import Element
 from .core.template import Template
 
 # router components
@@ -25,7 +25,7 @@ from .server.reload import ReloadServer
 
 # events components
 from .utils.events import EventHandler
-from .utils.types import Events, EventType
+from .utils.types import Events, EventType, HTMLTag
 
 # Utility, Helpers and Exceptions
 from .utils.types import JWTAlgorithms
@@ -33,13 +33,14 @@ from .config.config import config
 from .utils.exceptions import *
 
 # version information
-__version__ = '0.7.0'
+__version__ = '0.8.0'
 
 __all__ = [
     'Template',
     'Element',
     'EventType',
     'Events',
+    'HTMLTag',
     'JWTAlgorithms',
     'EventHandler',
     'Router',
@@ -102,11 +103,11 @@ class SetupApplication:
             host=config['server'].get('host')
         )
     
+
     def import_module(self):
         try:
             module = importlib.import_module(self.__target_module)
             importlib.reload(module=module)
-
             return module
         
         except ImportError as e:
@@ -136,5 +137,4 @@ class SetupApplication:
             getattr(self.__module, self.__target_function.__name__)(self.__router)
     
     def update(self):
-        print('♻  Reload server routes...')
         self.load_target()

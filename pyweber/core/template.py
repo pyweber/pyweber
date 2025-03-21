@@ -1,10 +1,10 @@
 import os
 import lxml.html as HTMLPARSER
 from lxml.etree import Element as LXML_Element
-from pyweber.core.elements import Element, Events
+from pyweber.core.element import Element, Events
 from pyweber.utils.load import LoadStaticFiles
 from pyweber.config.config import config
-from pyweber.utils.types import HTTPStatusCode
+from pyweber.utils.types import HTTPStatusCode, NonSelfClosingHTMLTags
 
 class Template:
     def __init__(self, template: str, status_code: int = 200):
@@ -24,7 +24,7 @@ class Template:
     
     @root.setter
     def root(self, value: Element):
-        if value.name != 'html':
+        if value.tag != 'html':
             raise ValueError('This Element is not valid to root. Please add the Html Element')
         
         self.__root = value
@@ -55,10 +55,10 @@ class Template:
 
         has_websocket_script, has_icon = False, False
         for child in root.childs[0].childs:
-            if child.name == 'script' and child.attrs.get('src', None) == '/_pyweber/static/js.js':
+            if child.tag == 'script' and child.attrs.get('src', None) == '/_pyweber/static/js.js':
                 has_websocket_script = True
 
-            if child.name == 'link':
+            if child.tag == 'link':
                 if 'icon' in list(child.attrs.values()):
                     has_icon = True
             
@@ -66,34 +66,40 @@ class Template:
                 break
         
         if not has_websocket_script:
+            el_1 = Element(
+                tag='script',
+                content=f"window.PYWEBER_WS_PORT = {config['websocket'].get('port')}",
+                attrs={
+                    'type': 'text/javascript'
+                }
+            )
+            el_2 = Element(
+                tag='script',
+                attrs={
+                    'src': '/_pyweber/static/js.js',
+                    'type': 'text/javascript'
+                }
+            )
+            el_3 = Element(
+                tag='link',
+                attrs={
+                    'rel': 'icon',
+                    'href': f'{self.__icon.strip()}'.replace('\\', '/'),
+                }
+            )
+
+            el_1.uuid, el_2.uuid, el_3.uuid = None, None, None
+
             root.childs[0].childs.extend(
                 [
-                    Element(
-                        name='script',
-                        content=f"window.PYWEBER_WS_PORT = {config['websocket'].get('port')}",
-                        attrs={
-                            'type': 'text/javascript'
-                        }
-                    ),
-                    Element(
-                        name='script',
-                        attrs={
-                            'src': '/_pyweber/static/js.js',
-                            'type': 'text/javascript'
-                        }
-                    )
+                    el_1,
+                    el_2
                 ]
             )
 
         if not has_icon:
             root.childs[0].childs.append(
-                Element(
-                    name='link',
-                    attrs={
-                        'rel': 'icon',
-                        'href': f'{self.__icon.strip()}'.replace('\\', '/'),
-                    }
-                )
+                el_3
             )
         
         return root
@@ -180,7 +186,7 @@ class Template:
         elif selector.startswith('.'):
             return element.classes and selector[1:] in element.classes
         else:
-            return element.name == selector
+            return element.tag == selector
     
     def __parse_html(self, html: str) -> Element:
         if not html.replace('<!DOCTYPE html>', '').strip().startswith('<html'):
@@ -222,7 +228,7 @@ class Template:
         parent = parent
         value = HTMLElement.attrib.pop('value', None)
         uuid = HTMLElement.attrib.pop('uuid', None)
-        content = HTMLElement.text.strip() if HTMLElement.text else None
+        content = HTMLElement.text if HTMLElement.text else None
         events_dict = {key[1:]: HTMLElement.attrib.pop(key) for key in HTMLElement.attrib if key.startswith('_on')}
         childrens: list[HTMLPARSER.HtmlElement] = HTMLElement.getchildren()
         
@@ -232,23 +238,23 @@ class Template:
                 setattr(event_obj, key, value)
 
         element = Element(
-            name=name,
+            tag=name,
             id=id,
             classes=classes,
-            parent=parent,
             value=value,
             content=content,
             events=event_obj,
-            uuid=uuid,
             style=style_dict,
-            attrs=dict(HTMLElement.attrib),
-            template=self
+            attrs=dict(HTMLElement.attrib)
         )
+        element.parent = parent
+        element.template = self
+        element.uuid = uuid
 
         if parent:
             if gettail(HTMLElement.tail):
-                parent.content = parent.content if parent.content else ''
-                parent.content += f" «{element.uuid}»{gettail(HTMLElement.tail)}"
+                parent.content = parent.content or ''
+                parent.content += f"{{{element.uuid}}} {gettail(HTMLElement.tail)}"
 
         for child in childrens:
             element.childs.append(self.__create_element(child, element))
@@ -257,7 +263,7 @@ class Template:
     
     def __build_html(self, element: Element, indent: int = 0) -> str:
         indentation = ' ' * indent
-        html = f'{indentation}<{element.name} uuid="{element.uuid}"'
+        html = f'{indentation}<{element.tag} uuid="{element.uuid}"'
 
         if element.id:
             html += f' id="{element.id}"'
@@ -281,12 +287,12 @@ class Template:
                 else:
                     raise ValueError(f'Event {value} is an invalid callable ou event_id')
             
-        if not element.content and not element.childs and element.name != 'script':
+        if not element.content and not element.childs and element.tag not in NonSelfClosingHTMLTags.non_autoclosing_tags():
             return html + '>'
         
         html += '>'
         
-        final_content = str((element.content or '')).strip()
+        final_content = str((element.content or ''))
         has_children = bool(element.childs)
         
         if has_children or '\n' in final_content:
@@ -294,10 +300,10 @@ class Template:
         
         for child in element.childs:
             child_html = self.__build_html(child, indent + 4)
-            uuid_placeholder = f' «{child.uuid}»'
+            uuid_placeholder = f'{{{child.uuid}}}'
             
             if uuid_placeholder in final_content:
-                final_content = final_content.replace(uuid_placeholder, child_html.strip())
+                final_content = final_content.replace(uuid_placeholder, child_html)
             else:
                 final_content += '\n' + child_html
         
@@ -307,7 +313,7 @@ class Template:
             else:
                 html += final_content.strip()
         
-        html += f'</{element.name}>'
+        html += f'</{element.tag}>'
         
         return html
 

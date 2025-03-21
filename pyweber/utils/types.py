@@ -2,6 +2,13 @@ from enum import Enum
 import os
 from importlib.resources import files
 
+class Colors(Enum):
+    RESET = "\033[0m"
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+
 class JWTAlgorithms(Enum):
     HS256 = 'HS256'
     HS384 = 'HS384'
@@ -77,7 +84,10 @@ class WebSocketStatusCode(Enum):
     
     def search_by_code(code: int):
         for value in WebSocketStatusCode:
-            return value.value if str(code) in value.value else WebSocketStatusCode.INTERNAL_SERVER_ERROR.value
+            if str(code) in value.value:
+                return value.value
+        
+        return WebSocketStatusCode.INTERNAL_SERVER_ERROR.value
 
 class HTTPStatusCode(Enum):
     # Informational Responses (1xx)
@@ -217,6 +227,315 @@ class EventType(Enum):
     TOUCHEND = "ontouchend"
     TOUCHCANCEL = "ontouchcancel"
 
+from enum import Enum
+
+class WindowEventType(Enum):
+    # Eventos de Janela e Navegação
+    AFTER_PRINT = "onafterprint"
+    BEFORE_PRINT = "onbeforeprint"
+    BEFORE_UNLOAD = "onbeforeunload"
+    HASH_CHANGE = "onhashchange"
+    LOAD = "onload"
+    UNLOAD = "onunload"
+    PAGE_SHOW = "onpageshow"
+    PAGE_HIDE = "onpagehide"
+    POP_STATE = "onpopstate"
+    DOM_CONTENT_LOADED = "onDOMContentLoaded"
+
+    # Eventos de Rede
+    ONLINE = "ononline"
+    OFFLINE = "onoffline"
+
+    # Eventos de Armazenamento
+    STORAGE = "onstorage"
+
+    # Eventos de Mensagens e Comunicação
+    MESSAGE = "onmessage"
+    MESSAGE_ERROR = "onmessageerror"
+
+    # Eventos de Animação e Transição
+    ANIMATION_START = "onanimationstart"
+    ANIMATION_END = "onanimationend"
+    ANIMATION_ITERATION = "onanimationiteration"
+    TRANSITION_START = "ontransitionstart"
+    TRANSITION_END = "ontransitionend"
+    TRANSITION_CANCEL = "ontransitioncancel"
+
+    # Eventos de Fullscreen e Pointer Lock
+    FULLSCREEN_CHANGE = "onfullscreenchange"
+    FULLSCREEN_ERROR = "onfullscreenerror"
+    POINTER_LOCK_CHANGE = "onpointerlockchange"
+    POINTER_LOCK_ERROR = "onpointerlockerror"
+
+    # Eventos de Dispositivo
+    DEVICE_MOTION = "ondevicemotion"
+    DEVICE_ORIENTATION = "ondeviceorientation"
+    DEVICE_ORIENTATION_ABSOLUTE = "ondeviceorientationabsolute"
+    ORIENTATION_CHANGE = "onorientationchange"
+
+    # Eventos de Gamepad
+    GAMEPAD_CONNECTED = "ongamepadconnected"
+    GAMEPAD_DISCONNECTED = "ongamepaddisconnected"
+
+    # Eventos de VR
+    VR_DISPLAY_CONNECT = "onvrdisplayconnect"
+    VR_DISPLAY_DISCONNECT = "onvrdisplaydisconnect"
+    VR_DISPLAY_PRESENT_CHANGE = "onvrdisplaypresentchange"
+    VR_DISPLAY_ACTIVATE = "onvrdisplayactivate"
+    VR_DISPLAY_DEACTIVATE = "onvrdisplaydeactivate"
+    VR_DISPLAY_BLUR = "onvrdisplayblur"
+    VR_DISPLAY_FOCUS = "onvrdisplayfocus"
+    VR_DISPLAY_POINTER_RESTRICTED = "onvrdisplaypointerrestricted"
+    VR_DISPLAY_POINTER_UNRESTRICTED = "onvrdisplaypointerunrestricted"
+
+    # Eventos de Service Worker e Cache
+    INSTALL = "oninstall"
+    ACTIVATE = "onactivate"
+    FETCH = "onfetch"
+    NOTIFICATION_CLICK = "onnotificationclick"
+    NOTIFICATION_CLOSE = "onnotificationclose"
+    PUSH = "onpush"
+    PUSH_SUBSCRIPTION_CHANGE = "onpushsubscriptionchange"
+    SYNC = "onsync"
+    PERIODIC_SYNC = "onperiodicsync"
+    BACKGROUND_FETCH_SUCCESS = "onbackgroundfetchsuccess"
+    BACKGROUND_FETCH_FAILURE = "onbackgroundfetchfailure"
+    BACKGROUND_FETCH_ABORT = "onbackgroundfetchabort"
+    BACKGROUND_FETCH_CLICK = "onbackgroundfetchclick"
+    CONTENT_DELETE = "oncontentdelete"
+
+    # Eventos de Clipboard
+    CUT = "oncut"
+    COPY = "oncopy"
+    PASTE = "onpaste"
+
+    # Eventos de Seleção de Texto
+    SELECTION_CHANGE = "onselectionchange"
+
+    # Eventos de Visibilidade
+    VISIBILITY_CHANGE = "onvisibilitychange"
+
+    # Eventos de Rejeição de Promises
+    REJECTION_HANDLED = "onrejectionhandled"
+    UNHANDLED_REJECTION = "onunhandledrejection"
+
+    # Eventos de Segurança
+    SECURITY_POLICY_VIOLATION = "onsecuritypolicyviolation"
+
+class HTMLTag(Enum):
+    # Tags Semânticas e de Estruturação
+    html = "html"
+    head = "head"
+    body = "body"
+    title = "title"
+    script = "script"
+    noscript = "noscript"
+    section = "section"
+    nav = "nav"
+    article = "article"
+    aside = "aside"
+    header = "header"
+    footer = "footer"
+    address = "address"
+    main = "main"
+    div = "div"
+    span = "span"
+    
+    # Tags de Formatação de Texto
+    p = "p"
+    h1 = "h1"
+    h2 = "h2"
+    h3 = "h3"
+    h4 = "h4"
+    h5 = "h5"
+    h6 = "h6"
+    b = "b"
+    strong = "strong"
+    i = "i"
+    em = "em"
+    mark = "mark"
+    small = "small"
+    DEL = "del"
+    ins = "ins"
+    sub = "sub"
+    sup = "sup"
+    blockquote = "blockquote"
+    cite = "cite"
+    q = "q"
+    code = "code"
+    pre = "pre"
+    kbd = "kbd"
+    samp = "samp"
+    var = "var"
+    
+    # Tags de Listas
+    ul = "ul"
+    ol = "ol"
+    li = "li"
+    dl = "dl"
+    dt = "dt"
+    dd = "dd"
+    
+    # Tags de Tabelas
+    table = "table"
+    caption = "caption"
+    thead = "thead"
+    tbody = "tbody"
+    tfoot = "tfoot"
+    tr = "tr"
+    th = "th"
+    td = "td"
+    
+    # Tags de Formulário
+    form = "form"
+    label = "label"
+    input = "input"
+    textarea = "textarea"
+    button = "button"
+    fieldset = "fieldset"
+    legend = "legend"
+    select = "select"
+    optgroup = "optgroup"
+    option = "option"
+    datalist = "datalist"
+    output = "output"
+    progress = "progress"
+    meter = "meter"
+    
+    # Tags de Mídia e Integração
+    audio = "audio"
+    video = "video"
+    source = "source"
+    track = "track"
+    object = "object"
+    param = "param"
+    embed = "embed"
+    iframe = "iframe"
+    canvas = "canvas"
+    svg = "svg"
+    math = "math"
+    
+    # Tags de Metadados
+    base = "base"
+    link = "link"
+    meta = "meta"
+    style = "style"
+    
+    # Tags de Conteúdo Interativo
+    details = "details"
+    summary = "summary"
+    dialog = "dialog"
+    menu = "menu"
+    menuitem = "menuitem"
+
+class NonSelfClosingHTMLTags(Enum):
+    # Tags Semânticas e de Estruturação
+    html = "html"
+    head = "head"
+    body = "body"
+    title = "title"
+    script = "script"
+    style = "style"
+    noscript = "noscript"
+    section = "section"
+    nav = "nav"
+    article = "article"
+    aside = "aside"
+    header = "header"
+    footer = "footer"
+    address = "address"
+    main = "main"
+    div = "div"
+    span = "span"
+    
+    # Tags de Formatação de Texto
+    p = "p"
+    h1 = "h1"
+    h2 = "h2"
+    h3 = "h3"
+    h4 = "h4"
+    h5 = "h5"
+    h6 = "h6"
+    b = "b"
+    strong = "strong"
+    i = "i"
+    em = "em"
+    mark = "mark"
+    small = "small"
+    DEL = "del"
+    ins = "ins"
+    sub = "sub"
+    sup = "sup"
+    blockquote = "blockquote"
+    cite = "cite"
+    q = "q"
+    code = "code"
+    pre = "pre"
+    kbd = "kbd"
+    samp = "samp"
+    var = "var"
+    
+    # Tags de Listas
+    ul = "ul"
+    ol = "ol"
+    li = "li"
+    dl = "dl"
+    dt = "dt"
+    dd = "dd"
+    
+    # Tags de Tabelas
+    table = "table"
+    caption = "caption"
+    thead = "thead"
+    tbody = "tbody"
+    tfoot = "tfoot"
+    tr = "tr"
+    th = "th"
+    td = "td"
+    
+    # Tags de Formulário
+    form = "form"
+    label = "label"
+    textarea = "textarea"
+    button = "button"
+    fieldset = "fieldset"
+    legend = "legend"
+    select = "select"
+    optgroup = "optgroup"
+    option = "option"
+    datalist = "datalist"
+    output = "output"
+    progress = "progress"
+    meter = "meter"
+    
+    # Tags de Mídia e Integração
+    audio = "audio"
+    video = "video"
+    object = "object"
+    iframe = "iframe"
+    canvas = "canvas"
+    svg = "svg"
+    math = "math"
+    
+    # Tags de Conteúdo Interativo
+    details = "details"
+    summary = "summary"
+    dialog = "dialog"
+    menu = "menu"
+    menuitem = "menuitem"
+
+    def non_autoclosing_tags() -> list[str]:
+        return [val.value for val in NonSelfClosingHTMLTags]
+
+class getBy(Enum):
+    tag = 'tag'
+    classes = 'classes'
+    id = 'id'
+    content = 'content'
+    value = 'value'
+    attrs = 'attrs'
+    style = 'style'
+    uuid = 'uuid'
 
 class Events:
     def __init__(
@@ -343,3 +662,195 @@ class Events:
         """Representação legível dos eventos."""
         events = {k: v for k, v in self.__dict__.items() if v is not None}
         return f"Events({events})"
+
+class WindowEvents:
+    def __init__(
+        self,
+        # Eventos de Janela e Navegação
+        onafterprint: callable = None,
+        onbeforeprint: callable = None,
+        onbeforeunload: callable = None,
+        onhashchange: callable = None,
+        onload: callable = None,
+        onunload: callable = None,
+        onpageshow: callable = None,
+        onpagehide: callable = None,
+        onpopstate: callable = None,
+        onDOMContentLoaded: callable = None,
+
+        # Eventos de Rede
+        ononline: callable = None,
+        onoffline: callable = None,
+
+        # Eventos de Armazenamento
+        onstorage: callable = None,
+
+        # Eventos de Mensagens e Comunicação
+        onmessage: callable = None,
+        onmessageerror: callable = None,
+
+        # Eventos de Animação e Transição
+        onanimationstart: callable = None,
+        onanimationend: callable = None,
+        onanimationiteration: callable = None,
+        ontransitionstart: callable = None,
+        ontransitionend: callable = None,
+        ontransitioncancel: callable = None,
+
+        # Eventos de Fullscreen e Pointer Lock
+        onfullscreenchange: callable = None,
+        onfullscreenerror: callable = None,
+        onpointerlockchange: callable = None,
+        onpointerlockerror: callable = None,
+
+        # Eventos de Dispositivo
+        ondevicemotion: callable = None,
+        ondeviceorientation: callable = None,
+        ondeviceorientationabsolute: callable = None,
+        onorientationchange: callable = None,
+
+        # Eventos de Gamepad
+        ongamepadconnected: callable = None,
+        ongamepaddisconnected: callable = None,
+
+        # Eventos de VR
+        onvrdisplayconnect: callable = None,
+        onvrdisplaydisconnect: callable = None,
+        onvrdisplaypresentchange: callable = None,
+        onvrdisplayactivate: callable = None,
+        onvrdisplaydeactivate: callable = None,
+        onvrdisplayblur: callable = None,
+        onvrdisplayfocus: callable = None,
+        onvrdisplaypointerrestricted: callable = None,
+        onvrdisplaypointerunrestricted: callable = None,
+
+        # Eventos de Service Worker e Cache
+        oninstall: callable = None,
+        onactivate: callable = None,
+        onfetch: callable = None,
+        onnotificationclick: callable = None,
+        onnotificationclose: callable = None,
+        onpush: callable = None,
+        onpushsubscriptionchange: callable = None,
+        onsync: callable = None,
+        onperiodicsync: callable = None,
+        onbackgroundfetchsuccess: callable = None,
+        onbackgroundfetchfailure: callable = None,
+        onbackgroundfetchabort: callable = None,
+        onbackgroundfetchclick: callable = None,
+        oncontentdelete: callable = None,
+
+        # Eventos de Clipboard
+        oncut: callable = None,
+        oncopy: callable = None,
+        onpaste: callable = None,
+
+        # Eventos de Seleção de Texto
+        onselectionchange: callable = None,
+
+        # Eventos de Visibilidade
+        onvisibilitychange: callable = None,
+
+        # Eventos de Rejeição de Promises
+        onrejectionhandled: callable = None,
+        onunhandledrejection: callable = None,
+
+        # Eventos de Segurança
+        onsecuritypolicyviolation: callable = None,
+    ):
+        # Eventos de Janela e Navegação
+        self.onafterprint = onafterprint
+        self.onbeforeprint = onbeforeprint
+        self.onbeforeunload = onbeforeunload
+        self.onhashchange = onhashchange
+        self.onload = onload
+        self.onunload = onunload
+        self.onpageshow = onpageshow
+        self.onpagehide = onpagehide
+        self.onpopstate = onpopstate
+        self.onDOMContentLoaded = onDOMContentLoaded
+
+        # Eventos de Rede
+        self.ononline = ononline
+        self.onoffline = onoffline
+
+        # Eventos de Armazenamento
+        self.onstorage = onstorage
+
+        # Eventos de Mensagens e Comunicação
+        self.onmessage = onmessage
+        self.onmessageerror = onmessageerror
+
+        # Eventos de Animação e Transição
+        self.onanimationstart = onanimationstart
+        self.onanimationend = onanimationend
+        self.onanimationiteration = onanimationiteration
+        self.ontransitionstart = ontransitionstart
+        self.ontransitionend = ontransitionend
+        self.ontransitioncancel = ontransitioncancel
+
+        # Eventos de Fullscreen e Pointer Lock
+        self.onfullscreenchange = onfullscreenchange
+        self.onfullscreenerror = onfullscreenerror
+        self.onpointerlockchange = onpointerlockchange
+        self.onpointerlockerror = onpointerlockerror
+
+        # Eventos de Dispositivo
+        self.ondevicemotion = ondevicemotion
+        self.ondeviceorientation = ondeviceorientation
+        self.ondeviceorientationabsolute = ondeviceorientationabsolute
+        self.onorientationchange = onorientationchange
+
+        # Eventos de Gamepad
+        self.ongamepadconnected = ongamepadconnected
+        self.ongamepaddisconnected = ongamepaddisconnected
+
+        # Eventos de VR
+        self.onvrdisplayconnect = onvrdisplayconnect
+        self.onvrdisplaydisconnect = onvrdisplaydisconnect
+        self.onvrdisplaypresentchange = onvrdisplaypresentchange
+        self.onvrdisplayactivate = onvrdisplayactivate
+        self.onvrdisplaydeactivate = onvrdisplaydeactivate
+        self.onvrdisplayblur = onvrdisplayblur
+        self.onvrdisplayfocus = onvrdisplayfocus
+        self.onvrdisplaypointerrestricted = onvrdisplaypointerrestricted
+        self.onvrdisplaypointerunrestricted = onvrdisplaypointerunrestricted
+
+        # Eventos de Service Worker e Cache
+        self.oninstall = oninstall
+        self.onactivate = onactivate
+        self.onfetch = onfetch
+        self.onnotificationclick = onnotificationclick
+        self.onnotificationclose = onnotificationclose
+        self.onpush = onpush
+        self.onpushsubscriptionchange = onpushsubscriptionchange
+        self.onsync = onsync
+        self.onperiodicsync = onperiodicsync
+        self.onbackgroundfetchsuccess = onbackgroundfetchsuccess
+        self.onbackgroundfetchfailure = onbackgroundfetchfailure
+        self.onbackgroundfetchabort = onbackgroundfetchabort
+        self.onbackgroundfetchclick = onbackgroundfetchclick
+        self.oncontentdelete = oncontentdelete
+
+        # Eventos de Clipboard
+        self.oncut = oncut
+        self.oncopy = oncopy
+        self.onpaste = onpaste
+
+        # Eventos de Seleção de Texto
+        self.onselectionchange = onselectionchange
+
+        # Eventos de Visibilidade
+        self.onvisibilitychange = onvisibilitychange
+
+        # Eventos de Rejeição de Promises
+        self.onrejectionhandled = onrejectionhandled
+        self.onunhandledrejection = onunhandledrejection
+
+        # Eventos de Segurança
+        self.onsecuritypolicyviolation = onsecuritypolicyviolation
+
+    def __repr__(self):
+        """Representação legível dos eventos."""
+        events = {k: v for k, v in self.__dict__.items() if v is not None}
+        return f"WindowEvents({events})"

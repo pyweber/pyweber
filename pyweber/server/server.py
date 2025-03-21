@@ -4,6 +4,7 @@ from uuid import uuid4
 from threading import Thread
 from pyweber.router.router import Router
 from pyweber.router.request import Request
+from pyweber.utils.utils import print_line, Colors
 
 class Server:
     def __init__(self, router: Router):
@@ -39,7 +40,7 @@ class Server:
                 pass
 
             url = f'http://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}'
-            print(f'🌐 Servidor rodando em {url}')
+            print_line(text=f'Server online in {Colors.GREEN.value}{url}{Colors.RESET.value}')
             session_id = str(uuid4())
             self.sessions.append(session_id)
 
@@ -55,7 +56,7 @@ class Server:
                             Thread(target=self.handle_response, args=(client_socket, session_id), daemon=True).start()
                     
                 except KeyboardInterrupt:
-                    print('Servidor desligado')
+                    print_line(text='Server offline')
                     break
             
     def run(self, route: str, port: int, host: str):

@@ -3,12 +3,11 @@ import json
 import shutil
 import argparse
 import subprocess
-from time import sleep
 from pathlib import Path
-from datetime import datetime
 from pyweber import __version__
 from pyweber.utils.load import StaticTemplates
 from pyweber.config.config import config
+from pyweber.utils.utils import print_line, Colors
 
 class CLI:
     def __init__(self):
@@ -80,7 +79,7 @@ class CommandFunctions:
 
         if self.project_name.exists():
             self.log_message(
-                message=f'❌ O diretório {project_name} já existe!',
+                message=f'❌ The {project_name} directory already exists!',
                 level='error'
             )
             return
@@ -114,13 +113,13 @@ class CommandFunctions:
                     self.create_static_file(str(path / file_contents[i][0]), file_contents[i][1])
 
             self.log_message(
-                message=f'✅ Projeto {project_name} criado com sucesso!',
+                message=f'✅ Project {project_name} sucessfully created!',
                 level='success'
             )
 
         except FileNotFoundError as e:
             self.log_message(
-                message=f'❌ Erro ao criar o projeto: {e}',
+                message=f'❌ Error to create project: {e}',
                 level='error'
             )
             shutil.rmtree(path=self.project_name, ignore_errors=True)
@@ -129,7 +128,7 @@ class CommandFunctions:
 
         try:
             self.log_message(
-                message=f'✨ Tentando iniciar o projecto',
+                message=f'✨ Trying to start the project',
                 level='warning'
             )
             self.update_reload_mode(file_path=os.path.join('.pyweber', 'config.json'), value=reload)
@@ -146,7 +145,7 @@ class CommandFunctions:
             subprocess.run(['pip', 'install', f'{framework}', '--upgrade'], shell=True, stderr=subprocess.PIPE)
 
             self.log_message(
-                message=f'✅ biblioteca actualizada com sucesso!',
+                message=f'✅ Framework updated sucessfully!',
                 level='warning'
             )
 
@@ -186,17 +185,14 @@ class CommandFunctions:
             file.write(content)
     
     def log_message(self, message: str, level: str = 'info'):
-        time = datetime.now().strftime('%H:%M:%S')
-
         colors = {
-            'info': '\033[94m',
-            'success': '\033[92m',
-            'warning': '\033[93m',
-            'error': '\033[91m'
+            'info': Colors.BLUE.value,
+            'success': Colors.GREEN.value,
+            'warning': Colors.YELLOW.value,
+            'error': Colors.RED.value,
+            'reset': Colors.RESET.value
         }
-        reset = '\033[0m'
-        print(f'{colors.get(level, "")}[{time}] {message}{reset}')
-        sleep(0.25)
+        print_line(f'{colors.get(level, '')}{message}{colors.get('reset')}')
 
 def app():
     cli = CLI()

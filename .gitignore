@@ -1,9 +1,11 @@
 # directories ignored
 build/
 dist/
-tests/
 __pycache__/
 pyweber.egg-info
+.pytest_cache/
+.vscode/
+htmlcov/
 
 # files ignored
 setup.py
