@@ -47,7 +47,7 @@ from pyweber.utils.types import Events
 
 # Create element with events
 button = Element(
-    name="button",
+    tag="button",
     content="Click Me",
     events=Events(
         onclick=handle_click,
@@ -306,14 +306,14 @@ class TodoList(Template):
         if todo_text:
             # Create new todo item
             todo_item = Element(
-                name="li",
+                tag="li",
                 classes=["todo-item"],
                 content=todo_text
             )
 
             # Add delete button
             delete_btn = Element(
-                name="button",
+                tag="button",
                 classes=["delete-btn"],
                 content="×"
             )

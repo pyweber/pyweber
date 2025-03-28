@@ -7,6 +7,7 @@ from pyweber.utils.events import EventConstrutor
 from pyweber.core.template import Template
 from pyweber.core.element import Element
 from pyweber.utils.exceptions import RouteNotFoundError
+from pyweber.utils.utils import print_line
 import inspect
 
 class websockets:
@@ -24,9 +25,10 @@ class websockets:
                 try:
                     if client.open:
                         await client.send('reload')
+                        print_line(text=f'Client id {client.id} updated...')
 
                 except Exception as e:
-                    print(f'Erro ao actualizar cliente: {e}')
+                    print_line(text=f'Error [websocket] 1: {e}')
     
     async def ws_handler(self, websocket: ws.WebSocketClientProtocol, _):
         self.__websocket_clients.add(websocket)
@@ -34,6 +36,9 @@ class websockets:
         try:
             async for message in websocket:
                 await self.handle_message(message, websocket)
+        
+        except Exception as e:
+            print_line(text=f'Error [websocket] 2: {e}')
         
         finally:
             self.__websocket_clients.remove(websocket)
@@ -82,6 +87,24 @@ class websockets:
         
         except Exception as e:
             await self.__ws_client_protocol.send(json.dumps({'Error': str(e)}))
+    
+    def stop_ws_server(self):
+        self.loop.stop()
+
+        pendings = asyncio.all_tasks(self.loop)
+        for task in pendings:
+            task.cancel()
+        
+        self.loop.run_until_complete(asyncio.gather(*pendings, return_exceptions=True))
+        self.loop.close()
+    
+    def restart_ws_server(self):
+        self.stop_ws_server()
+
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+
+        self.loop.run_until_complete(self.ws_start())
 
 class WsManager:
     def __init__(
@@ -106,7 +129,6 @@ class WsManager:
             new_element = last_template.parse_html(html=html)
             self.insert_values(values=values, element=new_element)
             self.update_template_reference(template=last_template, element=new_element)
-            self.update_window()
 
             # Atualizar o template
             last_template.root = new_element

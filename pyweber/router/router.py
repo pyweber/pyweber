@@ -20,6 +20,7 @@ class Router:
         self.__serve_static_framework_files
         self.page_unauthorized = Template(template=StaticTemplates.PAGE_UNAUTHORIZED(), status_code=401)
         self.page_not_found = Template(template=StaticTemplates.PAGE_NOT_FOUND(), status_code=404)
+
         self.window = Window()
     
     @property
@@ -238,7 +239,7 @@ class Router:
         secure: bool = True,
         expires: datetime = None
     ):
-        cookie = f'Set-Cookie: {cookie_name}={cookie_value}; Path={path}'
+        cookie = f'Set-Cookie: {cookie_name}={cookie_value}; Path={path};'
 
         if httponly:
             cookie += ' HttpOnly;'

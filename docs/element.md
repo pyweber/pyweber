@@ -17,7 +17,7 @@ from pyweber.utils.types import Events, EventType
 
 # Create a basic element
 button = Element(
-    name="button",
+    tag="button",
     id="submit-btn",
     classes=["btn", "btn-primary"],
     content="Submit",
@@ -26,11 +26,11 @@ button = Element(
 
 # Create a nested structure
 form = Element(
-    name="form",
+    tag="form",
     id="contact-form",
     childs=[
-        Element(name="input", attrs={"type": "text", "name": "name"}),
-        Element(name="input", attrs={"type": "email", "name": "email"}),
+        Element(tag="input", attrs={"type": "text", "name": "name"}),
+        Element(tag="input", attrs={"type": "email", "name": "email"}),
         button
     ]
 )
@@ -68,7 +68,7 @@ element.attrs["aria-label"] = "Description"
 #### Managing Child Elements
 ```python
 # Add a child element
-new_child = Element(name="span", content="Child text")
+new_child = Element(tag="span", content="Child text")
 parent_element.childs.append(new_child)
 new_child.parent = parent_element
 
@@ -298,14 +298,14 @@ class ContactForm(Template):
 def add_list_item(self, e):
     # Create a new list item
     new_item = Element(
-        name="li",
+        tag="li",
         classes=["list-item"],
         content=f"Item {len(self.list.childs) + 1}"
     )
 
     # Add delete button
     delete_btn = Element(
-        name="button",
+        tag="button",
         classes=["delete-btn"],
         content="×"
     )
@@ -322,21 +322,21 @@ You can create reusable components by extending the Element class:
 ```python
 class Card(Element):
     def __init__(self, title, content, image_url=None):
-        super().__init__(name="div", classes=["card"])
+        super().__init__(tag="div", classes=["card"])
 
         # Create card header
-        header = Element(name="div", classes=["card-header"])
-        header.childs.append(Element(name="h3", content=title))
+        header = Element(tag="div", classes=["card-header"])
+        header.childs.append(Element(tag="h3", content=title))
         self.childs.append(header)
 
         # Add image if provided
         if image_url:
-            img = Element(name="img", attrs={"src": image_url, "alt": title})
+            img = Element(tag="img", attrs={"src": image_url, "alt": title})
             self.childs.append(img)
 
         # Add content
-        body = Element(name="div", classes=["card-body"])
-        body.childs.append(Element(name="p", content=content))
+        body = Element(tag="div", classes=["card-body"])
+        body.childs.append(Element(tag="p", content=content))
         self.childs.append(body)
 ```
 ## Next Steps

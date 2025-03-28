@@ -4,13 +4,23 @@ from pyweber.config.config import config
 from pyweber.utils.utils import print_line, Colors
 
 class ResponseBuilder:
-    def __init__(self, request: Request, response_content: bytes, code: int, cookies: list[str], response_type: ContentTypes, route: str):
+    def __init__(
+        self,
+        request: Request,
+        response_content: bytes,
+        code: int,
+        cookies: list[str],
+        response_type: ContentTypes,
+        route: str,
+        session_id: str = None
+    ):
         self.code = code
         self.response_content = response_content
         self.cookies = cookies
         self.response_type = response_type
         self.request = request
         self.route = route
+        self.session_id = session_id
     
     @property
     def build_respose(self):
@@ -21,10 +31,12 @@ class ResponseBuilder:
             f'Connection: close\r\n'
         )
 
+        if self.session_id:
+            response += f'Session-ID: {self.session_id}\r\n'
+
         if self.cookies:
             for cookie in self.cookies:
                 response += cookie
-        
         response += '\r\n'
 
         print_line(text=f'{self.request._get_line_method_} {self.status_code}')

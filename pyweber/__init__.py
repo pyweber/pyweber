@@ -29,11 +29,12 @@ from .utils.types import Events, EventType, HTMLTag
 
 # Utility, Helpers and Exceptions
 from .utils.types import JWTAlgorithms
+from .utils.utils import print_line
 from .config.config import config
 from .utils.exceptions import *
 
 # version information
-__version__ = '0.8.0'
+__version__ = '0.8.1'
 
 __all__ = [
     'Template',
@@ -85,14 +86,14 @@ class SetupApplication:
         self.__target_function = target
         self.__target_module = os.path.splitext(os.path.basename(sys.argv[0]))[0]
         self.__module = self.import_module()
-        self.__router: Router = self.get_router_instances() or Router(update_handler=self.update)
-        self.__server = Server(router=self.__router)
+        self.__router: Router = self.get_router_instances()
         self.reload_server = ReloadServer(
             host=config['websocket'].get('host'),
             port=config['websocket'].get('port'),
             event=self.update,
             reload=config['session'].get('reload_mode')
         )
+        self.__server = Server()
     
     def run(self):
         self.load_target()
@@ -103,7 +104,6 @@ class SetupApplication:
             host=config['server'].get('host')
         )
     
-
     def import_module(self):
         try:
             module = importlib.import_module(self.__target_module)
@@ -117,24 +117,28 @@ class SetupApplication:
     def get_router_instances(self):
         if not self.__module:
             return None
+        
+        router = Router(update_handler=self.update)
 
         for _, obj in vars(self.__module).items():
             if isinstance(obj, Router):
-                obj._Router__update_handler = self.update
+                obj = router
                 return obj
             
-        return None
+        return router
     
     def load_target(self):
         self.__router.clear_routes
         self.__router.clear_middleware
         self.__module = self.import_module()
-        self.__router = self.get_router_instances() or Router(update_handler=self.update)
-        self.reload_server.websockets.router = self.__router
-        self.__server.router = self.__router
+        self.__router = self.get_router_instances()
 
         if self.__target_function:
             getattr(self.__module, self.__target_function.__name__)(self.__router)
+        
+        self.__server.router = self.__router
+        self.reload_server.websockets.router = self.__router
     
     def update(self):
+        print_line(text='♻  Restaring process again')
         self.load_target()

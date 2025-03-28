@@ -19,7 +19,7 @@ function connectWebSocket() {
     };
 
     socket.onerror = function(error) {
-        console.error('Erro na conexão WebSocket:', error);
+        console.error('Erro with Websocket connection:', error);
     };
 
     socket.onclose = function() {
@@ -181,7 +181,7 @@ function sendEvent(type, event, event_ref) {
         socket.send(JSON.stringify(eventData));
     } else {
         messageQueue.push(JSON.stringify(eventData));
-        console.log('Aguardando conexão...');
+        console.log('Waiting connection...');
     }
 }
 
@@ -212,7 +212,7 @@ function trackEvents() {
 
     const windowEvents = [
         // Eventos de Janela e Navegação
-        "afterprint", "beforeprint", "beforeunload", "hashchange", "load", "unload", "pageshow", "pagehide", "popstate", "resize", "scroll", "DOMContentLoaded",
+        "afterprint", "beforeprint", "beforeunload", "hashchange", "load", "pageshow", "pagehide", "popstate", "resize", "scroll", "DOMContentLoaded",
     
         // Eventos de Foco e Blur
         "focus", "blur",
@@ -236,13 +236,10 @@ function trackEvents() {
         "fullscreenchange", "fullscreenerror", "pointerlockchange", "pointerlockerror",
     
         // Eventos de Dispositivo
-        "devicemotion", "deviceorientation", "deviceorientationabsolute", "orientationchange",
+        "devicemotion", "deviceorientation", "deviceorientationabsolute",
     
         // Eventos de Gamepad
         "gamepadconnected", "gamepaddisconnected",
-    
-        // Eventos de VR
-        "vrdisplayconnect", "vrdisplaydisconnect", "vrdisplaypresentchange", "vrdisplayactivate", "vrdisplaydeactivate", "vrdisplayblur", "vrdisplayfocus", "vrdisplaypointerrestricted", "vrdisplaypointerunrestricted",
     
         // Eventos de Service Worker e Cache
         "install", "activate", "fetch", "message", "messageerror", "notificationclick", "notificationclose", "push", "pushsubscriptionchange", "sync", "periodicsync", "backgroundfetchsuccess", "backgroundfetchfailure", "backgroundfetchabort", "backgroundfetchclick", "contentdelete",
@@ -269,13 +266,10 @@ function trackEvents() {
         "drag", "dragstart", "dragend", "dragover", "dragenter", "dragleave", "drop",
     
         // Eventos de Teclado
-        "keydown", "keyup", "keypress",
+        "keydown", "keyup",
     
         // Eventos de Composição (IME)
         "compositionstart", "compositionupdate", "compositionend",
-    
-        // Eventos de Impressão
-        "beforeprint", "afterprint",
     
         // Eventos de Visibilidade
         "visibilitychange",

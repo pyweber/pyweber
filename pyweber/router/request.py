@@ -16,6 +16,7 @@ class Request:
         self.authorization: str = self.__get_authorization
         self.params: dict[str, None] = self.__get_params
         self.fragment: str = self.__get_fragment
+        self.session_id: str = self.__get_session_id
     
     @property
     def __get_method(self):
@@ -82,6 +83,10 @@ class Request:
     @property
     def __get_authorization(self):
         return self.__split_lines('Authorization:') or None
+    
+    @property
+    def __get_session_id(self):
+        return self.__split_lines('Session-ID:') or None
     
     @property
     def __get_cookies(self) -> dict[str, str]:

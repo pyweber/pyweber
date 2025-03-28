@@ -5,8 +5,8 @@ import argparse
 import subprocess
 from pathlib import Path
 from pyweber import __version__
-from pyweber.utils.load import StaticTemplates
 from pyweber.config.config import config
+from pyweber.utils.load import StaticTemplates
 from pyweber.utils.utils import print_line, Colors
 
 class CLI:
@@ -132,7 +132,7 @@ class CommandFunctions:
                 level='warning'
             )
             self.update_reload_mode(file_path=os.path.join('.pyweber', 'config.json'), value=reload)
-            subprocess.run(['python', file], shell=True, check=True)
+            subprocess.run(['python', file], check=True, shell=True)
         
         except subprocess.CalledProcessError as e:
             self.log_message(
@@ -142,7 +142,7 @@ class CommandFunctions:
 
     def update(self, framework: str):
         try:
-            subprocess.run(['pip', 'install', f'{framework}', '--upgrade'], shell=True, stderr=subprocess.PIPE)
+            subprocess.run(['pip', 'install', f'{framework}', '--upgrade'], check=True, shell=True, stderr=subprocess.PIPE)
 
             self.log_message(
                 message=f'✅ Framework updated sucessfully!',

@@ -242,7 +242,7 @@ def add_item(self, e: pw.EventHandler):
 
     # Create a new item
     new_item = pw.Element(
-        name="div",
+        tag="div",
         classes=["item"],
         content=f"Item {len(container.childs) + 1}"
     )
