@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: PyWeber Community Support
+    url: https://github.com/pyweber/pyweber/discussions
+    about: Por favor, faça perguntas gerais aqui.
+  - name: PyWeber Documentation
+    url: https://pyweber.readthedocs.io/
+    about: Consulte nossa documentação para informações.

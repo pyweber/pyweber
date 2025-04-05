@@ -9,10 +9,10 @@ A template in PyWeber can be created from an HTML file or from an HTML string:
 ```python
 import pyweber as pw
 
-# From an HTML file
-class PageTemplate(pw.Template):
-    def __init__(self, app: pw.Router):
-        super().__init__(template="page.html")
+# From an HTML file in the templates directory
+class HomePage(pw.Template):
+    def __init__(self, app: pw.Pyweber):
+        super().__init__(template="home.html")
 
         # Initialize elements and events
         self.setup()
@@ -27,13 +27,14 @@ class PageTemplate(pw.Template):
 
     def handle_click(self, e: pw.EventHandler):
         self.title.content = "Button was clicked!"
+        e.update()  # Update the UI
 
 # From an HTML string
-class InlineTemplate(pw.Template):
-    def __init__(self, app: pw.Router):
+class SimpleTemplate(pw.Template):
+    def __init__(self, app: pw.Pyweber):
         super().__init__(template="""
             <div>
-                <h1>Inline Template</h1>
+                <h1>Simple Template</h1>
                 <button id="action-button">Click Me</button>
             </div>
         """)
@@ -59,20 +60,19 @@ Template(template: str, status_code: int = 200)
 | `root` | Element | The root element of the parsed HTML |
 | `status_code` | int | The HTTP status code for this template |
 | `events` | dict | Dictionary of registered event handlers |
+| `data` | Any | Custom data that can be attached to the template |
 
-### Element Selection Methods
+## Element Selection Methods
 
 PyWeber provides several methods to select elements within a template:
 
-#### querySelector
+### querySelector
 
 ```python
 querySelector(selector: str, element: Element = None) -> Element | None
-```
 
 Selects the first element that matches the CSS selector.
 
-```python
 # Select by ID
 button = template.querySelector("#submit-button")
 
@@ -81,23 +81,21 @@ title = template.querySelector(".main-title")
 
 # Select by tag name
 paragraph = template.querySelector("p")
-```
-#### querySelectorAll
 
-```python
+### querySelectorAll
+
 querySelectorAll(selector: str, element: Element = None) -> list[Element]
-```
+
 Selects all elements that match the CSS selector.
 
-```python
 # Select all paragraphs
 paragraphs = template.querySelectorAll("p")
 
 # Select all elements with a specific class
 items = template.querySelectorAll(".item")
 ```
-#### getElementById
 
+### getElementById
 ```python
 getElementById(element_id: str, element: Element = None) -> Element | None
 ```
@@ -107,21 +105,32 @@ Selects an element by its ID.
 button = template.getElementById("submit-button")
 ```
 
-#### getElementByClass
-
+### getElementByClass
 ```python
 getElementByClass(class_name: str, element: Element = None) -> list[Element]
 ```
+
 Selects all elements with the specified class.
 
 ```python
 items = template.getElementByClass("item")
 ```
 
-### HTML Manipulation
-
-#### parse_html
+### getElementByUUID
 ```python
+getElementByUUID(element_uuid: str, element: Element = None) -> Element | None
+```
+Selects an element by its UUID (internal identifier).
+
+```python
+element = template.getElementByUUID("12345678-1234-5678-1234-567812345678")
+```
+
+## HTML Manipulation
+
+### parse_html
+```python
+
 parse_html(html: str = None) -> Element
 ```
 
@@ -133,13 +142,11 @@ new_element = template.parse_html("<div><h1>New Content</h1></div>")
 template.root = new_element
 ```
 
-#### build_html
+### build_html
 ```python
 build_html(element: Element = None) -> str
 ```
-
 Builds HTML string from the Element tree. If no element is provided, uses the template's root element.
-
 ```python
 # Get the current HTML
 html = template.build_html()
@@ -151,7 +158,6 @@ div_html = template.build_html(template.querySelector("div"))
 ## Working with Elements
 
 Elements in a template can be manipulated after selection:
-
 ```python
 # Change content
 title = template.querySelector("h1")
@@ -159,80 +165,145 @@ title.content = "New Title"
 
 # Change attributes
 image = template.querySelector("img")
-image.attrs["src"] = "/images/new-image.jpg"
-image.attrs["alt"] = "New Image"
+image.set_attr("src", "/images/new-image.jpg")
+image.set_attr("alt", "New Image")
 
-# Change styles (inline)
+# Change styles
 button = template.querySelector("button")
-button.style = {"background-color": "blue"; "color": "white"}
+button.set_style("background-color", "blue")
+button.set_style("color", "white")
 
 # Work with classes
-button.classes = ["primary-button"]  # Replace all classes
-# or
-button_element = template.querySelector(".btn")
-current_classes = button_element.classes
-if "active" not in current_classes:
-    button_element.add_class("active")
+button.add_class("primary-button")
+button.remove_class("disabled")
+button.toggle_class("active")  # Add if not present, remove if present
 ```
+## Element Properties and Methods
 
+Elements have various properties and methods for manipulation:
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `tag` | str | The HTML tag name |
+| `id` | str | The element's ID attribute |
+| `content` | str | The text content of the element |
+| `value` | str | The value attribute (for form elements) |
+| `classes` | list[str] | List of CSS classes |
+| `style` | dict[str, str] | Dictionary of inline styles |
+| `attrs` | dict[str, str] | Dictionary of HTML attributes |
+| `childs` | list[Element] | List of child elements |
+| `events` | TemplateEvents | Event handlers for this element |
+| `parent` | Element | The parent element |
+| `data` | Any | Custom data that can be attached to the element |
+
+### Methods
+
+#### Class Management
+```python
+add_class(class_name: str)
+remove_class(class_name: str)
+has_class(class_name: str) -> bool
+toggle_class(class_name: str)
+```
+#### Style Management
+```python
+set_style(key: str, value: str)
+get_style(key: str, default=None) -> str
+remove_style(key: str)
+```
+#### Attribute Management
+```python
+set_attr(key: str, value: str)
+get_attr(key: str, default=None) -> str
+remove_attr(key: str)
+```
+#### Child Management
+```python
+add_child(child: Element)
+remove_child(child: Element)
+pop_child(index: int = -1)
+```
+#### Element Selection
+```python
+querySelector(selector: str) -> Element
+querySelectorAll(selector: str) -> list[Element]
+getElement(by: GetBy, value: str) -> Element
+getElements(by: GetBy, value: str) -> list[Element]
+```
 ## Handling Events
 
 Events in PyWeber are handled by Python functions:
-
 ```python
-class MyTemplate(pw.Template):
-    def __init__(self, app: pw.Router):
-        super().__init__(template="template.html")
+class ContactForm(pw.Template):
+    def __init__(self, app: pw.Pyweber):
+        super().__init__(template="contact_form.html")
 
-        self.button = self.querySelector("#my-button")
-        self.input = self.querySelector("#my-input")
+        # Select form elements
+        self.form = self.querySelector("form")
+        self.name_input = self.querySelector("#name")
+        self.email_input = self.querySelector("#email")
+        self.submit_button = self.querySelector("#submit")
+        self.result = self.querySelector("#result")
 
-        # Assign event handlers
-        self.button.events.onclick = self.handle_click
-        self.input.events.oninput = self.handle_input
+        # Bind events
+        self.submit_button.events.onclick = self.handle_submit
+        self.name_input.events.oninput = self.validate_name
 
-    def handle_click(self, e: pw.EventHandler):
-        """Handle button click event"""
-        self.button.content = "Clicked!"
+    def validate_name(self, e: pw.EventHandler):
+        name = self.name_input.value
+        if len(name) < 3:
+            self.name_input.set_style("border-color", "red")
+        else:
+            self.name_input.set_style("border-color", "green")
+        e.update()
 
-    def handle_input(self, e: pw.EventHandler):
-        """Handle input change event"""
-        value = e.data.get("value", "")
-        self.button.content = f"Input: {value}"
-```
-### Available Events
+    def handle_submit(self, e: pw.EventHandler):
+        name = self.name_input.value
+        email = self.email_input.value
 
-PyWeber supports a wide range of DOM events, including:
+        if len(name) < 3 or "@" not in email:
+            self.result.content = "Please check your inputs"
+            self.result.set_style("color", "red")
+        else:
+            self.result.content = f"Thank you, {name}! We'll contact you at {email}"
+            self.result.set_style("color", "green")
 
-- **Mouse Events**: `onclick`, `ondblclick`, `onmousedown`, `onmouseup`, etc.
-- **Keyboard Events**: `onkeydown`, `onkeyup`, `onkeypress`
-- **Form Events**: `onfocus`, `onblur`, `onchange`, `oninput`, `onsubmit`
-- **Drag & Drop Events**: `ondrag`, `ondragstart`, `ondragend`, `ondrop`, etc.
-- **Media Events**: `onplay`, `onpause`, `onended`, etc.
-- **Touch Events**: `ontouchstart`, `ontouchend`, `ontouchmove`
-
-## Template Lifecycle
-
-1. **Initialization**: The template is created and HTML is parsed
-2. **Element Selection**: Elements are selected and stored as properties
-3. **Event Binding**: Event handlers are attached to elements
-4. **Rendering**: The template is rendered when its route is accessed
-5. **Event Handling**: Events trigger Python functions that update elements
-6. **Updates**: Changes to elements are sent to the client via WebSocket
-
-## Advanced Features
-
-### Custom Status Codes
-
-You can set custom HTTP status codes for templates:
-
-```python
-class NotFoundTemplate(pw.Template):
-    def __init__(self, app: pw.Router):
-        super().__init__(template="404.html", status_code=404)
+        e.update()
 ```
 
-### Dynamic Element Creation
+### Adding Events
+
+You can add events to elements in several ways:
+```python
+# Method 1: Using events property
+button.events.onclick = self.handle_click
+
+# Method 2: Using add_event method
+from pyweber.utils.types import EventType
+button.add_event(EventType.CLICK, self.handle_click)
+
+# Method 3: During element creation
+button = pw.Element(
+    tag="button",
+    content="Click Me",
+    events=pw.TemplateEvents(
+        onclick=self.handle_click
+    )
+)
+```
+
+### Removing Events
+```python
+# Remove a specific event
+button.remove_event(EventType.CLICK)
+
+# Reset all events
+button.events = pw.TemplateEvents()
+```
+
+## Dynamic Element Creation
 
 You can create and modify elements dynamically:
 ```python
@@ -247,31 +318,134 @@ def add_item(self, e: pw.EventHandler):
         content=f"Item {len(container.childs) + 1}"
     )
 
+    # Create a delete button
+    delete_btn = pw.Element(
+        tag="button",
+        classes=["delete-btn"],
+        content="×"
+    )
+
+    # Add event to the delete button
+    delete_btn.events.onclick = self.delete_item
+
+    # Add button to item
+    new_item.add_child(delete_btn)
+
     # Add to container
     container.childs.append(new_item)
+
+    e.update()
+
+def delete_item(self, e: pw.EventHandler):
+    # Get the button that was clicked
+    button = e.element
+
+    # Get the parent item
+    item = button.parent
+
+    # Get the container
+    container = item.parent
+
+    # Remove the item from the container
+    container.remove_child(item)
+
+    e.update()
 ```
+## Example: Todo List Application
 
-### Template Composition
-
-You can compose templates by nesting them:
+Here's a complete example of a simple todo list application:
 ```python
-class HeaderTemplate(pw.Template):
-    def __init__(self):
-        super().__init__(template="header.html")
-        self.logo = self.querySelector(".logo")
+import pyweber as pw
 
-class PageTemplate(pw.Template):
-    def __init__(self, app: pw.Router):
-        super().__init__(template="page.html")
+class TodoList(pw.Template):
+    def __init__(self, app: pw.Pyweber):
+        super().__init__(template="""
+            <div class="container">
+                <h1>Todo List</h1>
+                <div class="input-group">
+                    <input id="new-todo" type="text" placeholder="Add new item">
+                    <button id="add-button">Add</button>
+                </div>
+                <ul id="todo-list"></ul>
+            </div>
+        """)
 
-        # Create header
-        self.header = HeaderTemplate()
+        self.input = self.querySelector("#new-todo")
+        self.add_button = self.querySelector("#add-button")
+        self.todo_list = self.querySelector("#todo-list")
 
-        # Get the header container
-        header_container = self.querySelector("#header-container")
+        # Initialize empty list
+        self.todos = []
 
-        # Replace with our header template's root
-        header_container.childs = [self.header.root]
+        # Add event handlers
+        self.add_button.events.onclick = self.add_todo
+        self.input.events.onkeydown = self.handle_key
+
+    def handle_key(self, e: pw.EventHandler):
+        if e.event_data.key == "Enter":
+            self.add_todo(e)
+
+    def add_todo(self, e: pw.EventHandler):
+        text = self.input.value
+        if text:
+            # Create new list item
+            item = pw.Element(
+                tag="li",
+                classes=["todo-item"]
+            )
+
+            # Create text span
+            text_span = pw.Element(
+                tag="span",
+                content=text,
+                classes=["todo-text"]
+            )
+
+            # Create delete button
+            delete_btn = pw.Element(
+                tag="button",
+                content="×",
+                classes=["delete-btn"]
+            )
+            delete_btn.events.onclick = self.delete_todo
+
+            # Add elements to item
+            item.add_child(text_span)
+            item.add_child(delete_btn)
+
+            # Add to list
+            self.todo_list.childs.append(item)
+            self.todos.append(text)
+
+            # Clear input
+            self.input.value = ""
+
+            e.update()
+
+    def delete_todo(self, e: pw.EventHandler):
+        # Get the button that was clicked
+        button = e.element
+
+        # Get the parent item
+        item = button.parent
+
+        # Find the text span
+        text_span = item.querySelector(".todo-text")
+
+        # Remove from our data
+        if text_span.content in self.todos:
+            self.todos.remove(text_span.content)
+
+        # Remove from DOM
+        self.todo_list.remove_child(item)
+
+        e.update()
+
+def main(app: pw.Pyweber):
+    app.add_route("/", template=TodoList(app=app))
+
+if __name__ == "__main__":
+    pw.run(target=main)
 ```
 
 ## Best Practices
@@ -279,66 +453,12 @@ class PageTemplate(pw.Template):
 1. **Organize Templates**: Create separate template classes for different pages or components
 2. **Meaningful Names**: Use descriptive names for element variables
 3. **Separation of Concerns**: Keep event handlers focused on specific tasks
-4. **Reuse Components**: Create reusable template components for common UI elements
-5. **Validate Input**: Always validate user input before processing
+4. **Update the UI**: Always call `e.update()` after making changes to ensure the UI is refreshed
+5. **Reuse Components**: Create reusable template components for common UI elements
+6. **Validate Input**: Always validate user input before processing
 
-## Example: Complete Form Template
-```python
-class ContactForm(pw.Template):
-    def __init__(self, app: pw.Router):
-        super().__init__(template="contact_form.html")
-
-        # Select form elements
-        self.form = self.querySelector("form")
-        self.name_input = self.querySelector("#name")
-        self.email_input = self.querySelector("#email")
-        self.message_input = self.querySelector("#message")
-        self.submit_button = self.querySelector("#submit")
-        self.error_message = self.querySelector(".error-message")
-        self.success_message = self.querySelector(".success-message")
-
-        # Hide messages initially
-        self.error_message.attrs["style"] = "display: none;"
-        self.success_message.attrs["style"] = "display: none;"
-
-        # Bind events
-        self.form.events.onsubmit = self.handle_submit
-
-    def handle_submit(self, e: pw.EventHandler):
-        # Get form data
-        name = self.name_input.value
-        email = self.email_input.value
-        message = self.message_input.value
-
-        # Validate
-        if not name or not email or not message:
-            self.show_error("All fields are required")
-            return
-
-        if "@" not in email:
-            self.show_error("Invalid email address")
-            return
-
-        # Process form (in a real app, you'd send this data somewhere)
-        self.show_success("Thank you for your message!")
-
-        # Reset form
-        self.name_input.value = ""
-        self.email_input.value = ""
-        self.message_input.value = ""
-
-    def show_error(self, message: str):
-        self.error_message.content = message
-        self.error_message.attrs["style"] = "display: block;"
-        self.success_message.attrs["style"] = "display: none;"
-
-    def show_success(self, message: str):
-        self.success_message.content = message
-        self.success_message.attrs["style"] = "display: block;"
-        self.error_message.attrs["style"] = "display: none;"
-```
 ## Next Steps
 
-- Learn about [Elements](elements.md) in detail
+- Learn about [Elements](element.md) in detail
 - Explore [Routing](router.md) to connect templates to URLs
 - Understand [Event Handling](events.md) for interactive applications

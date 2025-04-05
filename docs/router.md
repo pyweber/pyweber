@@ -1,368 +1,236 @@
-# Routing in PyWeber
 
-The routing system in PyWeber connects URLs to templates, allowing you to create a navigable web application with multiple pages.
+# PyWeber Core
 
-## Basic Routing
+The PyWeber class is the central component of the PyWeber framework, handling routing, request processing, and template management.
 
-### Adding Routes
-
-The most common way to add routes is through the `add_route` method:
-
+## Basic Usage
 ```python
 import pyweber as pw
 
 class HomePage(pw.Template):
-    def __init__(self, app: pw.Router):
+    def __init__(self, app: pw.Pyweber):
         super().__init__(template="home.html")
         # Template setup...
 
-class AboutPage(pw.Template):
-    def __init__(self, app: pw.Router):
-        super().__init__(template="about.html")
-        # Template setup...
-
-def main(app: pw.Router):
-    # Basic route
+def main(app: pw.Pyweber):
     app.add_route("/", template=HomePage(app=app))
-
-    # Another route
-    app.add_route("/about", template=AboutPage(app=app))
 
 if __name__ == "__main__":
     pw.run(target=main)
 ```
-
-### Route Decorator
-
-You can also use the `route` decorator for a more Flask-like syntax:
-
+## Initialization
 ```python
-def main(app: pw.Router):
-    @app.route("/")
-    def home():
-        return HomePage(app=app)
-
-    @app.route("/about")
-    def about():
-        return AboutPage(app=app)
+app = pw.Pyweber()
 ```
-
-## Dynamic Routes
-
-PyWeber supports dynamic routes with parameters:
-
-```python
-class UserProfile(pw.Template):
-    def __init__(self, app: pw.Router, user_id=None):
-        super().__init__(template="user_profile.html")
-        self.user_id = user_id
-        self.title = self.querySelector("h1")
-        self.title.content = f"User Profile: {user_id}"
-
-def main(app: pw.Router):
-    # Dynamic route with parameter
-    app.add_route("/users/{user_id}", template=UserProfile(app=app))
-```
-
-## Router API
-
-### Constructor
-
-
-Router(update_handler: callable)
-
-
+The PyWeber constructor accepts optional keyword arguments:
 - `update_handler`: A function that handles template updates
 
-### Properties
+## Routing
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `list_routes` | list[str] | List of all registered routes |
-| `clear_routes` | None | Clears all registered routes |
-| `page_not_found` | Template | Template for 404 errors |
-| `page_unauthorized` | Template | Template for 401 errors |
-| `cookies` | list[str] | List of cookies to be sent with responses |
-
-### Methods
-
-#### add_route
-
+### Adding Routes
 ```python
-add_route(route: str, template: Template) -> None
+# Add a route with a template
+app.add_route("/", template=HomePage(app=app))
+
+# Add a route with a function that returns a template
+app.add_route("/dynamic", template=get_dynamic_page)
+
+# Add a route with a dictionary (returns JSON)
+app.add_route("/api/data", template={"name": "John", "age": 30})
+
+# Add a route with a string (converted to a template)
+app.add_route("/simple", template="<h1>Simple Page</h1>")
 ```
 
-Adds a new route to the application.
-
-- `route`: URL path (must start with `/`)
-- `template`: Template instance to render for this route
-
-#### update_route
-
+### Route Decorator
 ```python
-update_route(route: str, template: Template) -> None
+@app.route("/users")
+def users_page(app=app):
+    return UsersPage(app=app)
+
+# With dynamic parameters
+@app.route("/users/{user_id}")
+def user_profile(user_id, app=app):
+    return UserProfile(app=app, user_id=user_id)
 ```
 
-Updates an existing route with a new template.
-
-- `route`: Existing URL path
-- `template`: New template instance
-
-#### remove_route
-
+### Managing Routes
 ```python
-remove_route(route: str) -> None
+# Update an existing route
+app.update_route("/", template=NewHomePage(app=app))
+
+# Remove a route
+app.remove_route("/old-page")
+
+# Create a redirect
+app.redirect("/old-path", "/new-path")
+
+# Check if a route exists
+if app.exists("/about"):
+    print("About page exists")
+
+# Check if a route is redirected
+if app.is_redirected("/old-path"):
+    print("This path is redirected")
+
+# Get all routes
+routes = app.list_routes
+
+# Clear all routes
+app.clear_routes
 ```
-
-Removes a route from the application.
-
-- `route`: URL path to remove
-
-#### redirect
-
-```python
-redirect(from_route: str, to_route: str) -> None
-```
-
-Creates a redirect from one route to another.
-
-- `from_route`: Source URL path
-- `to_route`: Destination URL path (must exist)
-
-#### get_template
-
-```python
-get_template(route: str) -> Template
-```
-
-Gets the template for a specific route.
-
-- `route`: URL path
-- Returns: Template instance or 404 template if not found
-
-#### exists
-
-```python
-exists(route: str) -> bool
-```
-
-Checks if a route exists.
-
-- `route`: URL path to check
-- Returns: True if the route exists, False otherwise
-
-#### is_redirected
-
-```python
-is_redirected(route: str) -> bool
-```
-
-Checks if a route is redirected.
-
-- `route`: URL path to check
-- Returns: True if the route is redirected, False otherwise
-
-#### set_cookie
-
-```python
-set_cookie(
-    cookie_name: str,
-    cookie_value: str,
-    path: str = '/',
-    samesite: str = 'Strict',
-    httponly: bool = True,
-    secure: bool = True,
-    expires: datetime = None
-) -> None
-```
-
-Sets a cookie to be sent with responses.
-
-- `cookie_name`: Name of the cookie
-- `cookie_value`: Value of the cookie
-- `path`: Cookie path (default: '/')
-- `samesite`: SameSite attribute (options: 'Strict', 'Lax', None)
-- `httponly`: Whether the cookie is HTTP-only (default: True)
-- `secure`: Whether the cookie requires HTTPS (default: True)
-- `expires`: Expiration date (default: None, session cookie)
-
-#### launch_url
-
-```python
-launch_url(url: str) -> bool
-```
-
-Opens a URL in the default web browser.
-
-- `url`: URL to open
-- Returns: True if successful, False otherwise
 
 ## Middleware
 
-Middleware functions process requests before they reach the template. They can modify requests, perform authentication, or return alternative responses.
+PyWeber supports middleware for processing requests before and after they reach the route handler.
 
-### Adding Middleware
-
+### Before Request Middleware
 ```python
+@app.before_request(status_code=200)
 def auth_middleware(request: pw.Request):
     # Check if user is authenticated
     if 'user_id' not in request.cookies:
         # Return unauthorized template
-        return UnauthorizedTemplate()
-    return None  # Continue to the next middleware or route handler
+        return app.page_unauthorized
 
-def main(app: pw.Router):
-    # Add middleware to the router
-    app.middleware(auth_middleware)
-
-    # Or use as a decorator
-    @app.middleware
-    def log_requests(request: pw.Request):
-        print(f"Request: {request.method} {request.path}")
-        return None  # Continue processing
+    # Continue processing
+    return None
 ```
 
-### Middleware Flow
+### After Request Middleware
+```python
+@app.after_request()
+def log_response(response: pw.Response):
+    # Log response details
+    print(f"Response: {response.code} {response.route}")
 
-1. When a request is received, each middleware function is called in order
-2. If a middleware returns a Template, that template is rendered and no further processing occurs
-3. If all middleware return None, the router processes the request normally
+    # Modify response if needed
+    response.add_header("X-Custom-Header", "Value")
 
-## Request Object
+    return response
+```
 
-The Request object contains information about the incoming HTTP request.
+### Clearing Middleware
+```python
+# Clear before request middleware
+app.clear_before_request
 
-### Properties
+# Clear after request middleware
+app.clear_after_request
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `method` | str | HTTP method (GET, POST, etc.) |
-| `path` | str | URL path |
-| `netloc` | str | Network location (domain) |
-| `host` | str | Host header value |
-| `user_agent` | str | User-Agent header value |
-| `cookies` | dict[str, str] | Dictionary of cookies |
-| `referer` | str | Referer header value |
-| `accept` | list[str] | Accept header values |
-| `params` | dict[str, str] | URL query parameters |
-| `fragment` | str | URL fragment (after #) |
+## Error Pages
 
-## Response Handling
+PyWeber provides default error pages that can be customized:
 
-PyWeber automatically builds HTTP responses based on templates and their status codes.
+# Custom 404 page
+app.page_not_found = pw.Template(template="404.html", status_code=404)
 
-### Status Codes
+# Custom 401 page
+app.page_unauthorized = pw.Template(template="401.html", status_code=401)
 
-You can set custom status codes for templates:
+# Custom 500 page
+app.page_server_error = pw.Template(template="500.html", status_code=500)
+```
+## Cookie Management
+```python
+# Set a cookie
+app.set_cookie(
+    cookie_name="user_id",
+    cookie_value="12345",
+    path="/",
+    samesite="Strict",
+    httponly=True,
+    secure=True,
+    expires=None  # Session cookie
+)
+
+# Get all cookies
+cookies = app.cookies
+
+## Template Management
+
+# Get a template for a specific route
+template = app.clone_template("/about")
+
+# Update the template
+template.querySelector("h1").content = "New Title"
+
+# Update the route with the modified template
+app.update_route("/about", template=template)
+```
+
+## Browser Integration
+```python
+# Open a URL in the default browser
+app.launch_url("https://example.com")
+```
+
+## Window API
+
+PyWeber provides a Window API for browser-like functionality:
 
 ```python
-# Create a template with a specific status code
-error_template = pw.Template(template="error.html", status_code=500)
+# Access the window object
+window = app.window
 
-# Or change the status code later
-template.status_code = 201  # Created
+# Set window title
+window.title = "My PyWeber App"
+
+# Set window location
+window.location = "/dashboard"
+
+# Add window event handler
+window.events.onresize = handle_resize
 ```
 
-### Content Types
+## ASGI Support
 
-PyWeber automatically determines the appropriate content type based on the requested file extension:
-
-- `.html` → `text/html`
-- `.css` → `text/css`
-- `.js` → `application/javascript`
-- `.json` → `application/json`
-- `.png`, `.jpg`, `.gif` → appropriate image types
-- etc.
-
-## Error Handling
-
-PyWeber provides default templates for common errors:
-
-### 404 Not Found
-
-By default, PyWeber shows a simple 404 page when a route is not found. You can customize this:
+PyWeber can be used with ASGI servers like Uvicorn:
 
 ```python
-def main(app: pw.Router):
-    # Create a custom 404 template
-    custom_404 = pw.Template(template="404.html", status_code=404)
+# app.py
+import pyweber as pw
 
-    # Set it as the default not found page
-    app.page_not_found = custom_404
+class HomePage(pw.Template):
+    def __init__(self, app: pw.Pyweber):
+        super().__init__(template="home.html")
+
+def setup_routes(app: pw.Pyweber):
+    app.add_route("/", template=HomePage(app=app))
+setup_routes(app)
+
+# Run with uvicorn
+# uvicorn app:app
 ```
-
-### 401 Unauthorized
-
-Similarly, you can customize the unauthorized page:
-
-```python
-def main(app: pw.Router):
-    # Create a custom 401 template
-    custom_401 = pw.Template(template="401.html", status_code=401)
-
-    # Set it as the default unauthorized page
-    app.page_unauthorized = custom_401
-```
-
-## Advanced Routing
-
-### Serving Static Files
-
-PyWeber automatically serves static files from the appropriate directories:
-
-
-```bash
-my_project/
-├── main.py
-├── templates/
-│   └── index.html
-└── src/
-    ├── style/
-    │   └── style.css
-    └── assets/
-        └── logo.png
-```
-
-These files are accessible at:
-- `/src/style/style.css`
-- `/src/assets/logo.png`
-
-### External Requests
-
-PyWeber can proxy requests to external URLs:
-
-```python
-def main(app: pw.Router):
-    # This will proxy requests to /api/* to the external API
-    app.add_route("/api", template=ExternalAPIProxy(app=app))
-```
-
-## Example: Complete Routing Setup
-
+## Example: Complete Application
 ```python
 import pyweber as pw
 from datetime import datetime, timedelta
 
 class HomePage(pw.Template):
-    def __init__(self, app: pw.Router):
+    def __init__(self, app: pw.Pyweber):
         super().__init__(template="home.html")
-        # Template setup...
+        self.title = self.querySelector("h1")
+        self.login_button = self.querySelector("#login-button")
+        self.login_button.events.onclick = self.go_to_login
+
+    def go_to_login(self, e: pw.EventHandler):
+        app.window.location = "/login"
+        e.update()
 
 class LoginPage(pw.Template):
-    def __init__(self, app: pw.Router):
+    def __init__(self, app: pw.Pyweber):
         super().__init__(template="login.html")
         self.form = self.querySelector("form")
         self.username = self.querySelector("#username")
         self.password = self.querySelector("#password")
         self.error = self.querySelector(".error")
-
         self.form.events.onsubmit = self.handle_login
 
     def handle_login(self, e: pw.EventHandler):
         username = self.username.value
         password = self.password.value
 
-        # Simple authentication (in a real app, use proper auth)
         if username == "admin" and password == "password":
             # Set authentication cookie
             app.set_cookie(
@@ -372,18 +240,35 @@ class LoginPage(pw.Template):
             )
 
             # Redirect to dashboard
-            return app.redirect("/login", "/dashboard")
+            app.window.location = "/dashboard"
         else:
             self.error.content = "Invalid username or password"
 
-class DashboardPage(pw.Template):
-    def __init__(self, app: pw.Router):
-        super().__init__(template="dashboard.html")
-        # Template setup...
+        e.update()
 
+class DashboardPage(pw.Template):
+    def __init__(self, app: pw.Pyweber):
+        super().__init__(template="dashboard.html")
+        self.welcome = self.querySelector("#welcome")
+        self.logout = self.querySelector("#logout")
+        self.logout.events.onclick = self.handle_logout
+
+    def handle_logout(self, e: pw.EventHandler):
+        # Clear cookie by setting it to expire in the past
+        app.set_cookie(
+            cookie_name="user_id",
+            cookie_value="",
+            expires=datetime(1970, 1, 1)
+        )
+
+        # Redirect to home
+        app.window.location = "/"
+        e.update()
+
+@app.before_request()
 def auth_middleware(request: pw.Request):
     # Protected routes
-    protected_routes = ["/dashboard", "/profile", "/settings"]
+    protected_routes = ["/dashboard"]
 
     # Check if the requested path is protected
     if request.path in protected_routes:
@@ -395,10 +280,7 @@ def auth_middleware(request: pw.Request):
     # Continue processing
     return None
 
-def main(app: pw.Router):
-    # Add middleware
-    app.middleware(auth_middleware)
-
+def main(app: pw.Pyweber):
     # Add routes
     app.add_route("/", template=HomePage(app=app))
     app.add_route("/login", template=LoginPage(app=app))
@@ -406,7 +288,6 @@ def main(app: pw.Router):
 
     # Add redirects
     app.redirect("/home", "/")
-    app.redirect("/admin", "/dashboard")
 
     # Custom error pages
     app.page_not_found = pw.Template(template="404.html", status_code=404)
@@ -415,19 +296,17 @@ def main(app: pw.Router):
 if __name__ == "__main__":
     pw.run(target=main)
 ```
-
 ## Best Practices
 
 1. **Organize Routes**: Group related routes together
 2. **Use Descriptive Names**: Make route paths descriptive and follow REST conventions
 3. **Protect Sensitive Routes**: Use middleware for authentication and authorization
 4. **Custom Error Pages**: Create user-friendly error pages
-5. **Redirects**: Use redirects for moved content or friendly URLs
-6. **Stateless Design**: Keep routes stateless when possible
-7. **Parameter Validation**: Validate route parameters before using them
+5. **Stateless Design**: Keep routes stateless when possible
+6. **Parameter Validation**: Validate route parameters before using them
 
 ## Next Steps
 
 - Learn about [Templates](template.md) for creating dynamic pages
-- Explore [Elements](elements.md) for manipulating the DOM
+- Explore [Elements](element.md) for manipulating the DOM
 - Understand [Event Handling](events.md) for interactive applications

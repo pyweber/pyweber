@@ -1,6 +1,6 @@
 # PyWeber CLI
 
-The PyWeber Command Line Interface (CLI) provides abilities to create, run, and manage PyWeber applications.
+The PyWeber Command Line Interface (CLI) provides tools to create, manage, and run PyWeber applications.
 
 ## Installation
 
@@ -10,11 +10,11 @@ The CLI is automatically installed with PyWeber:
 pip install pyweber
 ```
 
-## Available Commands
+## Basic Commands
 
 ### Check Version
 
-Display the current version of PyWeber.
+Display the current version of PyWeber:
 
 ```bash
 pyweber --version
@@ -22,20 +22,36 @@ pyweber --version
 pyweber -v
 ```
 
+### Update PyWeber
+
+Update to the latest version of PyWeber:
+
+```bash
+pyweber --update
+# or
+pyweber -u
+```
+
+## Project Management
+
 ### Create a New Project
 
-Create a new PyWeber project with the recommended directory structure.
+Create a new PyWeber project with the recommended directory structure:
 
 ```bash
 pyweber create-new my_project
+```
+
+Add the `--with-config` flag to automatically create a configuration file:
+
+```bash
+pyweber create-new my_project --with-config
 ```
 
 This command creates a new project with the following structure:
 
 ```
 my_project/
-├── .pyweber/
-│   └── config.json
 ├── src/
 │   ├── assets/
 │   │   └── favicon.ico
@@ -46,9 +62,17 @@ my_project/
 └── main.py
 ```
 
+If `--with-config` is specified, it also creates:
+
+```
+my_project/
+├── .pyweber/
+│   └── config.toml
+```
+
 ### Run a Project
 
-Run a PyWeber application.
+Run a PyWeber application:
 
 ```bash
 pyweber run
@@ -68,47 +92,114 @@ Enable hot reload during development to automatically refresh the browser when f
 pyweber run --reload
 ```
 
-This updates the `.pyweber/config.json` file to set `reload_mode` to `true`.
-
-### Update PyWeber
-
-Update PyWeber to the latest version.
+You can also run with reload mode directly:
 
 ```bash
-pyweber --update
-# or
-pyweber -u
+pyweber -r
 ```
 
-## Configuration
+This updates the configuration file to set `reload_mode` to `true`.
 
-When creating a new project, PyWeber generates a `.pyweber/config.json` file with default settings. This file contains configuration for:
+## Configuration Management
 
-- Application information
-- Server settings
-- WebSocket settings
-- Session management
-- And more
+### Create Configuration File
 
-You can modify this file to customize your application's behavior.
-
-## Project Structure
-
-A typical PyWeber project includes:
-
-- **main.py**: Entry point for your application
-- **templates/**: HTML templates
-- **src/style/**: CSS stylesheets
-- **src/assets/**: Static assets like images and icons
-- **.pyweber/**: Configuration files
-
-## Example Usage
-
-### Create and Run a Project
+Create a configuration file for an existing project:
 
 ```bash
-# Create a new project
-pyweber create-new my_webapp
+pyweber create-config-file
+```
+
+You can specify a custom path and filename:
+
+```bash
+pyweber create-config-file --config-path .config --config-name settings.toml
+```
+
+### Edit Configuration
+
+Edit the project configuration interactively:
+
+```bash
+pyweber -e
+```
+
+This opens an interactive menu where you can:
+- Edit existing fields
+- Remove fields
+- Remove sections
+- Add new fields
+- Add new sections
+
+### Add Configuration Section
+
+Add a new section to the configuration file:
+
+```bash
+pyweber add-section --section-name database
+```
+
+## Dependency Management
+
+### Install Requirements
+
+Install project dependencies defined in the configuration file:
+
+```bash
+pyweber install
+```
+
+You can specify a custom configuration file path:
+
+```bash
+pyweber install --config-file-path custom/path/config.toml
+```
+
+## Configuration File Format
+
+PyWeber uses TOML for configuration files. A typical configuration includes:
+
+```toml
+[app]
+name = "My PyWeber App"
+description = "A PyWeber application"
+keywords = ["pyweber", "web", "python"]
+icon = "src/assets/favicon.ico"
+
+[server]
+host = "localhost"
+port = 8800
+
+[session]
+reload_mode = false
+
+[websocket]
+host = "localhost"
+port = 8801
+
+[requirements]
+packages = ["requests", "pillow"]
+```
+
+## Configuration Types
+
+When adding new configuration fields, you can specify types:
+
+| Type | Format Example |
+|------|----------------|
+| String | `name str Alex` |
+| Integer | `age int 18` |
+| Float | `price float 19.99` |
+| List | `tags list python flask api` |
+| Dictionary | `db dict user:str=admin; port:int=5432` |
+
+## Example Workflows
+
+### Create and Run a New Project
+
+```bash
+# Create a new project with configuration
+pyweber create-new my_webapp --with-config
 
 # Navigate to the project directory
 cd my_webapp
@@ -117,12 +208,24 @@ cd my_webapp
 pyweber run --reload
 ```
 
-### Custom Entry Point
-
-If your main file is not named `main.py`:
+### Update Configuration and Install Dependencies
 
 ```bash
-pyweber run app.py --reload
+# Edit configuration interactively
+pyweber -e
+
+# Install project dependencies
+pyweber install
+```
+
+### Customize Project Configuration
+
+```bash
+# Add a new database section
+pyweber add-section --section-name database
+
+# Edit configuration to add database settings
+pyweber -e
 ```
 
 ## Troubleshooting
@@ -133,6 +236,3 @@ If you encounter issues with the CLI:
 2. Check that you're in the correct directory
 3. Verify that your project structure follows PyWeber conventions
 4. Check the console for error messages
-
----
-For more detailed information, refer to the [PyWeber documentation](https://pyweber.readthedocs.io/).

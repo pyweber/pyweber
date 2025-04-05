@@ -1,9 +1,5 @@
 # PyWeber Framework
 
-![PyWeber Logo](images/pyweber.png)
-
-[![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master) [![License](https://img.shields.io/pypi/l/pyweber.svg)](https://github.com/pyweber/pyweber/blob/master/LICENSE)
-
 PyWeber is a lightweight Python web framework designed to create dynamic, reactive web applications with a simple and intuitive API. It combines the simplicity of Python with the reactivity of modern frontend frameworks.
 
 ## Key Features
@@ -16,34 +12,28 @@ PyWeber is a lightweight Python web framework designed to create dynamic, reacti
 - **WebSocket Integration**: Real-time communication between client and server
 - **Minimal Configuration**: Get started quickly with sensible defaults
 
-## Installation
+## Quick Start
 
-Install PyWeber using pip:
+### Installation
 
 ```bash
 pip install pyweber
 ```
 
-## Quick Start
-
-### Create a New Project
-
-The easiest way to get started is to use the PyWeber CLI:
+### Create a Project
 
 ```bash
-pyweber create-new my_first_app
-cd my_first_app
+# Create a new project with configuration
+pyweber create-new my_app --with-config
+cd my_app
 ```
 
-### Or Start from Scratch
-
-Create a simple counter application:
-
+### Build a Simple Counter
 ```python
 import pyweber as pw
 
 class Counter(pw.Template):
-    def __init__(self, app: pw.Router):
+    def __init__(self, app: pw.Pyweber):
         super().__init__(template="""
             <div>
                 <h1>PyWeber Counter</h1>
@@ -56,12 +46,12 @@ class Counter(pw.Template):
         self.button = self.querySelector("#increment")
         self.button.events.onclick = self.increment
 
-    def increment(self, e: pw.EventHandler):
+    async def increment(self, e: pw.EventHandler):
         current = int(self.count.content)
         self.count.content = str(current + 1)
         e.update()
 
-def main(app: pw.Router):
+def main(app: pw.Pyweber):
     app.add_route("/", template=Counter(app=app))
 
 if __name__ == "__main__":
@@ -71,80 +61,72 @@ if __name__ == "__main__":
 Run your application:
 
 ```bash
-python main.py
-# or use the CLI
-pyweber run
+pyweber run --reload
 ```
 
-Visit `http://localhost:8800` in your browser to see your application.
+## Core Components
 
-## Core Concepts
+### Pyweber
 
-### Templates
-
-Templates in PyWeber represent complete pages or reusable components. They combine HTML structure with Python logic:
-
+The main application class that handles routing, middleware, and template management:
 ```python
-class MyTemplate(pw.Template):
-    def __init__(self, app: pw.Router):
-        super().__init__(template="path/to/template.html")
-        # or inline HTML
-        # super().__init__(template="<h1>Hello World</h1>")
+app = pw.Pyweber()
+app.add_route("/", template=HomePage(app=app))
+app.add_route("/users/{user_id}", template=UserProfile(app=app))
 ```
 
-### Elements
+### Template
+
+Templates represent pages or components with HTML structure and Python logic:
+```python
+class HomePage(pw.Template):
+    def __init__(self, app: pw.Pyweber):
+        super().__init__(template="index.html")
+        self.title = self.querySelector("h1")
+        self.title.content = "Welcome to PyWeber!"
+```
+
+### Element
 
 Elements represent DOM nodes that you can manipulate:
-
 ```python
-# Select elements
-title = template.querySelector("h1")
-buttons = template.querySelectorAll(".button")
+# Create elements
+button = pw.Element(tag="button", content="Click me", id="my-button")
 
-# Modify content
-title.content = "New Title"
-
-# Change attributes
-image.attributes["src"] = "/path/to/image.jpg"
-
-# Modify styles
-button.style["background-color"] = "blue"
-
-# Work with classes
-button.classes.add("active")
-button.classes.remove("disabled")
+# Modify properties
+button.content = "Clicked!"
+button.attributes["disabled"] = "true"
+button.style["color"] = "red"
+button.add_class("active")
 ```
 
 ### Events
 
 Handle user interactions with Python functions:
-
 ```python
-def button_click(e: pw.EventHandler):
-    e.element.content = "Clicked!"
+# Define event handlers
+async def handle_click(e: pw.EventHandler):
+    e.element.content = "Processing..."
+    await process_data()
+    e.element.content = "Done!"
+    e.update()
 
-button.events.onclick = button_click
+# Attach events
+button.events.onclick = handle_click
 ```
 
-### Routing
+### Window
 
-Define routes to different templates:
-
+Interact with the browser window:
 ```python
-def main(app: pw.Router):
-    app.add_route("/", template=HomePage(app=app))
-    app.add_route("/about", template=AboutPage(app=app))
-    app.add_route("/users/{user_id}", template=UserProfile(app=app))
+# Access window properties
+width = template.window.inner_width
+scroll_pos = template.window.scroll_y
+
+# Register window events
+template.window.events.onresize = handle_resize
+template.window.events.onscroll = handle_scroll
 ```
-
-## Why PyWeber?
-
-PyWeber bridges the gap between backend and frontend development by allowing Python developers to create dynamic web interfaces without extensive JavaScript knowledge. It's ideal for:
-
-- **Prototyping**: Quickly build interactive prototypes
-- **Internal Abilities**: Create admin panels and dashboards
-- **Small to Medium Applications**: Build complete web applications with a single language
-- **Learning Web Development**: Understand web concepts with familiar Python syntax
 
 ## Comparison with Other Frameworks
 
@@ -156,21 +138,58 @@ PyWeber bridges the gap between backend and frontend development by allowing Pyt
 | Hot Reload | Built-in | Add-on | Add-on | Built-in |
 | Template Language | Python + HTML | Jinja2 | DTL | JSX |
 | Server-Side | Yes | Yes | Yes | No (by default) |
+| Configuration | Simple TOML | Environment vars | settings.py | package.json |
+| CLI Tools | Comprehensive | Limited | Extensive | Extensive |
+
+## Configuration
+
+PyWeber provides a flexible configuration system:
+```python
+# Access configuration
+from pyweber.config.config import config
+
+# Get values
+port = config.get("server", "port")
+debug = config.get("app", "debug")
+
+# Set values
+config.set("server", "port", 9000)
+```
+
+Create or edit configuration files:
+
+```bash
+# Create config file
+pyweber create-config-file
+
+# Edit interactively
+pyweber --edit
+```
+
+## CLI Tools
+
+PyWeber includes a powerful CLI:
+
+```bash
+# Create projects
+pyweber create-new my_project
+
+# Run applications
+pyweber run --reload
+
+# Manage configuration
+pyweber add-section --section-name database
+
+# Update framework
+pyweber --update
+```
 
 ## Next Steps
 
-- [Installation Guide](installation.md)
-- [CLI Documentation](cli.md)
-- [Template System](template.md)
-- [Router Documentation](router.md)
-- [Examples](https://github.com/pyweber/pyweber-examples.git)
+- [Installation Guide](installation.md) - Detailed setup instructions
+- [Templates](template.md) - Creating dynamic UI components
+- [Elements](element.md) - DOM manipulation
+- [Events](events.md) - Handling user interactions
+- [CLI](cli.md) - Command-line tools
 
-## Community and Support
-
-- [GitHub Repository](https://github.com/pyweber/pyweber)
-- [Documentation](https://pyweber.readthedocs.io/)
-- [Issue Tracker](https://github.com/pyweber/pyweber/issues)
-
-## License
-
-PyWeber is released under the MIT License. See the LICENSE file for details.
+Visit [Pyweber Docs](https://pyweber.readthedocs.io/) for complete documentation.

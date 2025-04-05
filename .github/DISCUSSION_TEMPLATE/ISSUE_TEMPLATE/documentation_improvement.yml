@@ -1,0 +1,63 @@
+name: Documentation Improvement
+description: Suggest improvements to PyWeber documentation
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping us improve PyWeber's documentation!
+  
+  - type: dropdown
+    id: doc_type
+    attributes:
+      label: Documentation Type
+      description: What type of documentation needs improvement?
+      options:
+        - API Reference
+        - Tutorials
+        - Examples
+        - Installation Guide
+        - Conceptual Guides
+        - README
+        - Other (specify below)
+    validations:
+      required: true
+  
+  - type: input
+    id: page_link
+    attributes:
+      label: Documentation Link
+      description: Please provide a link to the documentation page that needs improvement (if applicable).
+      placeholder: https://pyweber.readthedocs.io/en/latest/...
+  
+  - type: textarea
+    id: issue
+    attributes:
+      label: What's the issue with the current documentation?
+      description: Describe what's missing, unclear, or incorrect.
+    validations:
+      required: true
+  
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Improvement
+      description: Describe how the documentation could be improved.
+    validations:
+      required: true
+  
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Information
+      description: Any other context or screenshots about the documentation improvement.
+  
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this documentation request, you agree to follow our [Code of Conduct](https://github.com/pyweber/pyweber/blob/main/CODE_OF_CONDUCT.md)
+      options:
+        - label: I agree to follow PyWeber's Code of Conduct
+          required: true

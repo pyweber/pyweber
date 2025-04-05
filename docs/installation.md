@@ -6,7 +6,7 @@ This guide covers the installation process for PyWeber and setting up your devel
 
 PyWeber requires:
 
-- Python 3.8 or higher
+- Python 3.10 or higher
 - pip (Python package installer)
 
 ## Standard Installation
@@ -37,47 +37,6 @@ pyweber --version
 
 This should display the current version of PyWeber.
 
-## Dependencies
-
-PyWeber automatically installs the following dependencies:
-
-- lxml: For HTML parsing and template processing
-- websockets: For real-time communication
-- watchdog: For file monitoring and hot reload
-
-## Virtual Environments
-
-It's recommended to use a virtual environment for your PyWeber projects:
-
-### Using venv (Python's built-in virtual environment)
-
-```bash
-# Create a virtual environment
-python -m venv venv
-
-# Activate the virtual environment
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
-
-# Install PyWeber in the virtual environment
-pip install pyweber
-```
-
-### Using conda
-
-```bash
-# Create a conda environment
-conda create -n pyweber-env python=3.10
-
-# Activate the environment
-conda activate pyweber-env
-
-# Install PyWeber
-pip install pyweber
-```
-
 ## Creating Your First Project
 
 After installation, you can create a new PyWeber project:
@@ -85,6 +44,9 @@ After installation, you can create a new PyWeber project:
 ```bash
 # Create a new project
 pyweber create-new my_project
+
+# Create a project with configuration file
+pyweber create-new my_project --with-config
 
 # Navigate to the project directory
 cd my_project
@@ -95,133 +57,148 @@ pyweber run
 
 Visit `http://localhost:8800` in your browser to see your application.
 
-## Manual Project Setup
+## Configuration Management
 
-If you prefer to set up a project manually:
+PyWeber provides a robust configuration system to manage your application settings.
 
-1. Create a project directory:
-   ```bash
-   mkdir my_project
-   cd my_project
-   ```
+### Creating a Configuration File
 
-2. Create a minimal project structure:
-   ```
-   my_project/
-   ├── main.py
-   ├── templates/
-   │   └── index.html
-   └── src/
-       ├── style/
-       │   └── style.css
-       └── assets/
-           └── favicon.ico
-   ```
+You can create a configuration file for your project:
 
-3. Create a basic `main.py` file:
+```bash
+# Create a default config file in the .pyweber directory
+pyweber create-config-file
 
-    ```python
-    import pyweber as pw
+# Specify a custom path and name
+pyweber create-config-file --config-path config --config-name settings.toml
+```
 
-    class HomePage(pw.Template):
-        def __init__(self, app: pw.Router):
-            super().__init__(template="index.html")
+### Managing Configuration
 
-    def main(app: pw.Router):
-        app.add_route("/", template=HomePage(app=app))
+PyWeber provides CLI tools to manage your configuration:
 
-    if __name__ == "__main__":
-        pw.run(target=main)
-    ```
+```bash
+# Edit configuration interactively
+pyweber --edit
 
-4. Create a simple `templates/index.html` file:
-   ```html
-   <!DOCTYPE html>
-   <html>
-   <head>
-       <title>My PyWeber App</title>
-       <link rel="stylesheet" href="/src/style/style.css">
-   </head>
-   <body>
-       <h1>Welcome to PyWeber!</h1>
-       <p>This is a manually created project.</p>
-   </body>
-   </html>
-   ```
+# Add a new section to your configuration
+pyweber add-section --section-name database
+```
 
-5. Run your application:
-   ```bash
-   python main.py
-   ```
+### Configuration Structure
+
+The default configuration file includes these sections:
+
+```toml
+[app]
+name = "my_project"
+description = "A my_project built with pyweber framework"
+version = "0.1.0"
+debug = true
+
+[server]
+host = "127.0.0.1"
+port = 8800
+workers = 1
+
+[session]
+secret_key = "your-secret-key"
+reload_mode = false
+session_lifetime = 86400
+
+[requirements]
+packages = []
+```
+
+### Programmatic Configuration Access
+
+You can access configuration values in your code:
+```python
+from pyweber.config.config import config
+
+# Get configuration values
+app_name = config.get("app", "name")
+port = config.get("server", "port")
+
+# Set configuration values
+config.set("app", "version", "0.2.0")
+
+# Delete configuration values
+config.delete("app", "debug")
+```
+
+## Installing Project Requirements
+
+PyWeber can install project dependencies defined in your configuration file:
+
+```bash
+# Install all packages listed in the requirements section
+pyweber install
+
+# Specify a custom config file path
+pyweber install --config-file-path custom/path/config.toml
+```
+
+## Running Your Application
+
+PyWeber provides multiple ways to run your application:
+
+```bash
+# Run with default settings
+pyweber run
+
+# Run a specific file
+pyweber run app.py
+
+# Run with hot reload enabled
+pyweber run --reload
+
+# Quick run with reload mode
+pyweber --reload-mode
+```
+
+## Project Structure
+
+A typical PyWeber project has the following structure:
+
+```
+my_project/
+├── .pyweber/
+│   └── config.toml      # Configuration file
+├── main.py              # Application entry point
+├── templates/
+│   └── index.html       # HTML templates
+└── src/
+    ├── style/
+    │   └── style.css    # CSS stylesheets
+    └── assets/
+        └── favicon.ico  # Static assets
+```
+
+## Updating PyWeber
+
+To update PyWeber to the latest version:
+
+```bash
+pyweber --update
+```
 
 ## Troubleshooting
 
-### Common Installation Issues
+If you encounter issues during installation or setup:
 
-#### lxml Installation Problems
-
-If you encounter issues installing lxml:
-
-- **Windows**: You might need to install Visual C++ Build Abilities
-- **Linux**: Install the development packages for libxml2 and libxslt
-  ```bash
-  # Ubuntu/Debian
-  sudo apt-get install libxml2-dev libxslt-dev
-  
-  # Fedora/CentOS
-  sudo dnf install libxml2-devel libxslt-devel
-  ```
-- **macOS**: Install with Homebrew
-  ```bash
-  brew install libxml2
-  ```
-
-#### Permission Errors
-
-If you encounter permission errors during installation:
-
-```bash
-# On Windows, run as administrator
-# On macOS/Linux, use sudo
-sudo pip install pyweber
-```
-
-Or install for the current user only:
-
-```bash
-pip install --user pyweber
-```
-
-#### Dependency Conflicts
-
-If you encounter dependency conflicts:
-
-```bash
-pip install pyweber --upgrade --force-reinstall
-```
-
-#### Path Issues
-
-If the `pyweber` command is not found after installation:
-
-1. Ensure Python's scripts directory is in your PATH
-2. Try using `python -m pyweber` instead
-
-### Getting Help
-
-If you encounter issues not covered here:
-
-1. Check the [GitHub Issues](https://github.com/pyweber/pyweber/issues) for similar problems
-2. Create a new issue with details about your environment and the error message
-3. Refer to the [troubleshooting guide](troubleshooting.md) for more detailed solutions
+1. Ensure you're using Python 3.10 or higher
+2. Check that pip is up to date: `pip install --upgrade pip`
+3. Try installing in a virtual environment
+4. For permission errors, use `pip install --user pyweber`
 
 ## Next Steps
 
 Now that you have PyWeber installed, you can:
 
-- Follow the [Quick Start Guide](index.md#quick-start)
-- Learn about the [CLI](cli.md)
-- Explore [Templates](template.md)
-- Set up [Routing](router.md)
+- Explore [Templates](template.md) for creating UI components
+- Learn about [Elements](element.md) for DOM manipulation
+- Understand [Events](events.md) for handling user interactions
+- Set up routing with the [PyWeber class](router.md)
 
 Happy coding with PyWeber!
