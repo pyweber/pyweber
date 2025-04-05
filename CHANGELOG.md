@@ -1,6 +1,10 @@
 # PyWeber Changelog
 
-## Version 0.8.2 (Current)
+## Version 0.8.3
+### Bug Fixed
+- Fixed `FileNotFoundError` when try run on reload_mode if config file not exists
+
+## Version 0.8.2
 ---
 ### New Features
 - Added comprehensive configuration management system
