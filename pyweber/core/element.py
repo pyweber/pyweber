@@ -1,7 +1,6 @@
-from pyweber.utils.types import getBy
-from pyweber.core.base_element import ElementConstrutor
-from pyweber.utils.types import HTMLTag, Events
 from uuid import uuid4
+from pyweber.utils.types import HTMLTag, GetBy
+from pyweber.models.element import ElementConstrutor
 
 class Element(ElementConstrutor):
     def __init__(
@@ -19,16 +18,16 @@ class Element(ElementConstrutor):
         super().__init__(tag, id, content, value, classes, style, attrs, childs, events)
         self.uuid = getattr(self, 'uuid', None) or str(uuid4())
     
-    def getElement(self, by: getBy, value: str, element: 'Element' = None) -> 'Element':
+    def getElement(self, by: GetBy, value: str, element: 'Element' = None) -> 'Element':
         results = self.getElements(by=by, value=value, element=element)
 
         return results[0] if results else None
     
-    def getElements(self, by: getBy, value: str, element: 'Element' = None) -> list['Element']:
+    def getElements(self, by: GetBy, value: str, element: 'Element' = None) -> list['Element']:
         element = element or self
         results: list['Element'] = []
 
-        if isinstance(by, getBy):
+        if isinstance(by, GetBy):
             by: str = by.value
         
         if by == 'classes':

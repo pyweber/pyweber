@@ -59,6 +59,7 @@ class Counter(pw.Template):
     def increment(self, e: pw.EventHandler):
         current = int(self.count.content)
         self.count.content = str(current + 1)
+        e.update()
 
 def main(app: pw.Router):
     app.add_route("/", template=Counter(app=app))

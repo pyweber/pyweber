@@ -1,6 +1,7 @@
-from pyweber.utils.types import Events, EventType, HTMLTag
 from uuid import uuid4
 from typing import TYPE_CHECKING
+from pyweber.core.events import TemplateEvents
+from pyweber.utils.types import EventType, HTMLTag
 
 if TYPE_CHECKING:
     from pyweber.core.template import Template
@@ -16,7 +17,7 @@ class ElementConstrutor:
         style: dict[str, str],
         attrs: dict[str, str],
         childs: list['ElementConstrutor'],
-        events: Events,
+        events: 'TemplateEvents',
     ):
         self.tag = tag
         self.id = id
@@ -26,7 +27,8 @@ class ElementConstrutor:
         self.style = style or {}
         self.attrs = attrs or {}
         self.childs = childs or []
-        self.events = events or Events()
+        self.events = events or TemplateEvents()
+        self.data = None
     
     @property
     def template(self):
@@ -149,17 +151,12 @@ class ElementConstrutor:
         
         self.__style[key] = value
     
-    def get_style(self, key: str):
-        if key not in self.__style:
-            raise KeyError('style not defined for this element')
-        
-        return self.__style.get(key, None)
+    def get_style(self, key: str, default= None):
+        return self.__style.get(key, default)
     
     def remove_style(self, key: str):
-        if key not in self.__style:
-            raise TypeError('style not defined for this element')
-        
-        del self.__style[key]
+        if key in self.__style:
+            del self.__style[key]
     
     @property
     def attrs(self):
@@ -184,17 +181,12 @@ class ElementConstrutor:
         
         self.__attrs[key] = value
     
-    def get_attr(self, key: str):
-        if key not in self.__style:
-            raise KeyError('style not defined for this element')
-        
-        return self.__attrs.get(key, None)
+    def get_attr(self, key: str, default=None) -> str | None:        
+        return self.__attrs.get(key, default)
     
     def remove_attr(self, key: str):
-        if key not in self.__style:
-            raise TypeError('style not defined for this element')
-        
-        del self.__attrs[key]
+        if key in self.__attrs:
+            del self.__attrs[key]
     
     @property
     def content(self):
@@ -285,8 +277,8 @@ class ElementConstrutor:
         return self.__events
     
     @events.setter
-    def events(self, event_handler: Events):
-        if not isinstance(event_handler, Events):
+    def events(self, event_handler: 'TemplateEvents'):
+        if not isinstance(event_handler, TemplateEvents):
             raise TypeError('Event_handler must a be Events instance')
         
         self.__events = event_handler
@@ -298,10 +290,22 @@ class ElementConstrutor:
         if not callable(event_handler):
             raise TypeError('Event_handler must a be callable function')
         
-        setattr(self.__events, event_type, event_handler)
+        setattr(self.__events, event_type.value, event_handler)
     
     def remove_event(self, event_type: EventType):
         if not isinstance(event_type, EventType):
             raise TypeError('Event_type must a be EventType instance')
         
         setattr(self.__events, event_type.value, None)
+    
+    def __repr__(self):
+        return (
+            f'Element('
+            f'tag={self.tag}, '
+            f'id={self.id}, '
+            f'classes={self.classes}, '
+            f'content_length={len(str(self.content)) if self.content else 0}, '
+            f'value={self.value}, '
+            f'parent={bool(self.parent)}, '
+            f'childs={len(self.childs)})'
+        )

@@ -1,4 +1,0 @@
-websockets
-watchdog
-lxml
-requests

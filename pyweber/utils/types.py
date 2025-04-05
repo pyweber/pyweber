@@ -1,13 +1,37 @@
-from enum import Enum
 import os
+from enum import Enum
 from importlib.resources import files
 
-class Colors(Enum):
+class Colors:
     RESET = "\033[0m"
+    BOLD = "\033[1m"
+
+    # Cores básicas
     RED = "\033[91m"
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
     BLUE = "\033[94m"
+    MAGENTA = "\033[95m"
+    CYAN = "\033[96m"
+    WHITE = "\033[97m"
+
+    # Cores em fundo
+    BG_RED = "\033[41m"
+    BG_GREEN = "\033[42m"
+    BG_YELLOW = "\033[43m"
+    BG_BLUE = "\033[44m"
+    BG_MAGENTA = "\033[45m"
+    BG_CYAN = "\033[46m"
+    BG_WHITE = "\033[47m"
+
+    # Cores com negrito
+    BOLD_RED = "\033[1;91m"
+    BOLD_GREEN = "\033[1;92m"
+    BOLD_YELLOW = "\033[1;93m"
+    BOLD_BLUE = "\033[1;94m"
+    BOLD_MAGENTA = "\033[1;95m"
+    BOLD_CYAN = "\033[1;96m"
+    BOLD_WHITE = "\033[1;97m"
 
 class JWTAlgorithms(Enum):
     HS256 = 'HS256'
@@ -22,6 +46,12 @@ class JWTAlgorithms(Enum):
     PS256 = 'PS256'
     PS384 = 'PS384'
     PS512 = 'PS512'
+
+class OrientationType(Enum):
+    LANDSCAPE_PRIMARY = "landscape-primary"
+    LANDSCAPE_SECONDARY = "landscape-secondary"
+    PORTRAIT_PRIMARY = "portrait-primary"
+    PORTRAIT_SECONDARY = "portrait-secondary"
 
 class ContentTypes(Enum):
     html = "text/html"
@@ -56,11 +86,14 @@ class ContentTypes(Enum):
 class StaticFilePath(Enum):
     html_base = files(anchor='pyweber').joinpath(os.path.join('static', 'html.html'))
     html_404 = files(anchor='pyweber').joinpath(os.path.join('static', 'html404.html'))
+    html_500 = files(anchor='pyweber').joinpath(os.path.join('static', 'html500.html'))
     html_401 = files(anchor='pyweber').joinpath(os.path.join('static', 'html401.html'))
     js_base = files(anchor='pyweber').joinpath(os.path.join('static', 'js.js'))
     css_base = files(anchor='pyweber').joinpath(os.path.join('static', 'css.css'))
     main_base = files(anchor='pyweber').joinpath(os.path.join('static', 'main.py'))
     favicon_path = files(anchor='pyweber').joinpath(os.path.join('static', 'favicon'))
+    config_default = files(anchor='pyweber').joinpath(os.path.join('static', 'config.toml'))
+    pyweber_css = files(anchor='pyweber').joinpath(os.path.join('static', 'pyweber.css'))
 
 class WebSocketStatusCode(Enum):
     NORMAL_CLOSURE = "1000 Normal Closure"
@@ -226,8 +259,6 @@ class EventType(Enum):
     TOUCHMOVE = "ontouchmove"
     TOUCHEND = "ontouchend"
     TOUCHCANCEL = "ontouchcancel"
-
-from enum import Enum
 
 class WindowEventType(Enum):
     # Eventos de Janela e Navegação
@@ -527,7 +558,7 @@ class NonSelfClosingHTMLTags(Enum):
     def non_autoclosing_tags() -> list[str]:
         return [val.value for val in NonSelfClosingHTMLTags]
 
-class getBy(Enum):
+class GetBy(Enum):
     tag = 'tag'
     classes = 'classes'
     id = 'id'
@@ -536,321 +567,3 @@ class getBy(Enum):
     attrs = 'attrs'
     style = 'style'
     uuid = 'uuid'
-
-class Events:
-    def __init__(
-        self,
-        # Eventos de Mouse
-        onclick: callable = None,
-        ondblclick: callable = None,
-        onmousedown: callable = None,
-        onmouseup: callable = None,
-        onmousemove: callable = None,
-        onmouseover: callable = None,
-        onmouseout: callable = None,
-        onmouseenter: callable = None,
-        onmouseleave: callable = None,
-        oncontextmenu: callable = None,
-        onwheel: callable = None,
-
-        # Eventos de Teclado
-        onkeydown: callable = None,
-        onkeyup: callable = None,
-        onkeypress: callable = None,
-
-        # Eventos de Formulário
-        onfocus: callable = None,
-        onblur: callable = None,
-        onchange: callable = None,
-        oninput: callable = None,
-        onsubmit: callable = None,
-        onreset: callable = None,
-        onselect: callable = None,
-
-        # Eventos de Drag & Drop
-        ondrag: callable = None,
-        ondragstart: callable = None,
-        ondragend: callable = None,
-        ondragover: callable = None,
-        ondragenter: callable = None,
-        ondragleave: callable = None,
-        ondrop: callable = None,
-
-        # Eventos de Scroll e Resize
-        onscroll: callable = None,
-        onresize: callable = None,
-
-        # Eventos de Mídia
-        onplay: callable = None,
-        onpause: callable = None,
-        onended: callable = None,
-        onvolumechange: callable = None,
-        onseeked: callable = None,
-        onseeking: callable = None,
-        ontimeupdate: callable = None,
-
-        # Eventos de Rede
-        ononline: callable = None,
-        onoffline: callable = None,
-
-        # Eventos de Toque (Mobile)
-        ontouchstart: callable = None,
-        ontouchmove: callable = None,
-        ontouchend: callable = None,
-        ontouchcancel: callable = None,
-    ):
-        # Eventos de Mouse
-        self.onclick = onclick
-        self.ondblclick = ondblclick
-        self.onmousedown = onmousedown
-        self.onmouseup = onmouseup
-        self.onmousemove = onmousemove
-        self.onmouseover = onmouseover
-        self.onmouseout = onmouseout
-        self.onmouseenter = onmouseenter
-        self.onmouseleave = onmouseleave
-        self.oncontextmenu = oncontextmenu
-        self.onwheel = onwheel
-
-        # Eventos de Teclado
-        self.onkeydown = onkeydown
-        self.onkeyup = onkeyup
-        self.onkeypress = onkeypress
-
-        # Eventos de Formulário
-        self.onfocus = onfocus
-        self.onblur = onblur
-        self.onchange = onchange
-        self.oninput = oninput
-        self.onsubmit = onsubmit
-        self.onreset = onreset
-        self.onselect = onselect
-
-        # Eventos de Drag & Drop
-        self.ondrag = ondrag
-        self.ondragstart = ondragstart
-        self.ondragend = ondragend
-        self.ondragover = ondragover
-        self.ondragenter = ondragenter
-        self.ondragleave = ondragleave
-        self.ondrop = ondrop
-
-        # Eventos de Scroll e Resize
-        self.onscroll = onscroll
-        self.onresize = onresize
-
-        # Eventos de Mídia
-        self.onplay = onplay
-        self.onpause = onpause
-        self.onended = onended
-        self.onvolumechange = onvolumechange
-        self.onseeked = onseeked
-        self.onseeking = onseeking
-        self.ontimeupdate = ontimeupdate
-
-        # Eventos de Rede
-        self.ononline = ononline
-        self.onoffline = onoffline
-
-        # Eventos de Toque (Mobile)
-        self.ontouchstart = ontouchstart
-        self.ontouchmove = ontouchmove
-        self.ontouchend = ontouchend
-        self.ontouchcancel = ontouchcancel
-
-    def __repr__(self):
-        """Representação legível dos eventos."""
-        events = {k: v for k, v in self.__dict__.items() if v is not None}
-        return f"Events({events})"
-
-class WindowEvents:
-    def __init__(
-        self,
-        # Eventos de Janela e Navegação
-        onafterprint: callable = None,
-        onbeforeprint: callable = None,
-        onbeforeunload: callable = None,
-        onhashchange: callable = None,
-        onload: callable = None,
-        onunload: callable = None,
-        onpageshow: callable = None,
-        onpagehide: callable = None,
-        onpopstate: callable = None,
-        onDOMContentLoaded: callable = None,
-
-        # Eventos de Rede
-        ononline: callable = None,
-        onoffline: callable = None,
-
-        # Eventos de Armazenamento
-        onstorage: callable = None,
-
-        # Eventos de Mensagens e Comunicação
-        onmessage: callable = None,
-        onmessageerror: callable = None,
-
-        # Eventos de Animação e Transição
-        onanimationstart: callable = None,
-        onanimationend: callable = None,
-        onanimationiteration: callable = None,
-        ontransitionstart: callable = None,
-        ontransitionend: callable = None,
-        ontransitioncancel: callable = None,
-
-        # Eventos de Fullscreen e Pointer Lock
-        onfullscreenchange: callable = None,
-        onfullscreenerror: callable = None,
-        onpointerlockchange: callable = None,
-        onpointerlockerror: callable = None,
-
-        # Eventos de Dispositivo
-        ondevicemotion: callable = None,
-        ondeviceorientation: callable = None,
-        ondeviceorientationabsolute: callable = None,
-        onorientationchange: callable = None,
-
-        # Eventos de Gamepad
-        ongamepadconnected: callable = None,
-        ongamepaddisconnected: callable = None,
-
-        # Eventos de VR
-        onvrdisplayconnect: callable = None,
-        onvrdisplaydisconnect: callable = None,
-        onvrdisplaypresentchange: callable = None,
-        onvrdisplayactivate: callable = None,
-        onvrdisplaydeactivate: callable = None,
-        onvrdisplayblur: callable = None,
-        onvrdisplayfocus: callable = None,
-        onvrdisplaypointerrestricted: callable = None,
-        onvrdisplaypointerunrestricted: callable = None,
-
-        # Eventos de Service Worker e Cache
-        oninstall: callable = None,
-        onactivate: callable = None,
-        onfetch: callable = None,
-        onnotificationclick: callable = None,
-        onnotificationclose: callable = None,
-        onpush: callable = None,
-        onpushsubscriptionchange: callable = None,
-        onsync: callable = None,
-        onperiodicsync: callable = None,
-        onbackgroundfetchsuccess: callable = None,
-        onbackgroundfetchfailure: callable = None,
-        onbackgroundfetchabort: callable = None,
-        onbackgroundfetchclick: callable = None,
-        oncontentdelete: callable = None,
-
-        # Eventos de Clipboard
-        oncut: callable = None,
-        oncopy: callable = None,
-        onpaste: callable = None,
-
-        # Eventos de Seleção de Texto
-        onselectionchange: callable = None,
-
-        # Eventos de Visibilidade
-        onvisibilitychange: callable = None,
-
-        # Eventos de Rejeição de Promises
-        onrejectionhandled: callable = None,
-        onunhandledrejection: callable = None,
-
-        # Eventos de Segurança
-        onsecuritypolicyviolation: callable = None,
-    ):
-        # Eventos de Janela e Navegação
-        self.onafterprint = onafterprint
-        self.onbeforeprint = onbeforeprint
-        self.onbeforeunload = onbeforeunload
-        self.onhashchange = onhashchange
-        self.onload = onload
-        self.onunload = onunload
-        self.onpageshow = onpageshow
-        self.onpagehide = onpagehide
-        self.onpopstate = onpopstate
-        self.onDOMContentLoaded = onDOMContentLoaded
-
-        # Eventos de Rede
-        self.ononline = ononline
-        self.onoffline = onoffline
-
-        # Eventos de Armazenamento
-        self.onstorage = onstorage
-
-        # Eventos de Mensagens e Comunicação
-        self.onmessage = onmessage
-        self.onmessageerror = onmessageerror
-
-        # Eventos de Animação e Transição
-        self.onanimationstart = onanimationstart
-        self.onanimationend = onanimationend
-        self.onanimationiteration = onanimationiteration
-        self.ontransitionstart = ontransitionstart
-        self.ontransitionend = ontransitionend
-        self.ontransitioncancel = ontransitioncancel
-
-        # Eventos de Fullscreen e Pointer Lock
-        self.onfullscreenchange = onfullscreenchange
-        self.onfullscreenerror = onfullscreenerror
-        self.onpointerlockchange = onpointerlockchange
-        self.onpointerlockerror = onpointerlockerror
-
-        # Eventos de Dispositivo
-        self.ondevicemotion = ondevicemotion
-        self.ondeviceorientation = ondeviceorientation
-        self.ondeviceorientationabsolute = ondeviceorientationabsolute
-        self.onorientationchange = onorientationchange
-
-        # Eventos de Gamepad
-        self.ongamepadconnected = ongamepadconnected
-        self.ongamepaddisconnected = ongamepaddisconnected
-
-        # Eventos de VR
-        self.onvrdisplayconnect = onvrdisplayconnect
-        self.onvrdisplaydisconnect = onvrdisplaydisconnect
-        self.onvrdisplaypresentchange = onvrdisplaypresentchange
-        self.onvrdisplayactivate = onvrdisplayactivate
-        self.onvrdisplaydeactivate = onvrdisplaydeactivate
-        self.onvrdisplayblur = onvrdisplayblur
-        self.onvrdisplayfocus = onvrdisplayfocus
-        self.onvrdisplaypointerrestricted = onvrdisplaypointerrestricted
-        self.onvrdisplaypointerunrestricted = onvrdisplaypointerunrestricted
-
-        # Eventos de Service Worker e Cache
-        self.oninstall = oninstall
-        self.onactivate = onactivate
-        self.onfetch = onfetch
-        self.onnotificationclick = onnotificationclick
-        self.onnotificationclose = onnotificationclose
-        self.onpush = onpush
-        self.onpushsubscriptionchange = onpushsubscriptionchange
-        self.onsync = onsync
-        self.onperiodicsync = onperiodicsync
-        self.onbackgroundfetchsuccess = onbackgroundfetchsuccess
-        self.onbackgroundfetchfailure = onbackgroundfetchfailure
-        self.onbackgroundfetchabort = onbackgroundfetchabort
-        self.onbackgroundfetchclick = onbackgroundfetchclick
-        self.oncontentdelete = oncontentdelete
-
-        # Eventos de Clipboard
-        self.oncut = oncut
-        self.oncopy = oncopy
-        self.onpaste = onpaste
-
-        # Eventos de Seleção de Texto
-        self.onselectionchange = onselectionchange
-
-        # Eventos de Visibilidade
-        self.onvisibilitychange = onvisibilitychange
-
-        # Eventos de Rejeição de Promises
-        self.onrejectionhandled = onrejectionhandled
-        self.onunhandledrejection = onunhandledrejection
-
-        # Eventos de Segurança
-        self.onsecuritypolicyviolation = onsecuritypolicyviolation
-
-    def __repr__(self):
-        """Representação legível dos eventos."""
-        events = {k: v for k, v in self.__dict__.items() if v is not None}
-        return f"WindowEvents({events})"

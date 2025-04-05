@@ -19,3 +19,8 @@ class InvalidRouteFormatError(RouterError):
     """Exception for invalid route format."""
     def __init__(self):
         super().__init__("The route must start with /")
+
+class InvalidCallableError(RouterError):
+    """Exception for invalid callable format"""
+    def __init__(self):
+        super().__init__("The decorator function must be a callable function")

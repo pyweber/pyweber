@@ -1,4 +1,4 @@
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 class Request:
     def __init__(self, raw_request: str):
@@ -156,4 +156,100 @@ Request(
     accept_language= {self.accept_language}
     params= {self.params}
     fragment= {self.fragment}
+)""".strip()
+
+class RequestASGI:
+    def __init__(self, raw_request: dict):
+        self.__raw_request = raw_request
+        self.method: str = self.__get_method()
+        self.path: str = self.__get_path()
+        self.netloc: str = self.__get_netloc()
+        self.host: str = self.__get_host()
+        self.user_agent: str = self.__get_user_agent()
+        self.referer: str = self.__get_referer()
+        self.cookies: dict[str, str] = self.__get_cookies()
+        self.accept: list[str] = self.__get_accept()
+        self.accept_encoding: list[str] = self.__get_accept_encoding()
+        self.accept_language: list[str] = self.__get_accept_language()
+        self.authorization: str = self.__get_authorization()
+        self.params: dict[str, list[str]] = self.__get_params()
+        self.fragment: str = self.__get_fragment()
+        self.session_id: str = self.__get_session_id()
+    
+    def __get_method(self):
+        return self.__raw_request.get("method", "").upper()
+    
+    def __get_path(self) -> str:
+        return self.__raw_request.get("path", "")
+    
+    def __get_netloc(self):
+        scheme = self.__get_path().split(':', 1)[0]
+        return scheme if scheme in ['http', 'https'] else None
+    
+    def __get_host(self):
+        for key, value in self.__raw_request.get("headers", []):
+            if key == b"host":
+                return value.decode().split(":")[0]
+        return ""
+    
+    def __get_user_agent(self):
+        return self.__get_header(b"user-agent")
+    
+    def __get_referer(self):
+        return self.__get_header(b"referer")
+    
+    def __get_authorization(self):
+        return self.__get_header(b"authorization")
+    
+    def __get_session_id(self):
+        return self.__get_header(b"session-id")
+    
+    def __get_cookies(self):
+        cookie_header = self.__get_header(b"cookie")
+        if cookie_header:
+            return {c.split("=")[0]: c.split("=")[1] for c in cookie_header.split("; ")}
+        return {}
+    
+    def __get_accept(self):
+        return self.__split_header(b"accept", ",")
+    
+    def __get_accept_encoding(self):
+        return self.__split_header(b"accept-encoding", ",")
+    
+    def __get_accept_language(self):
+        return self.__split_header(b"accept-language", ",")
+    
+    def __get_params(self):
+        query_string = self.__raw_request.get("query_string", b"").decode()
+        return parse_qs(query_string)
+    
+    def __get_fragment(self):
+        return None  # ASGI requests geralmente não incluem fragmentos
+    
+    def __get_header(self, key: bytes):
+        for h_key, h_value in self.__raw_request.get("headers", []):
+            if h_key == key:
+                return h_value.decode()
+        return ""
+    
+    def __split_header(self, key: bytes, separator: str):
+        header_value = self.__get_header(key)
+        return [v.strip() for v in header_value.split(separator)] if header_value else []
+    
+    def __repr__(self):
+        return f"""
+RequestASGI(
+    method={self.method}
+    path={self.path}
+    netloc={self.netloc}
+    host={self.host}
+    user_agent={self.user_agent}
+    referer={self.referer}
+    url={self.path}
+    cookies={self.cookies}
+    accept={self.accept}
+    accept_encoding={self.accept_encoding}
+    accept_language={self.accept_language}
+    params={self.params}
+    fragment={self.fragment}
 )""".strip()

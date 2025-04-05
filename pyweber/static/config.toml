@@ -1,0 +1,35 @@
+[app]
+name = 'Pyweber App'
+version = '0.1.0'
+description = 'A powerfull app made with pyweber framework'
+keywords = ['pyweber', 'python web', 'web', 'python']
+icon = '/_pyweber/static/favicon.ico'
+
+[requirements]
+packages = []
+
+[server]
+host = '0.0.0.0'
+port = 8800
+route = '/'
+
+[websocket]
+port = 8765
+
+[database.database_1]
+type = ''
+name = ''
+username = ''
+password = ''
+host = ''
+port = ''
+dsn = ''
+ssl = ''
+
+[session]
+secret_key = 'TOKEN_HEX'
+timeout = 3600
+reload_mode = false
+env = 'development'
+
+[api_keys]

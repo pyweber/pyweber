@@ -1,4 +1,5 @@
 import os
+import toml
 from pyweber.utils.types import ContentTypes, StaticFilePath
 
 class LoadStaticFiles:
@@ -67,7 +68,19 @@ class StaticTemplates:
         ).load
     
     @staticmethod
+    def PAGE_SERVER_ERROR() -> str:
+        return LoadStaticFiles(
+            path=str(StaticFilePath.html_500.value)
+        ).load
+    
+    @staticmethod
     def FAVICON() -> bytes:
         return LoadStaticFiles(
             path=str(os.path.join(StaticFilePath.favicon_path.value, 'favicon.ico'))
         ).load
+    
+    @staticmethod
+    def CONFIG_DEFAULT() -> dict[str, dict[str, (bool, str, int)]]:
+        return toml.loads(LoadStaticFiles(
+            path=str(StaticFilePath.config_default.value)
+        ).load)

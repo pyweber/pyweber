@@ -1,8 +1,10 @@
 import os
+from uuid import uuid4
 import lxml.html as HTMLPARSER
 from lxml.etree import Element as LXML_Element
-from pyweber.core.element import Element, Events
-from pyweber.utils.load import LoadStaticFiles
+from pyweber.core.events import TemplateEvents
+from pyweber.core.element import Element
+from pyweber.utils.loads import LoadStaticFiles
 from pyweber.config.config import config
 from pyweber.utils.types import HTTPStatusCode, NonSelfClosingHTMLTags
 
@@ -13,6 +15,7 @@ class Template:
         self.__icon: str = self.get_icon()
         self.__root = self.parse_html()
         self.__status_code = status_code
+        self.data = None
     
     @property
     def template(self):
@@ -51,58 +54,7 @@ class Template:
         if not html:
             html = self.__template
         
-        root = self.__parse_html(html=html)
-
-        has_websocket_script, has_icon = False, False
-        for child in root.childs[0].childs:
-            if child.tag == 'script' and child.attrs.get('src', None) == '/_pyweber/static/js.js':
-                has_websocket_script = True
-
-            if child.tag == 'link':
-                if 'icon' in list(child.attrs.values()):
-                    has_icon = True
-            
-            if has_icon and has_websocket_script:
-                break
-        
-        if not has_websocket_script:
-            el_1 = Element(
-                tag='script',
-                content=f"window.PYWEBER_WS_PORT = {config['websocket'].get('port')}",
-                attrs={
-                    'type': 'text/javascript'
-                }
-            )
-            el_2 = Element(
-                tag='script',
-                attrs={
-                    'src': '/_pyweber/static/js.js',
-                    'type': 'text/javascript'
-                }
-            )
-            el_3 = Element(
-                tag='link',
-                attrs={
-                    'rel': 'icon',
-                    'href': f'{self.__icon.strip()}'.replace('\\', '/'),
-                }
-            )
-
-            el_1.uuid, el_2.uuid, el_3.uuid = None, None, None
-
-            root.childs[0].childs.extend(
-                [
-                    el_1,
-                    el_2
-                ]
-            )
-
-        if not has_icon:
-            root.childs[0].childs.append(
-                el_3
-            )
-        
-        return root
+        return self.__inject_default_elements(root=self.__parse_html(html=html))
 
     def build_html(self, element: Element = None):
         if element:
@@ -232,7 +184,7 @@ class Template:
         events_dict = {key[1:]: HTMLElement.attrib.pop(key) for key in HTMLElement.attrib if key.startswith('_on')}
         childrens: list[HTMLPARSER.HtmlElement] = HTMLElement.getchildren()
         
-        event_obj = Events()
+        event_obj = TemplateEvents()
         for key, value in events_dict.items():
             if hasattr(event_obj, key):
                 setattr(event_obj, key, value)
@@ -327,8 +279,80 @@ class Template:
         
         return file_path
     
-    def __event_id(self, event: object):
+    def __create_default_element(self, *args, **kwargs):
+        return Element(*args, **kwargs)
+    
+    def __inject_default_elements(self, root: Element):
+        has_websocket_script, has_icon, has_description, has_css, has_keywords = False, False, False, False, False
+        for child in root.childs[0].childs:
+            if child.tag == 'script' and child.get_attr('src', '').startswith('/_pyweber/static/') and child.get_attr('src', '').endswith('/.js'):
+                has_websocket_script = True
+            
+            elif child.tag == 'link':
+                if 'icon' in list(child.attrs.values()):
+                    has_icon = True
+                
+                elif child.get_attr('rel') == 'stylesheet' and child.get_attr('href', '').startswith('/_pyweber/static/') and child.get_attr('href', '').endswith('/.css'):
+                    has_css = True
+            
+            elif child.tag == 'meta':
+                if 'description' in list(child.attrs.values()):
+                    has_description = True
+                
+                elif 'keywords' in list(child.attrs.values()):
+                    has_keywords = True
+            
+            if has_websocket_script and has_icon and has_css and has_description and has_keywords:
+                break
+        
+        if not has_websocket_script:
+            ws_port = self.__create_default_element(
+                tag='script',
+                content=f"window.PYWEBER_WS_PORT = {config['websocket'].get('port')}",
+                attrs={'type': 'text/javascript'}
+            )
+            script = self.__create_default_element(
+                tag='script',
+                attrs={'src': f'/_pyweber/static/{str(uuid4())}/.js', 'type': 'text/javascript'}
+            )
+            ws_port.uuid, script.uuid = None, None
+            root.childs[0].childs.extend([ws_port, script])
+        
+        if not has_icon:
+            icon = self.__create_default_element(
+                tag='link',
+                attrs={'rel': 'icon', 'href': f'{self.__icon.strip()}'.replace('\\', '/')}
+            )
+            icon.uuid = None
+            root.childs[0].childs.append(icon)
+        
+        if not has_css:
+            css = self.__create_default_element(
+                tag='link',
+                attrs={'rel': 'stylesheet', 'href': f'/_pyweber/static/{str(uuid4())}/.css'}
+            )
+            css.uuid = None
+            root.childs[0].childs.append(css)
+        
+        if not has_description:
+            description = self.__create_default_element(
+                tag='meta',
+                attrs={'name': 'description', 'content': config['app'].get('description')}
+            )
+            description.uuid = None
+            root.childs[0].childs.append(description)
+        
+        if not has_keywords:
+            keywords = self.__create_default_element(
+                tag='meta',
+                attrs={'name': 'keywords', 'content': ', '.join(config['app'].get('keywords', []))}
+            )
+            keywords.uuid = None
+            root.childs[0].childs.append(keywords)
+        
+        return root
+    
+    def __event_id(self, event: callable):
         key = f'event_{id(event)}'
         self.__events[key] = event
-
         return key
