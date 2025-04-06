@@ -8,6 +8,7 @@ pyweber.egg-info
 htmlcov/
 site/
 templates/
+.vscode/
 
 # files ignored
 setup.py

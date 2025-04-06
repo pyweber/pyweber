@@ -188,12 +188,4 @@ pyweber add-section --section-name database
 pyweber --update
 ```
 
-## Next Steps
-
-- [Installation Guide](installation.md) - Detailed setup instructions
-- [Templates](template.md) - Creating dynamic UI components
-- [Elements](element.md) - DOM manipulation
-- [Events](events.md) - Handling user interactions
-- [CLI](cli.md) - Command-line tools
-
 Visit [Pyweber Docs](https://pyweber.readthedocs.io/) for complete documentation.
