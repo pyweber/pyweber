@@ -61,10 +61,10 @@ class ElementConstrutor:
             return
         
         if not isinstance(value, str):
-            raise TypeError('Element tag must be a HtmlTag ou string')
+            raise TypeError('Element tag must be an HtmlTag ou string')
         
         if not value.strip():
-            raise ValueError('Element tag name not be a dtring')
+            raise ValueError('Element tag name not be an empty value')
         
         self.__tag = value
     

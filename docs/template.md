@@ -5,7 +5,6 @@ Templates are the core building blocks of PyWeber applications. They represent H
 ## Creating Templates
 
 A template in PyWeber can be created from an HTML file or from an HTML string:
-
 ```python
 import pyweber as pw
 
@@ -32,25 +31,74 @@ class HomePage(pw.Template):
 # From an HTML string
 class SimpleTemplate(pw.Template):
     def __init__(self, app: pw.Pyweber):
-        super().__init__(template="""
-            <div>
-                <h1>Simple Template</h1>
-                <button id="action-button">Click Me</button>
-            </div>
-        """)
+        super().__init__(template="<div><h1>Simple Template</h1><button id='action-button'>Click Me</button></div>")
 
         # Initialize as before
         self.setup()
+```
+
+## Dynamic Templates (New in 0.8.4)
+
+PyWeber 0.8.4 introduces support for dynamic templates, allowing you to inject values into your templates at runtime:
+```python
+
+import pyweber as pw
+
+class DynamicTemplate(pw.Template):
+    def __init__(self, app: pw.Pyweber, username: str):
+        # Pass dynamic values to the template
+        super().__init__(
+            template="welcome.html",
+            username=username,
+            current_date="April 6, 2025"
+        )
+```
+
+In your HTML template (welcome.html):
+```html
+<h1>Welcome, {{username}}!</h1>
+<p>Today is {{current_date}}</p>
+```
+
+You can also inject Elements into your templates:
+```python
+import pyweber as pw
+
+class CompositeTemplate(pw.Template):
+    def __init__(self, app: pw.Pyweber):
+        # Create a navigation element
+        nav = pw.Element(
+            tag="nav",
+            classes=["main-nav"]
+        )
+
+        # Add items to navigation
+        nav.childs.append(pw.Element(tag="a", content="Home", attrs={"href": "/"}))
+        nav.childs.append(pw.Element(tag="a", content="About", attrs={"href": "/about"}))
+
+        # Pass the element to the template
+        super().__init__(
+            template="layout.html",
+            navigation=nav
+        )
+```
+
+In your HTML template (layout.html):
+```html
+<header>
+  {{navigation}}
+</header>
 ```
 
 ## Template Class API
 
 ### Constructor
 
-Template(template: str, status_code: int = 200)
+Template(template: str, status_code: int = 200, **kwargs)
 
 - `template`: Path to an HTML file (relative to the templates directory) or an HTML string
 - `status_code`: HTTP status code to return when this template is rendered (default: 200)
+- `**kwargs`: Dynamic values to inject into the template (new in 0.8.4)
 
 ### Properties
 
@@ -67,12 +115,12 @@ Template(template: str, status_code: int = 200)
 PyWeber provides several methods to select elements within a template:
 
 ### querySelector
-
 ```python
 querySelector(selector: str, element: Element = None) -> Element | None
+```
 
 Selects the first element that matches the CSS selector.
-
+```python
 # Select by ID
 button = template.querySelector("#submit-button")
 
@@ -81,13 +129,15 @@ title = template.querySelector(".main-title")
 
 # Select by tag name
 paragraph = template.querySelector("p")
+```
 
 ### querySelectorAll
-
+```python
 querySelectorAll(selector: str, element: Element = None) -> list[Element]
+```
 
 Selects all elements that match the CSS selector.
-
+```python
 # Select all paragraphs
 paragraphs = template.querySelectorAll("p")
 
@@ -96,9 +146,9 @@ items = template.querySelectorAll(".item")
 ```
 
 ### getElementById
-```python
+```python 
 getElementById(element_id: str, element: Element = None) -> Element | None
-```
+```   
 
 Selects an element by its ID.
 ```python
@@ -111,7 +161,6 @@ getElementByClass(class_name: str, element: Element = None) -> list[Element]
 ```
 
 Selects all elements with the specified class.
-
 ```python
 items = template.getElementByClass("item")
 ```
@@ -120,8 +169,8 @@ items = template.getElementByClass("item")
 ```python
 getElementByUUID(element_uuid: str, element: Element = None) -> Element | None
 ```
-Selects an element by its UUID (internal identifier).
 
+Selects an element by its UUID (internal identifier).
 ```python
 element = template.getElementByUUID("12345678-1234-5678-1234-567812345678")
 ```
@@ -130,12 +179,10 @@ element = template.getElementByUUID("12345678-1234-5678-1234-567812345678")
 
 ### parse_html
 ```python
-
 parse_html(html: str = None) -> Element
 ```
 
 Parses HTML into an Element tree. If no HTML is provided, uses the template's HTML.
-
 ```python
 # Parse new HTML and replace the current template
 new_element = template.parse_html("<div><h1>New Content</h1></div>")
@@ -146,6 +193,7 @@ template.root = new_element
 ```python
 build_html(element: Element = None) -> str
 ```
+
 Builds HTML string from the Element tree. If no element is provided, uses the template's root element.
 ```python
 # Get the current HTML
@@ -178,6 +226,32 @@ button.add_class("primary-button")
 button.remove_class("disabled")
 button.toggle_class("active")  # Add if not present, remove if present
 ```
+
+## HTML Comments (New in 0.8.4)
+
+PyWeber 0.8.4 adds support for HTML comments through a special 'comment' tag:
+```python
+# Create a comment element
+comment = pw.Element(
+    tag="comment",
+    content="This is a comment that will be rendered as <!-- This is a comment -->"
+)
+
+# Add it to the DOM
+container.childs.append(comment)
+```
+When parsing HTML, comments are also properly handled:
+```python
+html = """
+<div>
+  <!-- This is a comment -->
+  <p>This is a paragraph</p>
+</div>
+"""
+element = template.parse_html(html)
+# The comment is accessible as a 'comment' tag element
+```
+
 ## Element Properties and Methods
 
 Elements have various properties and methods for manipulation:
@@ -207,24 +281,28 @@ remove_class(class_name: str)
 has_class(class_name: str) -> bool
 toggle_class(class_name: str)
 ```
+
 #### Style Management
 ```python
 set_style(key: str, value: str)
 get_style(key: str, default=None) -> str
 remove_style(key: str)
 ```
+
 #### Attribute Management
 ```python
 set_attr(key: str, value: str)
 get_attr(key: str, default=None) -> str
 remove_attr(key: str)
 ```
+
 #### Child Management
 ```python
 add_child(child: Element)
 remove_child(child: Element)
 pop_child(index: int = -1)
 ```
+
 #### Element Selection
 ```python
 querySelector(selector: str) -> Element
@@ -232,6 +310,7 @@ querySelectorAll(selector: str) -> list[Element]
 getElement(by: GetBy, value: str) -> Element
 getElements(by: GetBy, value: str) -> list[Element]
 ```
+
 ## Handling Events
 
 Events in PyWeber are handled by Python functions:
@@ -272,7 +351,6 @@ class ContactForm(pw.Template):
 
         e.update()
 ```
-
 ### Adding Events
 
 You can add events to elements in several ways:
@@ -351,24 +429,19 @@ def delete_item(self, e: pw.EventHandler):
 
     e.update()
 ```
-## Example: Todo List Application
 
-Here's a complete example of a simple todo list application:
+## Example: Todo List Application with Dynamic Templates
+
+Here's a complete example of a simple todo list application using dynamic templates:
 ```python
 import pyweber as pw
 
 class TodoList(pw.Template):
-    def __init__(self, app: pw.Pyweber):
-        super().__init__(template="""
-            <div class="container">
-                <h1>Todo List</h1>
-                <div class="input-group">
-                    <input id="new-todo" type="text" placeholder="Add new item">
-                    <button id="add-button">Add</button>
-                </div>
-                <ul id="todo-list"></ul>
-            </div>
-        """)
+    def __init__(self, app: pw.Pyweber, username: str = "User"):
+        super().__init__(
+            template="<div class='container'><h1>{{username}}'s Todo List</h1><div class='input-group'><input id='new-todo' type='text' placeholder='Add new item'><button id='add-button'>Add</button></div><ul id='todo-list'></ul><!-- This is a comment that will be properly handled --></div>",
+            username=username
+        )
 
         self.input = self.querySelector("#new-todo")
         self.add_button = self.querySelector("#add-button")
@@ -442,7 +515,7 @@ class TodoList(pw.Template):
         e.update()
 
 def main(app: pw.Pyweber):
-    app.add_route("/", template=TodoList(app=app))
+    app.add_route("/", template=TodoList(app=app, username="John"))
 
 if __name__ == "__main__":
     pw.run(target=main)
@@ -456,6 +529,8 @@ if __name__ == "__main__":
 4. **Update the UI**: Always call `e.update()` after making changes to ensure the UI is refreshed
 5. **Reuse Components**: Create reusable template components for common UI elements
 6. **Validate Input**: Always validate user input before processing
+7. **Use Dynamic Templates**: Leverage the new dynamic template feature for cleaner code (new in 0.8.4)
+8. **Handle Comments Properly**: Use the new comment tag for adding comments to your templates (new in 0.8.4)
 
 ## Next Steps
 

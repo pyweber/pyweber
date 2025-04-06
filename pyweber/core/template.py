@@ -1,4 +1,5 @@
 import os
+from typing import Callable
 from uuid import uuid4
 import lxml.html as HTMLPARSER
 from lxml.etree import Element as LXML_Element
@@ -9,13 +10,14 @@ from pyweber.config.config import config
 from pyweber.utils.types import HTTPStatusCode, NonSelfClosingHTMLTags
 
 class Template:
-    def __init__(self, template: str, status_code: int = 200):
+    def __init__(self, template: str, status_code: int = 200, **kwargs):
         self.__template = self.__read_file(file_path=template)
-        self.__events: dict[str, callable] = {}
+        self.kwargs = kwargs
+        self.data = None
+        self.__status_code = status_code
+        self.__events: dict[str, Callable] = {}
         self.__icon: str = self.get_icon()
         self.__root = self.parse_html()
-        self.__status_code = status_code
-        self.data = None
     
     @property
     def template(self):
@@ -160,13 +162,17 @@ class Template:
             except:
                 return html_element
         
-        name = HTMLElement.tag
-        id = HTMLElement.attrib.pop('id', None)
+        if isinstance(HTMLElement, HTMLPARSER.HtmlComment):
+            name = 'comment'
+        else:
+            name = HTMLElement.tag
 
-        class_str = HTMLElement.attrib.pop('class', None)
+        id = self.__render_dynamic_values(content=HTMLElement.attrib.pop('id', None))
+
+        class_str = self.__render_dynamic_values(content=HTMLElement.attrib.pop('class', None))
         classes = class_str.split() if class_str else []
 
-        style_str: str = HTMLElement.attrib.pop('style', None)
+        style_str: str = self.__render_dynamic_values(content=HTMLElement.attrib.pop('style', None))
         style_dict = {}
 
         if style_str:
@@ -178,9 +184,9 @@ class Template:
                     style_dict[key.strip()] = value.strip()
 
         parent = parent
-        value = HTMLElement.attrib.pop('value', None)
         uuid = HTMLElement.attrib.pop('uuid', None)
-        content = HTMLElement.text if HTMLElement.text else None
+        value = self.__render_dynamic_values(content=HTMLElement.attrib.pop('value', None))
+        content: str = self.__render_dynamic_values(content=HTMLElement.text if HTMLElement.text else None)
         events_dict = {key[1:]: HTMLElement.attrib.pop(key) for key in HTMLElement.attrib if key.startswith('_on')}
         childrens: list[HTMLPARSER.HtmlElement] = HTMLElement.getchildren()
         
@@ -213,9 +219,24 @@ class Template:
         
         return element
     
+    def __render_dynamic_values(self, content: str):
+        if content:
+            begin = content.find('{{')
+            if begin != -1:
+                end = content.find('}}')
+                key = content[begin:end+2].removeprefix('{{').removesuffix('}}').strip()
+                new_content = self.kwargs.get(key, None)
+                
+                if new_content:
+                    if isinstance(new_content, Element):
+                        new_content = self.build_html(element=new_content)
+                    content = content.replace(content[begin:end+2], new_content)
+        
+        return content
+    
     def __build_html(self, element: Element, indent: int = 0) -> str:
         indentation = ' ' * indent
-        html = f'{indentation}<{element.tag} uuid="{element.uuid}"'
+        html = f'{indentation}<{element.tag} uuid="{element.uuid}"' if element.tag != 'comment' else f'{indentation}<!--'
 
         if element.id:
             html += f' id="{element.id}"'
@@ -240,11 +261,15 @@ class Template:
                     raise ValueError(f'Event {value} is an invalid callable ou event_id')
             
         if not element.content and not element.childs and element.tag not in NonSelfClosingHTMLTags.non_autoclosing_tags():
-            return html + '>'
+            if element.tag == 'comment':
+                return html + '-->'
+            else:
+                return html + '>'
         
-        html += '>'
+        if element.tag != 'comment':
+            html += '>'
         
-        final_content = str((element.content or ''))
+        final_content = str((self.__render_dynamic_values(content=element.content) or ''))
         has_children = bool(element.childs)
         
         if has_children or '\n' in final_content:
@@ -265,7 +290,7 @@ class Template:
             else:
                 html += final_content.strip()
         
-        html += f'</{element.tag}>'
+        html += f'</{element.tag}>' if element.tag != 'comment' else '-->'
         
         return html
 
@@ -306,49 +331,51 @@ class Template:
                 break
         
         if not has_websocket_script:
-            ws_port = self.__create_default_element(
-                tag='script',
-                content=f"window.PYWEBER_WS_PORT = {config['websocket'].get('port')}",
-                attrs={'type': 'text/javascript'}
+            root.childs[0].childs.extend(
+                [
+                    self.__create_default_element(
+                        tag='script',
+                        content=f"window.PYWEBER_WS_PORT = {config['websocket'].get('port')}",
+                        attrs={'type': 'text/javascript'}
+                    ),
+                    self.__create_default_element(
+                        tag='script',
+                        attrs={'src': f'/_pyweber/static/{str(uuid4())}/.js', 'type': 'text/javascript'}
+                    )
+                ]
             )
-            script = self.__create_default_element(
-                tag='script',
-                attrs={'src': f'/_pyweber/static/{str(uuid4())}/.js', 'type': 'text/javascript'}
-            )
-            ws_port.uuid, script.uuid = None, None
-            root.childs[0].childs.extend([ws_port, script])
         
         if not has_icon:
-            icon = self.__create_default_element(
-                tag='link',
-                attrs={'rel': 'icon', 'href': f'{self.__icon.strip()}'.replace('\\', '/')}
+            root.childs[0].childs.append(
+                self.__create_default_element(
+                    tag='link',
+                    attrs={'rel': 'icon', 'href': f'{self.__icon.strip()}'.replace('\\', '/')}
+                )
             )
-            icon.uuid = None
-            root.childs[0].childs.append(icon)
         
         if not has_css:
-            css = self.__create_default_element(
-                tag='link',
-                attrs={'rel': 'stylesheet', 'href': f'/_pyweber/static/{str(uuid4())}/.css'}
+            root.childs[0].childs.append(
+                self.__create_default_element(
+                    tag='link',
+                    attrs={'rel': 'stylesheet', 'href': f'/_pyweber/static/{str(uuid4())}/.css'}
+                )
             )
-            css.uuid = None
-            root.childs[0].childs.append(css)
         
         if not has_description:
-            description = self.__create_default_element(
-                tag='meta',
-                attrs={'name': 'description', 'content': config['app'].get('description')}
+            root.childs[0].childs.append(
+                self.__create_default_element(
+                    tag='meta',
+                    attrs={'name': 'description', 'content': config['app'].get('description')}
+                )
             )
-            description.uuid = None
-            root.childs[0].childs.append(description)
         
         if not has_keywords:
-            keywords = self.__create_default_element(
-                tag='meta',
-                attrs={'name': 'keywords', 'content': ', '.join(config['app'].get('keywords', []))}
+            root.childs[0].childs.append(
+                self.__create_default_element(
+                    tag='meta',
+                    attrs={'name': 'keywords', 'content': ', '.join(config['app'].get('keywords', []))}
+                )
             )
-            keywords.uuid = None
-            root.childs[0].childs.append(keywords)
         
         return root
     

@@ -21,6 +21,7 @@ nav:
   - Element: element.md
   - Event Handlers: events.md
   - CLI: cli.md
+  - Environment Variables: environment.md
   - Examples: examples.md
 
 markdown_extensions:

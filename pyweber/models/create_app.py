@@ -33,11 +33,14 @@ class CreatApp:
             
         self.__target = target
     
+    def environ_vars(self, variable: str, /, default = None):
+        return os.environ.get(variable, default=default)
+    
     def run(self):
         self.load_target()
         Thread(target=self.ws_server.ws_start, daemon=True).start()
 
-        if config['session'].get('reload_mode'):
+        if self.environ_vars('PYWEBER_RELOAD_MODE') or config['session'].get('reload_mode'):
             Thread(target=self.reload_server.start, daemon=True).start()
         
         self.http_server.run(

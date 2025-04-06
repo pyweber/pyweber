@@ -54,22 +54,44 @@ class OrientationType(Enum):
     PORTRAIT_SECONDARY = "portrait-secondary"
 
 class ContentTypes(Enum):
+    # -------- TEXT TYPES --------
     html = "text/html"
     css = "text/css"
-    unkown = 'application/octet-stream'
     js = "application/javascript"
     json = "application/json"
+    xml = "application/xml"
+    txt = "text/plain"
+    csv = "text/csv"
+    rtf = "application/rtf"
+
+    # Documentos de texto Office (abríveis como texto em alguns casos)
+    doc = "application/msword"
+    docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    xls = "application/vnd.ms-excel"
+    xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ppt = "application/vnd.ms-powerpoint"
+    pptx = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    
+    # -------- BYTE TYPES (BINÁRIOS) --------
     png = "image/png"
     jpg = "image/jpeg"
     jpeg = "image/jpeg"
     gif = "image/gif"
     svg = "image/svg+xml"
     ico = "image/x-icon"
+    webp = "image/webp"
+    bmp = "image/bmp"
+    tif = "image/tiff"
+    tiff = "image/tiff"
+
+    # Fontes
     woff = "font/woff"
     woff2 = "font/woff2"
     ttf = "font/ttf"
     otf = "font/otf"
     eot = "application/vnd.ms-fontobject"
+
+    # Vídeos
     mp4 = "video/mp4"
     webm = "video/webm"
     ogv = "video/ogg"
@@ -77,8 +99,27 @@ class ContentTypes(Enum):
     mov = "video/quicktime"
     flv = "video/x-flv"
     mkv = "video/x-matroska"
-    zip = 'application/zip'
-    zip7 = 'application/x-7z-compressed'
+    m4v = "video/x-m4v"
+    mpeg = "video/mpeg"
+
+    # Áudios
+    mp3 = "audio/mpeg"
+    ogg = "audio/ogg"
+    wav = "audio/wav"
+    m4a = "audio/mp4"
+    flac = "audio/flac"
+    aac = "audio/aac"
+
+    # PDFs e arquivos compactados
+    pdf = "application/pdf"
+    zip = "application/zip"
+    zip7 = "application/x-7z-compressed"
+    rar = "application/vnd.rar"
+    tar = "application/x-tar"
+    gz = "application/gzip"
+
+    # Desconhecido (fallback)
+    unkown = "application/octet-stream"
 
     def content_list() -> list[str]:
         return [value.name for value in ContentTypes]
@@ -459,6 +500,9 @@ class HTMLTag(Enum):
     menu = "menu"
     menuitem = "menuitem"
 
+    # Tags de Comentários
+    comment = "comment"
+
 class NonSelfClosingHTMLTags(Enum):
     # Tags Semânticas e de Estruturação
     html = "html"
@@ -554,6 +598,9 @@ class NonSelfClosingHTMLTags(Enum):
     dialog = "dialog"
     menu = "menu"
     menuitem = "menuitem"
+    
+    # Tags de Comentários
+    comment = "comment"
 
     def non_autoclosing_tags() -> list[str]:
         return [val.value for val in NonSelfClosingHTMLTags]

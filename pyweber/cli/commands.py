@@ -256,14 +256,13 @@ class CommandFunctions:
     
     def update_reload_mode(self, file_path: str, value: bool):
         config['session']['reload_mode'] = value
+        os.environ['PYWEBER_RELOAD_MODE'] = str(value)
+        
         try:
             with open(file_path, 'w') as file:
                 toml.dump(config.config, file)
         except FileNotFoundError:
-            self.log_message(
-                message='config file not file, reload_mode not available.',
-                level='warning'
-            )
+            pass
     
     def install_requirements(self, path: str):
         if not Path.exists(path):
