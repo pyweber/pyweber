@@ -84,3 +84,9 @@ class StaticTemplates:
         return toml.loads(LoadStaticFiles(
             path=str(StaticFilePath.config_default.value)
         ).load)
+
+    @staticmethod
+    def UPDATE_FILE() -> str:
+        return LoadStaticFiles(
+            path=str(StaticFilePath.update_file.value)
+        ).load

@@ -1,6 +1,5 @@
 import os
 import sys
-import toml
 import shutil
 import argparse
 import subprocess
@@ -17,16 +16,88 @@ class CLI:
         self.parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {self.get_version}")
         self.parser.add_argument("-u", "--update", action="store_true", help="Update to last pyweber version")
         self.parser.add_argument("-e", "--edit", action='store_true', help="Edit project file configuration")
-        self.parser.add_argument('-r', "--reload-mode", action='store_true', help='Run the project on reload mode. Only if python file named main')
+        
+        reload_group = self.parser.add_argument_group('reload mode options')
+        self._add_run_arguments(reload_group)
+        reload_group.add_argument(
+            '-r',
+            "--reload-mode",
+            action='store_true',
+            help='Run the project on reload mode with main.py'
+        )
+        
         self.subparsers = self.parser.add_subparsers(dest="command")
         self._add_create_command()
         self._add_create_config_file_command()
         self._add_config_file_new_section()
         self.add_install_requirements()
+        self.add_cert_command()
         self._add_run_command()
+        self.add_build_command()
 
         self.commands_funcs = CommandFunctions()
         self.edit_cli_parameters = ConfigManagerCLI()
+
+    def _add_run_arguments(self, parser):
+        """Adiciona argumentos comuns para execução do servidor"""
+        parser.add_argument(
+            '--file',
+            type=str,
+            default='main.py',
+            help='Main file of pyweber project. default is main.py'
+        )
+
+        parser.add_argument(
+            '--https',
+            action='store_true',
+            help='Run server with HTTPS enabled'
+        )
+
+        parser.add_argument(
+            '--cert',
+            type=str,
+            help='Path to SSL certificate file (required for HTTPS unless --auto-cert is used)'
+        )
+
+        parser.add_argument(
+            '--key',
+            type=str,
+            help='Path to SSL key file (required for HTTPS unless --auto-cert is used)'
+        )
+
+        parser.add_argument(
+            '--auto-cert',
+            action='store_true',
+            help='Automatically generate a self-signed certificate for development'
+        )
+
+        parser.add_argument(
+            '--port',
+            type=int,
+            default=8800,
+            help='Port to server run'
+        )
+
+        parser.add_argument(
+            '--host',
+            type=str,
+            default='0.0.0.0',
+            help='Hostname to server run'
+        )
+
+        parser.add_argument(
+            '--route',
+            type=str,
+            default='/',
+            help='Initial route when open website in first time'
+        )
+
+        parser.add_argument(
+            '--ws-port',
+            type=int,
+            default=8765,
+            help='Port to websocket run'
+        )
     
     def _add_create_command(self):
         create_parser = self.subparsers.add_parser(
@@ -49,6 +120,18 @@ class CLI:
             name='run',
             help='Run a pyweber project that you created'
         )
+
+        # Adicionar argumentos comuns
+        self._add_run_arguments(run_parser)
+
+        # Adicionar argumento específico para run
+        run_parser.add_argument(
+            '--reload',
+            action='store_true',
+            help='Add reload mode when running pyweber project'
+        )
+
+        # Sobrescrever o argumento 'file' para torná-lo posicional
         run_parser.add_argument(
             'file',
             type=str,
@@ -56,11 +139,37 @@ class CLI:
             default='main.py',
             help='Main file of pyweber project. default is main.py'
         )
+    
+    def add_cert_command(self):
+        cert_parser = self.subparsers.add_parser(
+            name='cert',
+            help='Manage SSL certificates for HTTPS'
+        )
 
-        run_parser.add_argument(
-            '--reload',
-            action='store_true',
-            help='Add reload mode when running pyweber project'
+        cert_subparsers = cert_parser.add_subparsers(dest="cert_command")
+
+        check_parser = cert_subparsers.add_parser(
+            name='check-mkcert',
+            help='Check if mkcert is installed and install it if not'
+        )
+
+        mkcert_parser = cert_subparsers.add_parser(
+            name='mkcert',
+            help='Generate a locally-trusted certificate using mkcert (recommended for development)'
+        )
+
+        mkcert_parser.add_argument(
+            '--output-dir',
+            type=str,
+            default='.pyweber/certs',
+            help='Directory to save the generated certificate files'
+        )
+
+        mkcert_parser.add_argument(
+            '--domains',
+            type=str,
+            default='localhost,127.0.0.1',
+            help='Comma-separated list of domains/IPs to include in the certificate'
         )
     
     def _add_create_config_file_command(self):
@@ -106,6 +215,19 @@ class CLI:
             default=Path('.pyweber', 'config.toml'),
             help='Path to project config file'
         )
+    
+    def add_build_command(self):
+        build_parser = self.subparsers.add_parser(
+            'build',
+            help='Build the pyweber project'
+        )
+
+        build_parser.add_argument(
+            '--project-name',
+            type=str,
+            default=os.path.basename(os.getcwd()),
+            help='Name to your final project'
+        )
 
     
     def run(self):
@@ -114,14 +236,26 @@ class CLI:
 
             args = self.parser.parse_args(args)
 
+            if args.reload_mode:
+                run_kwargs = {
+                    'file': getattr(args, 'file', 'main.py'),
+                    'reload': True,
+                    'https': getattr(args, 'https', False),
+                    'cert_file': getattr(args, 'cert', None),
+                    'key_file': getattr(args, 'key', None),
+                    'auto_cert': getattr(args, 'auto_cert', False),
+                    'port': getattr(args, 'port', 8800),
+                    'host': getattr(args, 'host', '0.0.0.0'),
+                    'route': getattr(args, 'route', '/'),
+                    'ws_port': getattr(args, 'ws_port', 8765)
+                }
+                self.commands_funcs.run_app(**run_kwargs)
+
             if args.update:
                 self.commands_funcs.update(framework='pyweber')
             
             elif args.edit:
                 self.edit_cli_parameters.init_config()
-            
-            elif args.reload_mode:
-                self.commands_funcs.run_app(file='main.py', reload=True)
             
             elif args.command == 'install':
                 self.commands_funcs.install_requirements(path=args.config_file_path)
@@ -130,7 +264,29 @@ class CLI:
                 self.commands_funcs.create(project_name=args.project_name, with_config=args.with_config)
             
             elif args.command == 'run':
-                self.commands_funcs.run_app(file=args.file, reload=args.reload)
+                file = getattr(args, 'file', None)
+                reload = getattr(args, 'reload', None)
+                https_enabled = getattr(args, 'https', False)
+                cert_file = getattr(args, 'cert_file', None)
+                key_file = getattr(args, 'key_file', None)
+                auto_cert = getattr(args, 'auto_cert', False)
+                port = getattr(args, 'port')
+                host = getattr(args, 'host')
+                route = getattr(args, 'route')
+                ws_port = getattr(args, 'ws_port')
+
+                self.commands_funcs.run_app(
+                    file=file,
+                    reload=reload,
+                    https=https_enabled,
+                    cert_file=cert_file,
+                    key_file=key_file,
+                    auto_cert=auto_cert,
+                    port = port,
+                    host = host,
+                    route = route,
+                    ws_port = ws_port,
+                )
             
             elif args.command == 'create-config-file':
                 self.commands_funcs.create_config_file(path=args.config_path, name=args.config_name)
@@ -138,6 +294,25 @@ class CLI:
             elif args.command == 'add-section':
                 self.edit_cli_parameters.new_section(section_name=args.section_name, value=None)
             
+            elif args.command == 'cert':
+                if args.cert_command == 'check-mkcert':
+                    self.commands_funcs.check_mkcert()
+                
+                elif args.cert_command == 'mkcert':
+                    output_dir = getattr(args, 'output_dir', '.pyweber/certs')
+                    domains = getattr(args, 'domains', 'localhost,127.0.0.1')
+
+                    self.commands_funcs.generate_mkcert(
+                        output_dir=output_dir,
+                        domains=domains
+                    )
+
+                else:
+                    self.parser.parse_args(['cert', '--help'])
+            
+            elif args.command == 'build':
+                project_name = getattr(args, 'project_name')
+                self.commands_funcs.build_project(project_name=project_name)
             else:
                 self.parser.print_help()
                 exit(code=1)
@@ -194,6 +369,8 @@ class CommandFunctions:
                     level='sucess'
                 )
 
+                config.save()
+
             self.log_message(
                 message=f'🟢 Project {project_name} sucessfully created!',
                 level='success'
@@ -206,15 +383,87 @@ class CommandFunctions:
             )
             shutil.rmtree(path=self.project_name, ignore_errors=True)
 
-    def run_app(self, file: str, reload: bool):
+    def run_app(self, **kwargs):
 
         try:
+            reload = kwargs.get('reload')
+            cert_file = kwargs.get('cert_file')
+            key_file = kwargs.get('key_file')
+            https = kwargs.get('https')
+            file = kwargs.get('file')
+            auto_cert = kwargs.get('auto_cert')
+            port = kwargs.get('port')
+            host = kwargs.get('host')
+            route = kwargs.get('route')
+            ws_port = kwargs.get('ws_port')
+
             self.log_message(
                 message=f'✨ Trying to start the project',
                 level='warning'
             )
-            self.update_reload_mode(file_path=config.path, value=reload)
-            subprocess.run(['python', file], check=True, shell=True)
+
+            os.environ['PYWEBER_RELOAD_MODE'] = str(reload)
+            os.environ['PYWEBER_SERVER_PORT'] = str(port)
+            os.environ['PYWEBER_SERVER_HOST'] = str(host)
+            os.environ['PYWEBER_SERVER_ROUTE'] = str(route)
+            os.environ['PYWEBER_WS_PORT'] = str(ws_port)
+
+            if https:
+                os.environ['PYWEBER_HTTPS_ENABLED'] = str(https)
+
+                if auto_cert:
+                    cert_path, key_path = self.generate_mkcert()
+                    os.environ['PYWEBER_CERT_FILE'] = cert_path
+                    os.environ['PYWEBER_KEY_FILE'] = key_path
+                    self.log_message(
+                        message=f'🔒 Using auto-generated self-signed certificate',
+                        level='info'
+                    )
+                
+                elif cert_file and key_file:
+                    os.environ['PYWEBER_CERT_FILE'] = cert_file
+                    os.environ['PYWEBER_KEY_FILE'] = key_file
+                    self.log_message(
+                        message=f'🔒 Using provided certificate: {cert_file}',
+                        level='info'
+                    )
+                
+                else:
+                    self.log_message(
+                        message=f'❌ HTTPS requires either --auto-cert or both --cert and --key options',
+                        level='error'
+                    )
+                    return
+            else:
+                os.environ['PYWEBER_HTTPS_ENABLED'] = str(https)
+            
+            try:
+                config['session']['reload_mode'] = reload
+                config['server']['host'] = host
+                config['server']['port'] = port
+                config['server']['route'] = route
+                config['websocket']['port'] = ws_port
+
+                if https:
+                    config['server']['https_enabled'] = https
+                    if auto_cert:
+                        config['server']['cert_file'] = os.environ['PYWEBER_CERT_FILE']
+                        config['server']['key_file'] = os.environ['PYWEBER_KEY_FILE']
+                    elif cert_file and key_file:
+                        config['server']['cert_file'] = cert_file
+                        config['server']['key_file'] = key_file
+                
+                else:
+                    config['server']['https_enabled'] = https
+                
+                config.save()
+            except FileNotFoundError:
+                pass
+            
+            if sys.platform == 'win32':
+                subprocess.run(['python', file], check=True, shell=True)
+            else:
+                subprocess.run(['python3', file], check=True, shell=True)
         
         except subprocess.CalledProcessError as e:
             self.log_message(
@@ -224,16 +473,41 @@ class CommandFunctions:
 
     def update(self, framework: str):
         try:
-            subprocess.run(['pip', 'install', f'{framework}', '--upgrade'], check=True, shell=True, stderr=subprocess.PIPE)
+            update_script = StaticTemplates.UPDATE_FILE().replace('{framework}', framework)
+
+            # Salvar o script em um arquivo temporário
+            import tempfile
+            with tempfile.NamedTemporaryFile('w', suffix='.py', delete=False) as f:
+                f.write(update_script)
+                temp_script = f.name
 
             self.log_message(
-                message=f'✅ Framework updated sucessfully!',
+                message=f'Starting {framework} update...',
                 level='warning'
             )
 
-        except subprocess.CalledProcessError as e:
+            # Executar o script em uma nova janela
+            if sys.platform == 'win32':
+                # No Windows, abrir em uma nova janela
+                subprocess.Popen(['start', 'python', temp_script], shell=True)
+            else:
+                # No Linux/Mac, executar em segundo plano
+                subprocess.Popen(['python', temp_script],
+                                start_new_session=True,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+
             self.log_message(
-                message=f'❌ Error: {e}',
+                message=f'Update process started in second plan',
+                level='success'
+            )
+
+            # Sair do programa atual
+            sys.exit(0)
+
+        except Exception as e:
+            self.log_message(
+                message=f'❌ Erro ao iniciar atualização: {e}',
                 level='error'
             )
     
@@ -252,17 +526,11 @@ class CommandFunctions:
             file.write(content)
     
     def create_config_file(self, path: str, name: str, keep_defaults=True):
+        config['app']['name'] = os.path.basename(os.getcwd())
+        config['app']['description'] = f'A {config['app']['name']} builded with pyweber framework'
         config.set_parameters(path=path, name=name, keep_defaults=keep_defaults)
-    
-    def update_reload_mode(self, file_path: str, value: bool):
-        config['session']['reload_mode'] = value
-        os.environ['PYWEBER_RELOAD_MODE'] = str(value)
-        
-        try:
-            with open(file_path, 'w') as file:
-                toml.dump(config.config, file)
-        except FileNotFoundError:
-            pass
+
+        config.save()
     
     def install_requirements(self, path: str):
         if not Path.exists(path):
@@ -278,6 +546,97 @@ class CommandFunctions:
 
         except Exception as e:
             print(f'Error: {e}')
+    
+    def build_project(self, project_name: str):
+        os.makedirs(os.path.join('build', project_name), exist_ok=True)
+
+        raise NotImplementedError(f'Build method for {project_name} not implemented yet')
+    
+    def generate_mkcert(self, **kwargs):
+        """Generate a locally-trusted certificate using mkcert"""
+        if not self.check_mkcert():
+            return None, None
+
+        try:
+            # Criar diretório para certificados
+            cert_dir = Path(kwargs.get('output_dir', '.pyweber/cert'))
+            cert_dir.mkdir(parents=True, exist_ok=True)
+
+            # Instalar CA local
+            subprocess.run(['mkcert', '-install'], check=True, capture_output=True)
+
+            # Gerar certificado
+            domain_list = [str(domain).strip() for domain in kwargs.get('domains', 'localhost, 127.0.0.1').strip().split(',')]
+            output_name = f"pyweber-{'-'.join(domain_list)}"
+            output_path = cert_dir / output_name
+
+            cmd = ['mkcert', '-key-file', f"{output_path}-key.pem", '-cert-file', f"{output_path}.pem"]
+            cmd.extend(domain_list)
+
+            subprocess.run(cmd, check=True, capture_output=True)
+
+            cert_file = f"{output_path}.pem"
+            key_file = f"{output_path}-key.pem"
+
+            self.log_message(
+                message=f"🔒 Certificate generated with mkcert at: {cert_file}",
+                level='success'
+            )
+
+            return str(cert_file), str(key_file)
+
+        except subprocess.SubprocessError as e:
+            self.log_message(
+                message=f"❌ Error generating certificate with mkcert: {e}",
+                level='error'
+            )
+            return None, None
+    
+    def check_mkcert(self):
+        """Check if mkcert is installed and provide installation instructions if not"""
+        try:
+            result = subprocess.run(['mkcert', '-version'], capture_output=True, text=True)
+            if result.returncode == 0:
+                self.log_message(
+                    message=f"✅ mkcert is installed: {result.stdout.strip()}",
+                    level='success'
+                )
+                return True
+            else:
+                raise FileNotFoundError
+        except (FileNotFoundError, subprocess.SubprocessError):
+            self.log_message(
+                message="❌ mkcert is not installed",
+                level='error'
+            )
+
+            # Instruções de instalação
+            self.log_message(
+                message="📋 Installation instructions:",
+                level='info'
+            )
+
+            if sys.platform == 'win32':
+                self.log_message(
+                    message="Windows: Install with Chocolatey: choco install mkcert",
+                    level='info'
+                )
+                self.log_message(
+                    message="Or download from: https://github.com/FiloSottile/mkcert/releases",
+                    level='info'
+                )
+            elif sys.platform == 'darwin':
+                self.log_message(
+                    message="macOS: Install with Homebrew: brew install mkcert",
+                    level='info'
+                )
+            else:
+                self.log_message(
+                    message="Linux: Install with your package manager or download from: https://github.com/FiloSottile/mkcert/releases",
+                    level='info'
+                )
+
+            return False
     
     def log_message(self, message: str, level: str = 'info'):
         colors = {

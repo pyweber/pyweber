@@ -135,6 +135,7 @@ class StaticFilePath(Enum):
     favicon_path = files(anchor='pyweber').joinpath(os.path.join('static', 'favicon'))
     config_default = files(anchor='pyweber').joinpath(os.path.join('static', 'config.toml'))
     pyweber_css = files(anchor='pyweber').joinpath(os.path.join('static', 'pyweber.css'))
+    update_file = files(anchor='pyweber').joinpath(os.path.join('static', 'update.py'))
 
 class WebSocketStatusCode(Enum):
     NORMAL_CLOSURE = "1000 Normal Closure"

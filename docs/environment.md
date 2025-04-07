@@ -1,62 +1,93 @@
-# Environment Variables in PyWeber
+# PyWeber Environment Variables
 
-PyWeber supports various environment variables that allow you to configure its behavior without modifying configuration files. This approach is particularly useful for deployment scenarios, containerized applications, or when you need to override configuration temporarily.
+PyWeber supports configuration through environment variables, allowing you to override settings without modifying configuration files. This is particularly useful for deployment environments, CI/CD pipelines, and development workflows.
 
 ## Available Environment Variables
 
-### Core Variables
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `PYWEBER_RELOAD_MODE` | Enable or disable hot reload for development | `False` | `PYWEBER_RELOAD_MODE=True` |
+| `PYWEBER_HTTPS_ENABLED` | Enable or disable HTTPS for secure connections | `False` | `PYWEBER_HTTPS_ENABLED=True` |
+| `PYWEBER_CERT_FILE` | Path to SSL certificate file for HTTPS | `None` | `PYWEBER_CERT_FILE=/path/to/cert.pem` |
+| `PYWEBER_KEY_FILE` | Path to SSL key file for HTTPS | `None` | `PYWEBER_KEY_FILE=/path/to/key.pem` |
+| `PYWEBER_SERVER_HOST` | Host address for the HTTP server | `127.0.0.1` | `PYWEBER_SERVER_HOST=0.0.0.0` |
+| `PYWEBER_SERVER_PORT` | Port for the HTTP server | `8800` | `PYWEBER_SERVER_PORT=8080` |
+| `PYWEBER_WS_PORT` | Port for the WebSocket server | `8765` | `PYWEBER_WS_PORT=8766` |
 
-| Variable Name | Type | Default | Description |
-|---------------|------|---------|-------------|
-| `PYWEBER_RELOAD_MODE` | Boolean | `False` | Enables or disables auto-reload functionality. When set to `True`, PyWeber will watch for file changes and automatically restart the application. Valid values: `True`, `False`, `1`, `0`, `yes`, `no` (case-insensitive). |
+## Usage
 
-### Usage Examples
+### Setting Environment Variables
 
-#### Command Line
+#### On Linux/macOS:
+```bash
+export PYWEBER_RELOAD_MODE=True
+export PYWEBER_HTTPS_ENABLED=True
+export PYWEBER_CERT_FILE=.pyweber/certs/localhost.pem
+export PYWEBER_KEY_FILE=.pyweber/certs/localhost-key.pem
+python main.py
+```
+
+#### On Windows:
+```cmd
+set PYWEBER_RELOAD_MODE=True
+set PYWEBER_HTTPS_ENABLED=True
+set PYWEBER_CERT_FILE=.pyweber\certs\localhost.pem
+set PYWEBER_KEY_FILE=.pyweber\certs\localhost-key.pem
+python main.py
+```
+
+### Using with CLI
+
+The PyWeber CLI automatically sets environment variables based on command-line arguments:
 
 ```bash
-# Enable reload mode
-PYWEBER_RELOAD_MODE=True python main.py
-
-# Disable reload mode
-PYWEBER_RELOAD_MODE=False python main.py
-
-#Automatically Enable using pyweber CLI
-pyweber -r 
-
-# or
+# Run with hot reload
 pyweber run --reload
+
+# Run with HTTPS using auto-generated certificate
+pyweber run --https --auto-cert
+
+# Run with HTTPS using specific certificate files
+pyweber run --https --cert /path/to/cert.pem --key /path/to/key.pem
 ```
 
-#### In Python Code
-```python
-import os
-import pyweber as pw
+## Priority Order
 
-# Set environment variable programmatically
-os.environ['PYWEBER_RELOAD_MODE'] = 'True'
-
-# Start PyWeber application
-pw.run(target=main)
-```
-## Environment Variables vs. Configuration Files
-
-PyWeber follows these precedence rules when determining configuration values:
+When determining configuration values, PyWeber uses the following priority order:
 
 1. Environment variables (highest priority)
 2. Command-line arguments
-3. Configuration file settings
+3. Configuration file values
 4. Default values (lowest priority)
 
-This means that environment variables will override any settings in your configuration files, allowing for flexible deployment configurations without modifying your codebase.
+This means environment variables will always override settings in your configuration files.
 
-## Best Practices
+## Security Considerations
 
-- Use environment variables for deployment-specific configurations
-- Use configuration files for application-specific settings
-- Use environment variables for sensitive information (like API keys) instead of storing them in configuration files
-- Document all environment variables used by your application for easier deployment and maintenance
+- Store sensitive information (like API keys or database credentials) in environment variables rather than configuration files
+- Never commit certificate private keys to version control
+- For production environments, use properly signed certificates from trusted certificate authorities
+- When using self-signed certificates in development, be aware of browser security warnings
 
-## Future Environment Variables
+## Examples
 
-As PyWeber evolves, additional environment variables will be added to provide more configuration options. Check this documentation for updates in future releases.
+### Development with Hot Reload and HTTPS
+
+```bash
+export PYWEBER_RELOAD_MODE=True
+export PYWEBER_HTTPS_ENABLED=True
+export PYWEBER_CERT_FILE=.pyweber/certs/localhost.pem
+export PYWEBER_KEY_FILE=.pyweber/certs/localhost-key.pem
+python main.py
+```
+
+### Production Configuration
+
+```bash
+export PYWEBER_RELOAD_MODE=False
+export PYWEBER_HTTPS_ENABLED=True
+export PYWEBER_CERT_FILE=/etc/letsencrypt/live/yourdomain.com/fullchain.pem
+export PYWEBER_KEY_FILE=/etc/letsencrypt/live/yourdomain.com/privkey.pem
+export PYWEBER_SERVER_HOST=0.0.0.0
+python main.py
+```

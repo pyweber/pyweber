@@ -12,6 +12,9 @@ packages = []
 host = '0.0.0.0'
 port = 8800
 route = '/'
+https_enabled = false
+cert_file = ''
+key_file = ''
 
 [websocket]
 port = 8765

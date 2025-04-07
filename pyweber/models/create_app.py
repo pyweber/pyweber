@@ -14,8 +14,22 @@ class CreatApp:
         self.target = target
         self.module = self.import_module()
         self.app = self.get_app_instances()
+        self.__reload_mode = os.environ.get('PYWEBER_RELOAD_MODE') or config.get('session', 'reload_mode')
+        self.__cert_file = os.environ.get('PYWEBER_CERT_FILE') or config.get('server', 'cert_file')
+        self.__key_file = os.environ.get('PYWEBER_KEY_FILE') or config.get('server', 'key_file')
+        self.__use_ssl = config.get('server', 'https_enabled')
+        self.__server_host = os.environ.get('PYWEBER_SERVER_HOST') or config.get('server', 'host')
+        self.__server_port = int(os.environ.get('PYWEBER_SERVER_PORT')) or int(config.get('server', 'port'))
+        self.__server_ws_port = int(os.environ.get('PYWEBER_WS_PORT')) or int(config.get('websocket', 'port'))
+        self.__server_route = os.environ.get('PYWEBER_SERVER_ROUTE') or config.get('server', 'route')
         self.http_server = HttpServer(update_handler=self.update)
-        self.ws_server = WsServer(host=config['server'].get('host'), port=config['websocket'].get('port'))
+        self.ws_server = WsServer(
+            host=self.__server_host,
+            port=self.__server_ws_port,
+            use_ssl=self.__use_ssl,
+            cert_file=self.__cert_file,
+            key_file=self.__key_file
+        )
         self.reload_server = ReloadServer(ws_reload=self.ws_server.send_reload, http_reload=self.update)
     
     @property
@@ -40,13 +54,16 @@ class CreatApp:
         self.load_target()
         Thread(target=self.ws_server.ws_start, daemon=True).start()
 
-        if self.environ_vars('PYWEBER_RELOAD_MODE') or config['session'].get('reload_mode'):
+        if self.__reload_mode:
             Thread(target=self.reload_server.start, daemon=True).start()
         
         self.http_server.run(
-            route=config['server'].get('route'),
-            port=config['server'].get('port'),
-            host=config['server'].get('host')
+            route=self.__server_route,
+            port=self.__server_port,
+            host=self.__server_host,
+            use_https=self.__use_ssl,
+            cert_file=self.__cert_file,
+            key_file=self.__key_file
         )
     
     def import_module(self):

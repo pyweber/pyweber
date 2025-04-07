@@ -1,5 +1,5 @@
 # pyweber run
-from .models.run import run, run_as_asgi
+from .models.run import run
 
 # pyweber sessions
 from .connection.session import sessions
@@ -63,7 +63,8 @@ __all__ = [
     'sessions',
     'config',
     'Colors',
-    'print_line',
+    'PrintLine',
+    'WriteLine',
     'ContentTypes',
     'EventType',
     'HTMLTag',

@@ -52,7 +52,7 @@ async def run_as_asgi(scope, response, send, app: 'Pyweber', target: callable = 
     create_app = CreatApp(target=None)
     ws_server = create_app.ws_server
     request = RequestASGI(raw_request=scope)
-    response = await app.get_route(request=request)
+    __response = await app.get_route(request=request)
 
     if not WS_RUNNING:
         WS_RUNNING = True
@@ -64,10 +64,10 @@ async def run_as_asgi(scope, response, send, app: 'Pyweber', target: callable = 
         Thread(target=ws_server.ws_start, daemon=True).start()
 
     headers = [
-        (b'content-type', response.response_type.encode()),
-        (b'content-length', str(len(response.response_content)).encode()),
+        (b'content-type', __response.response_type.encode()),
+        (b'content-length', str(len(__response.response_content)).encode()),
         (b'connection', b'close'),
-        (b'date', response.response_date.encode())
+        (b'date', __response.response_date.encode())
     ]
 
     if app.cookies:
@@ -76,11 +76,11 @@ async def run_as_asgi(scope, response, send, app: 'Pyweber', target: callable = 
 
     await send({
         'type': 'http.response.start',
-        'status': response.code,
+        'status': __response.code,
         'headers': headers
     })
 
     await send({
         'type': 'http.response.body',
-        'body': response.response_content
+        'body': __response.response_content
     })

@@ -1,5 +1,38 @@
 # PyWeber Changelog
 
+## [0.9.0] - 2025-04-07
+---
+### New Features
+- Added HTTPS/SSL support for secure connections:
+  - Implemented SSL context configuration for HTTP server
+  - Added WSS (WebSocket Secure) support for real-time connections
+  - Support for custom certificates and self-signed certificates
+  - Auto-generation of development certificates
+- Added configuration options for SSL in both HTTP and WebSocket servers
+- Improved CLI with SSL configuration options
+- Added comprehensive environment variables support:
+  - `PYWEBER_RELOAD_MODE` for controlling hot reload
+  - `PYWEBER_HTTPS_ENABLED` for enabling/disabling HTTPS
+  - `PYWEBER_CERT_FILE` and `PYWEBER_KEY_FILE` for SSL certificates
+  - `PYWEBER_SERVER_HOST` and `PYWEBER_SERVER_PORT` for server configuration
+  - `PYWEBER_WS_PORT` for WebSocket server port
+
+### Improvements
+- Enhanced security with proper SSL implementation
+- Better error handling for SSL-related issues
+- Improved WebSocket connection stability over secure connections
+- Added detailed logging for connection issues
+- Environment variables now take precedence over configuration files
+- Added new CLI commands for certificate management:
+  - `cert check-mkcert` to verify mkcert installation
+  - `cert mkcert` to generate locally-trusted certificates
+- Enhanced `run` command with additional server configuration options
+
+### Documentation
+- Added new documentation for environment variables
+- Updated SSL/HTTPS setup guides
+- Added certificate management instructions
+
 ## [0.8.4] - 2025-04-06
 ---
 ### Fixed

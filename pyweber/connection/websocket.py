@@ -1,6 +1,7 @@
 import json
 import inspect
 import asyncio
+import ssl
 import websockets as ws
 from threading import Thread
 from websockets.sync.server import serve
@@ -11,13 +12,25 @@ from pyweber.utils.utils import PrintLine, Colors
 from pyweber.connection.session import sessions, Session
 
 class WsServer:
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, use_ssl: bool, cert_file: str, key_file: str):
         self.host: str = host
         self.port: int = port
         self.app: Pyweber = None
         self.ws_connections: set[ws.server.ServerConnection] = set()
         self.color_red = Colors.RED
         self.color_reset = Colors.RESET
+        self.use_ssl = use_ssl
+        self.cert_file = cert_file
+        self.key_file = key_file
+        self.ssl_context = None
+    
+        if self.use_ssl and self.cert_file and self.key_file:
+            self.ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            try:
+                self.ssl_context.load_cert_chain(certfile=self.cert_file, keyfile=self.key_file)
+            except Exception as e:
+                PrintLine(f"{Colors.RED}WebSocket SSL configuration failed: {e}{Colors.RESET}")
+                self.use_ssl = False
     
     def ws_handler(self, websocket: ws.server.ServerConnection):
         try:
@@ -83,6 +96,7 @@ class WsServer:
                 ws_conn.send(json.dumps(data, ensure_ascii=False, indent=4))
         
         except Exception as e:
+            PrintLine(f'Error sending message: {e}')
             return
     
     def send_reload(self, session_id: str = None):
@@ -96,13 +110,20 @@ class WsServer:
             for ws_conn in self.ws_connections:
                 ws_conn.send('reload')
 
-        except:
+        except Exception as e:
+            PrintLine(f'Error sending reload: {e}')
             return
 
     def ws_start(self):
         try:
-            with serve(self.ws_handler, self.host, self.port) as server:
-                server.serve_forever()
+            if self.use_ssl and self.ssl_context:
+                with serve(self.ws_handler, self.host, self.port, ssl=self.ssl_context) as server:
+                    server.serve_forever()
+            else:
+                with serve(self.ws_handler, self.host, self.port) as server:
+                    server.serve_forever()
                 
-        except OSError:
-            pass
+        except OSError as e:
+            PrintLine(f"{Colors.RED}WebSocket server error: {e}{Colors.RESET}")
+        except Exception as e:
+            PrintLine(f"{Colors.RED}Unexpected error in WebSocket server: {e}{Colors.RESET}")
