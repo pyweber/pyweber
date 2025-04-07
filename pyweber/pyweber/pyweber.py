@@ -3,6 +3,8 @@ import inspect
 import json
 import asyncio
 import webbrowser
+import sys
+import traceback
 from typing import Union, Callable, Any
 from datetime import datetime
 from pyweber.core.window import Window
@@ -11,7 +13,13 @@ from pyweber.models.request import Request
 from pyweber.models.response import Response
 from pyweber.utils.types import ContentTypes, StaticFilePath
 from pyweber.utils.loads import StaticTemplates, LoadStaticFiles
-from pyweber.utils.exceptions import *
+from pyweber.utils.utils import PrintLine
+from pyweber.utils.exceptions import (
+    InvalidRouteFormatError,
+    InvalidTemplateError,
+    RouteAlreadyExistError,
+    RouteNotFoundError
+)
 
 class Pyweber:
     def __init__(self, **kwargs):
@@ -236,62 +244,77 @@ class Pyweber:
                 return asyncio.run(callback(**kwargs))
         else:
             return callback(**kwargs)
-
-    async def get_template(self, route: str):
-        path, kwargs = self.__resolve_path(route=route)
-
-        if self.is_file_request(route=route):
-            try:
-                if path in self.__routes:
-                    content = LoadStaticFiles(self.__routes.get(path)).load
-                else:
-                    content = LoadStaticFiles(route).load
-                status_code = 200
-            
-            except FileNotFoundError:
-                content = b'File not found'
-                status_code = 404
-            
-            return ResponseStruct(
-                content=content if isinstance(content, bytes) else content,
-                status_code=status_code,
-                content_type=self.get_content_type(route=route),
-                route=route
-            )
+    
+    async def __get_content_requested(self, path: str):
+        """Get content to non static file (existing route)
+        - `path` (str): real_path accoring with route requested with client
+        """
+        if self.is_redirected(route=path):
+            content = self.__routes[self.__redirects[path]]
+            route=self.get_redirected_route(path)
+        else:
+            content = self.__routes[path]
+            route = path
         
+        return route, content
+    
+    async def __get_response_content(self, content: Union[Template, dict, str], **kwargs):
+        if callable(content):
+            try:
+                resp_content = await self.async_get_content(content, **kwargs)
+            except Exception as error:
+                PrintLine(text=f'{self.__error_traceback()}')
+                resp_content = self.page_server_error
+                error_element = resp_content.querySelector('.error-content')
+
+                if error_element:
+                    error_element.content = str(error)
+
+            return resp_content
+        
+        return content
+    
+    async def __get_response_to_file_request(self, path: str, route: str):
+        """Get response to static file
+        - `path` (str): real_path accoring with route requested with client
+        - `route` (str): route requested with client
+        """
+        try:
+            if path in self.__routes:
+                content = LoadStaticFiles(self.__routes.get(path)).load
+            else:
+                content = LoadStaticFiles(route).load
+            status_code = 200
+        
+        except FileNotFoundError:
+            content = b'File not found'
+            status_code = 404
+        
+        return ResponseStruct(
+            content=content if isinstance(content, bytes) else content,
+            status_code=status_code,
+            content_type=self.get_content_type(route=route),
+            route=route
+        )
+    
+    async def __get_response_to_non_file_request(self, path: str, **kwargs):
         if path in self.__routes or self.is_redirected(route=path):
-            if self.is_redirected(route=path):
-                content = self.__routes[self.__redirects[path]]
-                route=self.get_redirected_route(path)
-            else:
-                content = self.__routes[path]
-            
-            if callable(content):
-                try:
-                    resp_content = await self.async_get_content(content, **kwargs)
-                except Exception as error:
-                    resp_content = self.page_server_error
-                    error_element = resp_content.querySelector('.error-content')
-
-                    if error_element:
-                        error_element.content = str(error)
-
-                response_content: Union[Template, str, dict] = resp_content
-            else:
-                response_content = content
+            route, content = await self.__get_content_requested(path=path)
+            response_content = await self.__get_response_content(content=content, **kwargs)
 
             if isinstance(response_content, Template):
                 content_type = ContentTypes.html
-
-                if self.is_redirected(route=path) and not str(response_content.status_code).startswith('3'):
-                    status_code = 302
-                else:
-                    status_code = response_content.status_code
+                status_code = (
+                    302 if self.is_redirected(path)
+                    and not str(response_content.status_code).startswith('3')
+                    else response_content.status_code
+                )
 
             elif isinstance(response_content, dict):
                 response_content = json.dumps(response_content, ensure_ascii=False)
                 content_type = ContentTypes.json
                 status_code = 200
+
             else:
                 response_content = Template(template=str(response_content))
                 content_type = ContentTypes.html
@@ -301,6 +324,7 @@ class Pyweber:
             response_content = self.page_not_found
             status_code = response_content.status_code
             content_type = ContentTypes.html
+            route = path
         
         return ResponseStruct(
             content=response_content,
@@ -308,6 +332,14 @@ class Pyweber:
             content_type=content_type,
             route=route
         )
+
+    async def get_template(self, route: str):
+        path, kwargs = self.__resolve_path(route=route)
+
+        if self.is_file_request(route=route):
+            return await self.__get_response_to_file_request(path=path, route=route)
+        
+        return await self.__get_response_to_non_file_request(path=path, **kwargs)
     
     def clone_template(self, route: str) -> Template:
         last_template = asyncio.run(self.get_template(route=route)).content
@@ -332,7 +364,7 @@ class Pyweber:
         
         return ContentTypes.html
     
-    def is_file_request(self, route: str):
+    def is_file_request(self, route: str) -> bool:
         return '.' in route.strip().split('/')[-1]
     
     def exists(self, route: str) -> bool:
@@ -443,9 +475,16 @@ class Pyweber:
 
             if response:
                 return status_code, response
+    
+    def __error_traceback(self):
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        error_details = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        error_message = ''.join(error_details)
+        return error_message
 
     def __repr__(self):
         return f'Pyweber(routes={len(self.list_routes)}, window={self.window})'
+    
 
 class ResponseStruct:
     def __init__(self, content: Union[Template, str], status_code: int, content_type: ContentTypes, route: str):

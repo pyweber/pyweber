@@ -52,7 +52,6 @@ __all__ = [
     'Template',
     'Pyweber',
     'run',
-    'run_as_asgi',
     'Request',
     'RequestASGI',
     'Response',

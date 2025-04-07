@@ -357,7 +357,8 @@ class Template:
             )
         
         if not has_css:
-            root.childs[0].childs.append(
+            root.childs[0].childs.insert(
+                1,
                 self.__create_default_element(
                     tag='link',
                     attrs={'rel': 'stylesheet', 'href': f'/_pyweber/static/{str(uuid4())}/.css'}
@@ -365,7 +366,8 @@ class Template:
             )
         
         if not has_description:
-            root.childs[0].childs.append(
+            root.childs[0].childs.insert(
+                0,
                 self.__create_default_element(
                     tag='meta',
                     attrs={'name': 'description', 'content': config['app'].get('description')}
@@ -373,7 +375,8 @@ class Template:
             )
         
         if not has_keywords:
-            root.childs[0].childs.append(
+            root.childs[0].childs.insert(
+                0,
                 self.__create_default_element(
                     tag='meta',
                     attrs={'name': 'keywords', 'content': ', '.join(config['app'].get('keywords', []))}

@@ -121,21 +121,27 @@ class ContentTypes(Enum):
     # Desconhecido (fallback)
     unkown = "application/octet-stream"
 
-    def content_list() -> list[str]:
-        return [value.name for value in ContentTypes]
+    @classmethod
+    def content_list(cls) -> list[str]:
+        return [value.name for value in cls]
 
 class StaticFilePath(Enum):
-    html_base = files(anchor='pyweber').joinpath(os.path.join('static', 'html.html'))
-    html_404 = files(anchor='pyweber').joinpath(os.path.join('static', 'html404.html'))
-    html_500 = files(anchor='pyweber').joinpath(os.path.join('static', 'html500.html'))
-    html_401 = files(anchor='pyweber').joinpath(os.path.join('static', 'html401.html'))
-    js_base = files(anchor='pyweber').joinpath(os.path.join('static', 'js.js'))
-    css_base = files(anchor='pyweber').joinpath(os.path.join('static', 'css.css'))
-    main_base = files(anchor='pyweber').joinpath(os.path.join('static', 'main.py'))
-    favicon_path = files(anchor='pyweber').joinpath(os.path.join('static', 'favicon'))
-    config_default = files(anchor='pyweber').joinpath(os.path.join('static', 'config.toml'))
-    pyweber_css = files(anchor='pyweber').joinpath(os.path.join('static', 'pyweber.css'))
-    update_file = files(anchor='pyweber').joinpath(os.path.join('static', 'update.py'))
+    framework = 'pyweber'
+    html_base = files(framework).joinpath(os.path.join('static', 'html.html'))
+    html_404 = files(framework).joinpath(os.path.join('static', 'html404.html'))
+    html_500 = files(framework).joinpath(os.path.join('static', 'html500.html'))
+    html_401 = files(framework).joinpath(os.path.join('static', 'html401.html'))
+    js_base = files(framework).joinpath(os.path.join('static', 'js.js'))
+    css_base = files(framework).joinpath(os.path.join('static', 'css.css'))
+    main_base = files(framework).joinpath(os.path.join('static', 'main.py'))
+    favicon_path = files(framework).joinpath(os.path.join('static', 'favicon'))
+    config_default = files(framework).joinpath(os.path.join('static', 'config.toml'))
+    pyweber_css = files(framework).joinpath(os.path.join('static', 'pyweber.css'))
+    update_file = files(framework).joinpath(os.path.join('static', 'update.py'))
+
+    @classmethod
+    def all_static_files(cls):
+        return [value.value for value in cls]
 
 class WebSocketStatusCode(Enum):
     NORMAL_CLOSURE = "1000 Normal Closure"
@@ -154,15 +160,17 @@ class WebSocketStatusCode(Enum):
     BAD_GATEWAY = "1014 Bad Gateway"
     TLS_HANDSHAKE = "1015 TLS Handshake Failure"
 
-    def content_list() -> list[int]:
-        return [int(value.value.split(' ')[0]) for value in WebSocketStatusCode]
+    @classmethod
+    def content_list(cls) -> list[int]:
+        return [int(value.value.split(' ')[0]) for value in cls]
     
-    def search_by_code(code: int):
-        for value in WebSocketStatusCode:
+    @classmethod
+    def search_by_code(cls, code: int):
+        for value in cls:
             if str(code) in value.value:
                 return value.value
         
-        return WebSocketStatusCode.INTERNAL_SERVER_ERROR.value
+        return cls.INTERNAL_SERVER_ERROR.value
 
 class HTTPStatusCode(Enum):
     # Informational Responses (1xx)
@@ -232,15 +240,17 @@ class HTTPStatusCode(Enum):
     NOT_EXTENDED = "510 Not Extended"
     NETWORK_AUTHENTICATION_REQUIRED = "511 Network Authentication Required"
 
-    def code_list() -> list[int]:
-        return [int(value.value.split(' ')[0]) for value in HTTPStatusCode]
+    @classmethod
+    def code_list(cls) -> list[int]:
+        return [int(value.value.split(' ')[0]) for value in cls]
     
-    def search_by_code(code: int) -> str:
-        for value in HTTPStatusCode:
+    @classmethod
+    def search_by_code(cls, code: int) -> str:
+        for value in cls:
             if str(code) in value.value:
                 return value.value
         
-        return HTTPStatusCode.NOT_FOUND.value
+        return cls.NOT_FOUND.value
 
 class EventType(Enum):
     # Mouse Events
@@ -603,8 +613,9 @@ class NonSelfClosingHTMLTags(Enum):
     # Tags de Comentários
     comment = "comment"
 
-    def non_autoclosing_tags() -> list[str]:
-        return [val.value for val in NonSelfClosingHTMLTags]
+    @classmethod
+    def non_autoclosing_tags(cls) -> list[str]:
+        return [val.value for val in cls]
 
 class GetBy(Enum):
     tag = 'tag'

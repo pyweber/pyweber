@@ -10,16 +10,12 @@ class LoadStaticFiles:
     @property
     def load(self) -> str | bytes:
         extension = self.path.split('.')[-1].strip()
-        mode = 'r'
-        encoding = 'utf-8'
+        mode, encoding = 'r', 'utf-8'
 
         try:
-            byte_index = ContentTypes.content_list().index(extension)
-            if byte_index >= ContentTypes.content_list().index('png'):
-                mode='rb'
-                encoding = None
-        
-        except:
+            if ContentTypes.content_list().index(extension) >= ContentTypes.content_list().index('png'):
+                mode, encoding='rb', None
+        except ValueError:
             pass
         
         if os.path.exists(self.path):

@@ -12,6 +12,8 @@ from importlib.metadata import version, PackageNotFoundError
 
 class CLI:
     def __init__(self):
+        self.default_file = 'main.py'
+        self.default_path_config_file = '.pyweber'
         self.parser = argparse.ArgumentParser(description='PyWeber - A Lightweight Python Framework')
         self.parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {self.get_version}")
         self.parser.add_argument("-u", "--update", action="store_true", help="Update to last pyweber version")
@@ -23,7 +25,7 @@ class CLI:
             '-r',
             "--reload-mode",
             action='store_true',
-            help='Run the project on reload mode with main.py'
+            help=f'Run the project on reload mode with {self.default_file}'
         )
         
         self.subparsers = self.parser.add_subparsers(dest="command")
@@ -43,8 +45,8 @@ class CLI:
         parser.add_argument(
             '--file',
             type=str,
-            default='main.py',
-            help='Main file of pyweber project. default is main.py'
+            default=self.default_file,
+            help=f'Main file of pyweber project. default is {self.default_file}'
         )
 
         parser.add_argument(
@@ -136,8 +138,8 @@ class CLI:
             'file',
             type=str,
             nargs='?',
-            default='main.py',
-            help='Main file of pyweber project. default is main.py'
+            default=self.default_file,
+            help=f'Main file of pyweber project. default is {self.default_file}'
         )
     
     def add_cert_command(self):
@@ -161,7 +163,7 @@ class CLI:
         mkcert_parser.add_argument(
             '--output-dir',
             type=str,
-            default='.pyweber/certs',
+            default=f'{self.default_path_config_file}/certs',
             help='Directory to save the generated certificate files'
         )
 
@@ -181,7 +183,7 @@ class CLI:
         create_config_parser.add_argument(
             '--config-path',
             type=str,
-            default='.pyweber',
+            default=self.default_path_config_file,
             help='Path to the directory where the config file will be created'
         )
 
@@ -212,7 +214,7 @@ class CLI:
         install_requirementes_parser.add_argument(
             '--config-file-path',
             nargs='?',
-            default=Path('.pyweber', 'config.toml'),
+            default=Path(self.default_path_config_file, 'config.toml'),
             help='Path to project config file'
         )
     
@@ -238,7 +240,7 @@ class CLI:
 
             if args.reload_mode:
                 run_kwargs = {
-                    'file': getattr(args, 'file', 'main.py'),
+                    'file': getattr(args, 'file', self.default_file),
                     'reload': True,
                     'https': getattr(args, 'https', False),
                     'cert_file': getattr(args, 'cert', None),
@@ -295,20 +297,7 @@ class CLI:
                 self.edit_cli_parameters.new_section(section_name=args.section_name, value=None)
             
             elif args.command == 'cert':
-                if args.cert_command == 'check-mkcert':
-                    self.commands_funcs.check_mkcert()
-                
-                elif args.cert_command == 'mkcert':
-                    output_dir = getattr(args, 'output_dir', '.pyweber/certs')
-                    domains = getattr(args, 'domains', 'localhost,127.0.0.1')
-
-                    self.commands_funcs.generate_mkcert(
-                        output_dir=output_dir,
-                        domains=domains
-                    )
-
-                else:
-                    self.parser.parse_args(['cert', '--help'])
+                self.run_cert_commands(args=args)
             
             elif args.command == 'build':
                 project_name = getattr(args, 'project_name')
@@ -320,6 +309,22 @@ class CLI:
         except KeyboardInterrupt:
             pass
     
+    def run_cert_commands(self, args):
+        if args.cert_command == 'check-mkcert':
+            self.commands_funcs.check_mkcert()
+        
+        elif args.cert_command == 'mkcert':
+            output_dir = getattr(args, 'output_dir', f'{self.default_path_config_file}/certs')
+            domains = getattr(args, 'domains', 'localhost,127.0.0.1')
+
+            self.commands_funcs.generate_mkcert(
+                output_dir=output_dir,
+                domains=domains
+            )
+
+        else:
+            self.parser.parse_args(['cert', '--help'])
+
     @property
     def get_version(self):
         try:
@@ -361,15 +366,15 @@ class CommandFunctions:
                 self.create_static_file(str(path / file_contents[i][0]), file_contents[i][1])
             
             if with_config:
+                config.set_parameters(path=Path(project_name, '.pyweber'))
                 config['app']['name'] = project_name
                 config['app']['description'] = f'A {project_name} builded with pyweber framework'
-                config.set_parameters(path=Path(project_name, '.pyweber'))
+                config.save()
+
                 self.log_message(
                     message=f'🟢 Config file sucessfully created. See in {config.path}!',
                     level='sucess'
                 )
-
-                config.save()
 
             self.log_message(
                 message=f'🟢 Project {project_name} sucessfully created!',
@@ -382,6 +387,59 @@ class CommandFunctions:
                 level='error'
             )
             shutil.rmtree(path=self.project_name, ignore_errors=True)
+    
+    def set_eviron_variables(self, reload: bool, port: int, host: str, route: str, ws_port: int):
+        os.environ['PYWEBER_RELOAD_MODE'] = str(reload)
+        os.environ['PYWEBER_SERVER_PORT'] = str(port)
+        os.environ['PYWEBER_SERVER_HOST'] = str(host)
+        os.environ['PYWEBER_SERVER_ROUTE'] = str(route)
+        os.environ['PYWEBER_WS_PORT'] = str(ws_port)
+
+        config['session']['reload_mode'] = reload
+        config['server']['host'] = host
+        config['server']['port'] = port
+        config['server']['route'] = route
+        config['websocket']['port'] = ws_port
+    
+    def check_https_context(self, is_https: bool, auto_cert: bool, cert_file: str, key_file: str):
+        if is_https:
+            os.environ['PYWEBER_HTTPS_ENABLED'] = str(is_https)
+            config['server']['https_enabled'] = is_https
+
+            if auto_cert:
+                cert_path, key_path = self.generate_mkcert()
+                os.environ['PYWEBER_CERT_FILE'] = cert_path
+                os.environ['PYWEBER_KEY_FILE'] = key_path
+
+                config['server']['cert_file'] = cert_path
+                config['server']['key_file'] = key_path
+
+                self.log_message(
+                    message=f'🔒 Using auto-generated self-signed certificate',
+                    level='info'
+                )
+            
+            elif cert_file and key_file:
+                os.environ['PYWEBER_CERT_FILE'] = cert_file
+                os.environ['PYWEBER_KEY_FILE'] = key_file
+
+                config['server']['cert_file'] = cert_file
+                config['server']['key_file'] = key_file
+
+                self.log_message(
+                    message=f'🔒 Using provided certificate: {cert_file}',
+                    level='info'
+                )
+            
+            else:
+                self.log_message(
+                    message=f'❌ HTTPS requires either --auto-cert or both --cert and --key options',
+                    level='error'
+                )
+                return
+        else:
+            os.environ['PYWEBER_HTTPS_ENABLED'] = str(is_https)
+            config['server']['https_enabled'] = is_https
 
     def run_app(self, **kwargs):
 
@@ -402,68 +460,19 @@ class CommandFunctions:
                 level='warning'
             )
 
-            os.environ['PYWEBER_RELOAD_MODE'] = str(reload)
-            os.environ['PYWEBER_SERVER_PORT'] = str(port)
-            os.environ['PYWEBER_SERVER_HOST'] = str(host)
-            os.environ['PYWEBER_SERVER_ROUTE'] = str(route)
-            os.environ['PYWEBER_WS_PORT'] = str(ws_port)
+            self.set_eviron_variables(reload, port, host, route, ws_port)
+            self.check_https_context(https, auto_cert, cert_file, key_file)
 
-            if https:
-                os.environ['PYWEBER_HTTPS_ENABLED'] = str(https)
-
-                if auto_cert:
-                    cert_path, key_path = self.generate_mkcert()
-                    os.environ['PYWEBER_CERT_FILE'] = cert_path
-                    os.environ['PYWEBER_KEY_FILE'] = key_path
-                    self.log_message(
-                        message=f'🔒 Using auto-generated self-signed certificate',
-                        level='info'
-                    )
-                
-                elif cert_file and key_file:
-                    os.environ['PYWEBER_CERT_FILE'] = cert_file
-                    os.environ['PYWEBER_KEY_FILE'] = key_file
-                    self.log_message(
-                        message=f'🔒 Using provided certificate: {cert_file}',
-                        level='info'
-                    )
-                
-                else:
-                    self.log_message(
-                        message=f'❌ HTTPS requires either --auto-cert or both --cert and --key options',
-                        level='error'
-                    )
-                    return
-            else:
-                os.environ['PYWEBER_HTTPS_ENABLED'] = str(https)
-            
             try:
-                config['session']['reload_mode'] = reload
-                config['server']['host'] = host
-                config['server']['port'] = port
-                config['server']['route'] = route
-                config['websocket']['port'] = ws_port
-
-                if https:
-                    config['server']['https_enabled'] = https
-                    if auto_cert:
-                        config['server']['cert_file'] = os.environ['PYWEBER_CERT_FILE']
-                        config['server']['key_file'] = os.environ['PYWEBER_KEY_FILE']
-                    elif cert_file and key_file:
-                        config['server']['cert_file'] = cert_file
-                        config['server']['key_file'] = key_file
-                
-                else:
-                    config['server']['https_enabled'] = https
-                
                 config.save() if config.path else None
             except FileNotFoundError:
                 pass
             
-            if sys.platform == 'win32':
+            (
                 subprocess.run(['python', file], check=True, shell=True)
-            else:
+                if sys.platform == 'win32' else
                 subprocess.run(['python3', file], check=True, shell=True)
+            )
         
         except subprocess.CalledProcessError as e:
             self.log_message(
@@ -492,10 +501,12 @@ class CommandFunctions:
                 subprocess.Popen(['start', 'python', temp_script], shell=True)
             else:
                 # No Linux/Mac, executar em segundo plano
-                subprocess.Popen(['python', temp_script],
-                                start_new_session=True,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
+                subprocess.Popen(
+                    ['python', temp_script],
+                    start_new_session=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
 
             self.log_message(
                 message=f'Update process started in second plan',
@@ -507,7 +518,7 @@ class CommandFunctions:
 
         except Exception as e:
             self.log_message(
-                message=f'❌ Erro ao iniciar atualização: {e}',
+                message=f'❌ Error to start the update: {e}',
                 level='error'
             )
     
@@ -515,21 +526,14 @@ class CommandFunctions:
         os.makedirs(path, exist_ok=True)
     
     def create_static_file(self, file_path: str, content: str | bytes):
-        encoding='utf-8'
-        mode = 'w'
-
-        if isinstance(content, bytes):
-            mode = 'wb'
-            encoding = None
-
+        encoding, mode=('utf-8', 'w') if not isinstance(content, bytes) else (None, 'wb')
         with open(file_path, mode=mode, encoding=encoding) as file:
             file.write(content)
     
     def create_config_file(self, path: str, name: str, keep_defaults=True):
+        config.set_parameters(path=path, name=name, keep_defaults=keep_defaults)
         config['app']['name'] = os.path.basename(os.getcwd())
         config['app']['description'] = f'A {config['app']['name']} builded with pyweber framework'
-        config.set_parameters(path=path, name=name, keep_defaults=keep_defaults)
-
         config.save()
     
     def install_requirements(self, path: str):
@@ -549,7 +553,6 @@ class CommandFunctions:
     
     def build_project(self, project_name: str):
         os.makedirs(os.path.join('build', project_name), exist_ok=True)
-
         raise NotImplementedError(f'Build method for {project_name} not implemented yet')
     
     def generate_mkcert(self, **kwargs):
@@ -749,39 +752,7 @@ class ConfigManagerCLI:
                             path.append(key_value[0])
                             questionary.print(text=guide_config(), style="bold fg:#00FFFF")
 
-                            value: str = questionary.text(
-                                f"Write a value for {key_value[0]}:",
-                            ).ask()
-
-                            if key_value[-1].lower() in ['set', 'list', 'tuple']:
-                                value = value.strip().split()
-                            elif key_value[-1].lower() in ['int', 'integer', 'number']:
-                                value = int(value.strip())
-                            elif key_value[-1].lower() in ['double', 'float']:
-                                value = float(value.strip())
-                            elif key_value[-1].lower() in ['dict', 'dictionary']:
-                                keys = value.split(';')
-
-                                if ':' not in value and '=' not in value:
-                                    raise ValueError('None separator key and value identified')
-                                else:
-                                    value = {}
-
-                                    for key in keys:
-                                        k, v = key.replace(':','=').strip().split('=')
-                                        type = k.split()
-
-                                        if type[-1] in DefaultTypes.floats:
-                                            v = float(v)
-                                        elif type[-1] in DefaultTypes.integer:
-                                            v = int(v)
-                                        elif type[-1] in DefaultTypes.lists:
-                                            v = v.split()
-                                        
-                                        value[type[0]] = v
-                            else:
-                                value = value.strip()
-                            
+                            value = self.__get_new_field_value(key_value=key_value)
                             config.set(*path, value=value)
                         else:
                             questionary.print(
@@ -794,6 +765,42 @@ class ConfigManagerCLI:
                     break
                 except TypeError:
                     break
+    
+    def __get_new_field_value(self, key_value: list[str]):
+        value: str = questionary.text(
+            f"Write a value for {key_value[0]}:",
+        ).ask()
+
+        if key_value[-1].lower() in ['set', 'list', 'tuple']:
+            value = value.strip().split()
+        elif key_value[-1].lower() in ['int', 'integer', 'number']:
+            value = int(value.strip())
+        elif key_value[-1].lower() in ['double', 'float']:
+            value = float(value.strip())
+        elif key_value[-1].lower() in ['dict', 'dictionary']:
+            value = self.__get_dict_values(keys=value.split(';'))
+        else:
+            value = value.strip()
+    
+    def __get_dict_values(self, keys: list[str], default_value: dict = {}):
+        if any(':' not in v and '=' not in v for v in keys):
+            raise ValueError('None separator key and value identified')
+        else:
+            default_value = default_value
+
+            for key in keys:
+                k, v = key.replace(':','=').strip().split('=')
+                type = k.split()
+
+                if type[-1] in DefaultTypes.floats:
+                    v = float(v)
+                elif type[-1] in DefaultTypes.integer:
+                    v = int(v)
+                elif type[-1] in DefaultTypes.lists:
+                    v = v.split()
+                
+                default_value[type[0]] = v
+        return default_value
     
     def edit_parameters(self):
         sections = self.get_all_sections()
@@ -814,26 +821,30 @@ class ConfigManagerCLI:
 
             if field:
                 path.append(field)
-                self.check_content_type(path=path)
+                self.__set_new_value(list_path=path)
     
-    def check_content_type(self, path: str):
-        current_value = config.get(*path)
+    def __get_new_value(self, list_path: list[str], current_value: bool | str):
+        if isinstance(current_value, bool):
+            confirm: str = questionary.text(
+                f"Confirm to change value for {list_path[-1]}? (Y/N): "
+            ).ask()
+
+            if confirm.lower() == 'y':
+                return not current_value
+            
+            return current_value
+
+        new_value: str = questionary.text(
+            f"What's a new value for {list_path[-1]}?: "
+        ).ask()
+        
+        return new_value
+    
+    def __set_new_value(self, list_path: list[str]):
+        current_value = config.get(*list_path)
 
         while True:
-            if isinstance(current_value, bool):
-                confirm: str = questionary.text(
-                    f"Confirm to change value for {path[-1]}? (Y/N): "
-                ).ask()
-
-                if confirm.lower() == 'y':
-                    new_value = not current_value
-                else:
-                    break
-
-            else:
-                new_value: str = questionary.text(
-                    f"What's a new value for {path[-1]}?: "
-                ).ask()
+            new_value = self.__get_new_value(list_path, current_value)
 
             try:
                 if isinstance(current_value, list):
@@ -843,11 +854,11 @@ class ConfigManagerCLI:
                 elif isinstance(current_value, float):
                     new_value = float(new_value)
                 
-                config.set(*path, value=new_value)
+                config.set(*list_path, value=new_value)
                 break
             except ValueError:
                 questionary.print(
-                    text=f'Invalid value for {path[-1]}, expected {type(current_value).__name__}.'
+                    text=f'Invalid value for {list_path[-1]}, expected {type(current_value).__name__}.'
                 )
             
             except TypeError:

@@ -1,5 +1,10 @@
 # PyWeber Changelog
 
+## [0.9.2] - 2025-04-07
+---
+### Bug Fixes
+- Fixed the non-updating of values ​​when creating the config file
+
 ## [0.9.1] - 2025-04-07
 ---
 ### New Features
