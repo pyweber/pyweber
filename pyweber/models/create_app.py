@@ -19,13 +19,13 @@ class CreatApp:
         self.__key_file = os.environ.get('PYWEBER_KEY_FILE') or config.get('server', 'key_file')
         self.__use_ssl = config.get('server', 'https_enabled')
         self.__server_host = os.environ.get('PYWEBER_SERVER_HOST') or config.get('server', 'host')
-        self.__server_port = int(os.environ.get('PYWEBER_SERVER_PORT')) or int(config.get('server', 'port'))
-        self.__server_ws_port = int(os.environ.get('PYWEBER_WS_PORT')) or int(config.get('websocket', 'port'))
+        self.__server_port = os.environ.get('PYWEBER_SERVER_PORT') or config.get('server', 'port')
+        self.__server_ws_port = os.environ.get('PYWEBER_WS_PORT') or config.get('websocket', 'port')
         self.__server_route = os.environ.get('PYWEBER_SERVER_ROUTE') or config.get('server', 'route')
         self.http_server = HttpServer(update_handler=self.update)
         self.ws_server = WsServer(
             host=self.__server_host,
-            port=self.__server_ws_port,
+            port=int(self.__server_ws_port),
             use_ssl=self.__use_ssl,
             cert_file=self.__cert_file,
             key_file=self.__key_file
@@ -59,7 +59,7 @@ class CreatApp:
         
         self.http_server.run(
             route=self.__server_route,
-            port=self.__server_port,
+            port=int(self.__server_port),
             host=self.__server_host,
             use_https=self.__use_ssl,
             cert_file=self.__cert_file,

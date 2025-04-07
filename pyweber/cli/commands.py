@@ -456,7 +456,7 @@ class CommandFunctions:
                 else:
                     config['server']['https_enabled'] = https
                 
-                config.save()
+                config.save() if config.path else None
             except FileNotFoundError:
                 pass
             

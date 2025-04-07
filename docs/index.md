@@ -46,14 +46,23 @@ class Counter(pw.Template):
             </div>
         """)
 
-        self.count = self.querySelector("#count")
         self.button = self.querySelector("#increment")
         self.button.events.onclick = self.increment
 
     async def increment(self, e: pw.EventHandler):
+        self.count = e.template.querySelector("#count")
         current = int(self.count.content)
         self.count.content = str(current + 1)
+        self.create_element()
         e.update()
+    
+    def create_element(self):
+        self.count.parent.parent.add_child(
+            pw.Element(
+                tag='p',
+                content=self.count.content
+            )
+        )
 
 def main(app: pw.Pyweber):
     app.add_route("/", template=Counter(app=app))
