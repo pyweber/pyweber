@@ -35,15 +35,15 @@ class Response:
         return self.__headers
     
     @property
-    def request(self):
+    def request(self) -> Request | RequestASGI:
         return self.__request
     
     @property
-    def http_version(self):
+    def http_version(self) -> str:
         return self.headers.get('Http-Version', None)
     
     @property
-    def response_date(self):
+    def response_date(self) -> str:
         return self.headers.get('Date', None)
     
     @property
@@ -63,11 +63,11 @@ class Response:
         return self.headers.get('Status', None)
     
     @property
-    def request_path(self):
+    def request_path(self) -> str:
         return self.headers.get('Request-Path', None)
     
     @property
-    def response_path(self):
+    def response_path(self) -> str:
         return self.headers.get('Response-Path', None)
     
     @property
@@ -104,6 +104,10 @@ class Response:
     
     def add_header(self, key: str, value: str):
         self.__headers[key] = value
+    
+    def set_header(self, key: str, /, value: str | bytes | int | float):
+        if key in self.__headers:
+            self.__headers[key] = value
     
     def new_content(self, value: bytes):
         if isinstance(value, bytes):

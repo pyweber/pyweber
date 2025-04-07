@@ -1,5 +1,42 @@
 # PyWeber Changelog
 
+## [0.9.1] - 2025-04-07
+---
+### New Features
+- Added `set_header()` method to Response class for modifying existing headers
+- Added `add_header()` method to Response class for adding new headers
+- Added support for asynchronous `after_request` middleware
+- Improved HTML rendering with conditional DOCTYPE handling:
+  - DOCTYPE is now only added when the root element is `<html>`
+  - Fixed nested template rendering issues
+
+### Improvements
+- Enhanced Response class with better header management
+- Optimized template rendering for dynamic content
+- Better error handling and logging for HTTP responses
+- Improved middleware processing with support for both synchronous and asynchronous functions
+- Fixed reload mode detection to properly handle string environment variables:
+  - Now correctly recognizes 'True', '1', True, and 1 as valid values
+  - Ensures consistent behavior when setting reload mode via environment variables
+
+### Bug Fixes
+- Fixed issue with duplicate DOCTYPE declarations in nested templates
+- Fixed middleware processing to properly handle both Request and Response objects
+- Corrected HTTP version handling in Response headers
+- Fixed content length calculation when response content is modified
+- Resolved inconsistency in reload mode activation when set via environment variables
+
+### Documentation
+- Updated Response class documentation with new methods
+- Added examples for asynchronous middleware usage
+- Improved template rendering documentation
+
+### Internal Changes
+- Refactored Response class for better maintainability
+- Improved type annotations throughout the codebase
+- Enhanced middleware processing pipeline
+- Added proper timezone handling for HTTP Date headers
+
 ## [0.9.0] - 2025-04-07
 ---
 ### New Features

@@ -58,11 +58,14 @@ class Template:
         
         return self.__inject_default_elements(root=self.__parse_html(html=html))
 
-    def build_html(self, element: Element = None):
-        if element:
-            return f'<!DOCTYPE html>\n{self.__build_html(element=element)}'
-
-        return f'<!DOCTYPE html>\n{self.__build_html(element=self.__root)}'
+    def build_html(self, element: Element = None, include_doctype: bool = True):
+        element = element or self.__root
+        html = self.__build_html(element=element)
+        
+        if include_doctype and element.tag == 'html':
+            html = f'<!DOCTYPE html>\n{html}'
+        
+        return html
     
     def getElementById(self, element_id: str, element: Element = None) -> Element | None:
         if element is None:

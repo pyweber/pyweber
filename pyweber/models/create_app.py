@@ -54,7 +54,7 @@ class CreatApp:
         self.load_target()
         Thread(target=self.ws_server.ws_start, daemon=True).start()
 
-        if self.__reload_mode:
+        if self.__reload_mode in [True, 'True', 1, '1']:
             Thread(target=self.reload_server.start, daemon=True).start()
         
         self.http_server.run(

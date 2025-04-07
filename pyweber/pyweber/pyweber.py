@@ -12,7 +12,6 @@ from pyweber.models.response import Response
 from pyweber.utils.types import ContentTypes, StaticFilePath
 from pyweber.utils.loads import StaticTemplates, LoadStaticFiles
 from pyweber.utils.exceptions import *
-from pyweber.utils.utils import PrintLine
 
 class Pyweber:
     def __init__(self, **kwargs):
@@ -154,7 +153,7 @@ class Pyweber:
     async def get_route(self, request: Request):
 
         # middleware before_request
-        __response: tuple[int, Union[dict, Template, Any]] | None = self.__process_middleware(resp=request, middle_list=self.__before_request)
+        __response: tuple[int, Union[dict, Template, Any]] | None = await self.__process_middleware(resp=request, middle_list=self.__before_request)
 
         if __response:
             status_code, response = __response
@@ -213,7 +212,7 @@ class Pyweber:
         )
         
         # middleware after request
-        __response = self.__process_middleware(resp=response, middle_list=self.__after_request)
+        __response = await self.__process_middleware(resp=response, middle_list=self.__after_request)
 
         if __response:
             _, response = __response
@@ -425,7 +424,7 @@ class Pyweber:
         from pyweber.models.run import run_as_asgi
         await run_as_asgi(scope, receive, send, app=self)
     
-    def __process_middleware(self, resp: Union[Request, Response], middle_list: list[dict[str, Union[int, Callable[..., Any]]]]):
+    async def __process_middleware(self, resp: Union[Request, Response], middle_list: list[dict[str, Union[int, Callable[..., Any]]]]):
         for middle_dict in middle_list:
             status_code, middle = middle_dict.values()
             params = inspect.signature(middle).parameters
@@ -437,7 +436,10 @@ class Pyweber:
                 elif param.kind == inspect.Parameter.KEYWORD_ONLY:
                     kwargs[name] = resp
             
-            response = middle(*args, **kwargs)
+            if inspect.iscoroutinefunction(middle):
+                response = await middle(*args, **kwargs)
+            else:
+                response = middle(*args, **kwargs)
 
             if response:
                 return status_code, response
