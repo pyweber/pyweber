@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyweber"
-version = "0.9.42"
+version = "0.9.43"
 description = "A lightweight Python framework for building and managing web applications."
 readme = "README.md"
 authors = [
-    { name = "DevPythonMZ", email = "zoidycine@egmail.com" }
+    { name = "DevPythonMZ", email = "zoidycine@gmail.com" }
 ]
 license = "MIT"
 requires-python = ">=3.10"
@@ -23,8 +23,8 @@ dependencies = [
 
 [project.urls]
 Documentation = "https://pyweber.readthedocs.io/en/latest"
-Source = "https://github.com/webtechmoz/pyweber"
-Tracker = "https://github.com/webtechmoz/pyweber/issues"
+Source = "https://github.com/pyweber/pyweber"
+Tracker = "https://github.com/pyweber/pyweber/issues"
 PyPI = "https://pypi.org/project/pyweber/"
 YouTube = "https://youtube.com/@devpythonMZ"
 
