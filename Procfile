@@ -1,1 +1,1 @@
-web: gunicorn main:run_as_asgi -k uvicorn.workers.UvicornWorker
+web: gunicorn main:run_as_asgi -k uvicorn.workers.UvicornWorker --ws=websockets

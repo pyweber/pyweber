@@ -56,9 +56,12 @@ class SideBar(pw.Template):
 def sidebar():
     return SideBar()
 
-async def run_as_asgi(scope, response, send):
-    return await pw.run_as_asgi(scope, response, send, app)
+async def run_as_asgi(scope, receive, send):
+    return await pw.run_as_asgi(scope, receive, send, app)
 
 if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app=run_as_asgi, port=8800)
+    pw.run(
+        cert_file='.pyweber/cert/pyweber-localhost-127.0.0.1.pem',
+        key_file='.pyweber/cert/pyweber-localhost-127.0.0.1-key.pem',
+        port=8800
+    )
