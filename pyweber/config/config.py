@@ -44,7 +44,7 @@ class PyweberConfig:
             keep_defaults = self.__keep_defaults
         
         if not any(name.endswith(ext) for ext in self.__extensions_allowed):
-            raise ValueError(f'Config file must be a toml file, but you got {str(name).split('.')[-1]} file')
+            raise ValueError(f"Config file must be a toml file, but you got {str(name).split('.')[-1]} file")
 
         self.__path, self.__name, self.__keep_defaults = path, name, keep_defaults
 

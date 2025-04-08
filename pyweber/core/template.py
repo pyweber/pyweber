@@ -239,7 +239,7 @@ class Template:
     
     def __build_html(self, element: Element, indent: int = 0) -> str:
         indentation = ' ' * indent
-        html = f'{indentation}<{element.tag} uuid="{element.uuid}"' if element.tag != 'comment' else f'{indentation}<!--'
+        html = f"{indentation}<{element.tag} uuid='{element.uuid}'" if element.tag != 'comment' else f'{indentation}<!--'
 
         if element.id:
             html += f' id="{element.id}"'
@@ -253,12 +253,12 @@ class Template:
             html += f' style="{style_str}"'
             
         for key, value in element.attrs.items():
-            html += f' {key}{f'="{value}"' if value else ''}'
+            html += f" {key}{f'="{value}"' if value else ''}"
 
         for key, value in element.events.__dict__.items():
             if value is not None:
                 if isinstance(value, str) or callable(value):
-                    html += f' {f"_{key}"}="{self.__event_id(value) if callable(value) else value}"'
+                    html += f" {f"_{key}"}='{self.__event_id(value) if callable(value) else value}'"
                 
                 else:
                     raise ValueError(f'Event {value} is an invalid callable ou event_id')

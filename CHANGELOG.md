@@ -1,6 +1,11 @@
 # PyWeber Changelog
 
-## [0.9.3] - 2025-04-07
+## [0.9.4] - 2025-04-08
+---
+### Bug Fixes
+- Fixed `SyntaxError` when format f-string in non-windows systems
+
+## [0.9.3] - 2025-04-08
 ---
 ### New Features
 - Added `Icon Element` as pre-builded Elements called `Components`

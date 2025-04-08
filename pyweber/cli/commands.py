@@ -533,7 +533,7 @@ class CommandFunctions:
     def create_config_file(self, path: str, name: str, keep_defaults=True):
         config.set_parameters(path=path, name=name, keep_defaults=keep_defaults)
         config['app']['name'] = os.path.basename(os.getcwd())
-        config['app']['description'] = f'A {config['app']['name']} builded with pyweber framework'
+        config['app']['description'] = f"A {config['app']['name']} builded with pyweber framework"
         config.save()
     
     def install_requirements(self, path: str):
@@ -649,7 +649,7 @@ class CommandFunctions:
             'error': Colors.RED,
             'reset': Colors.RESET
         }
-        PrintLine(f'{colors.get(level, '')}{message}{colors.get('reset')}')
+        PrintLine(f"{colors.get(level, '')}{message}{colors.get('reset')}")
 
 class ConfigManagerCLI:
     def __init__(self):

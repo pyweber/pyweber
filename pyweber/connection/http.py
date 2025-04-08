@@ -81,7 +81,7 @@ class HttpServer:
                 protocol = 'https' if self.use_https else 'http'
 
                 if not restart:
-                    url = f'{protocol}://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}'
+                    url = f"{protocol}://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}"
                     PrintLine(text=f'Server online in {Colors.GREEN}{url}{Colors.RESET}')
 
                 while True:

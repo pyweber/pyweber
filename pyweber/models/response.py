@@ -79,7 +79,7 @@ class Response:
         
         if http_code.startswith('4'):
             if http_code.startswith('401'):
-                return f'{http_code}\r\nWWW-Authenticate: Basic realm={config['app'].get('name')}'
+                return f"{http_code}\r\nWWW-Authenticate: Basic realm={config.get('app', 'name')}"
             
             if http_code.startswith('405'):
                 return f'{http_code}\r\nAllow: GET, POST, PUT, DELETE'
@@ -136,5 +136,5 @@ class Response:
         
         response += '\r\n'
 
-        PrintLine(text=f'{bold_white_color}{self.request._get_line_method_} {status_color}{self.status_code.replace('\r\n', ' ')}{reset_color}')
+        PrintLine(text=f"{bold_white_color}{self.request._get_line_method_} {status_color}{self.status_code.replace('\r\n', ' ')}{reset_color}")
         return response.encode() + self.response_content
