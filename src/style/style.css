@@ -1,0 +1,84 @@
+@import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css");
+
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #f2f2f2;
+}
+
+.container {
+    background-color: rgb(15, 15, 15);
+    height: 100dvh;
+    overflow: hidden;
+    width: 45px;
+    text-wrap: nowrap;
+    transition: width 0.25s ease-in-out;
+}
+
+.container:hover {
+    width: 200px;
+}
+
+.container:hover .title div {
+    display: inline;
+}
+
+.container:hover li a {
+    display: flex;
+}
+
+.title {
+    margin-top: 10px;
+    padding-left: 10px;
+    display: flex;
+    align-items: center;
+    column-gap: 10px;
+    margin-bottom: 20px;
+}
+
+.title div {
+    color: white;
+    font-weight: 700;
+    font-size: 25px;
+    display: none;
+}
+
+img {
+    width: 22px;
+    height: 22px;
+}
+
+li {
+    display: flex;
+    column-gap: 10px;
+    padding: 10px 0px 10px 10px;
+    list-style: none;
+}
+
+li i, a {
+    display: flex;
+    align-items: center;
+
+}
+
+li i {
+    color: white;
+    font-size: 20px;
+}
+
+li a {
+    text-decoration: none;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    width: 100%;
+    display: none;
+}
+
+li:hover {
+    background-color: blue;
+}
