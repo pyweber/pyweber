@@ -40,7 +40,7 @@ class CLI:
         self.commands_funcs = CommandFunctions()
         self.edit_cli_parameters = ConfigManagerCLI()
 
-    def _add_run_arguments(self, parser):
+    def _add_run_arguments(self, parser: argparse.ArgumentParser):
         """Adiciona argumentos comuns para execução do servidor"""
         parser.add_argument(
             '--file',

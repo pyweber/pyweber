@@ -1,5 +1,12 @@
 # PyWeber Changelog
 
+## [0.9.3] - 2025-04-07
+---
+### New Features
+- Added `Icon Element` as pre-builded Elements called `Components`
+- Added Bootstrap Icons. You need to import before on html or css to use it.
+- Added Uvicorn and Gunicorn servers.
+
 ## [0.9.2] - 2025-04-07
 ---
 ### Bug Fixes

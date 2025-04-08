@@ -1,5 +1,6 @@
 from importlib import import_module, reload
 from threading import Thread
+from typing import Callable
 import os
 import sys
 
@@ -10,18 +11,18 @@ from pyweber.connection.reload import ReloadServer
 from pyweber.config.config import config
 
 class CreatApp:
-    def __init__(self, target: callable):
+    def __init__(self, target: Callable, **kwargs):
         self.target = target
         self.module = self.import_module()
         self.app = self.get_app_instances()
-        self.__reload_mode = os.environ.get('PYWEBER_RELOAD_MODE') or config.get('session', 'reload_mode')
-        self.__cert_file = os.environ.get('PYWEBER_CERT_FILE') or config.get('server', 'cert_file')
-        self.__key_file = os.environ.get('PYWEBER_KEY_FILE') or config.get('server', 'key_file')
-        self.__use_ssl = config.get('server', 'https_enabled')
-        self.__server_host = os.environ.get('PYWEBER_SERVER_HOST') or config.get('server', 'host')
-        self.__server_port = os.environ.get('PYWEBER_SERVER_PORT') or config.get('server', 'port')
-        self.__server_ws_port = os.environ.get('PYWEBER_WS_PORT') or config.get('websocket', 'port')
-        self.__server_route = os.environ.get('PYWEBER_SERVER_ROUTE') or config.get('server', 'route')
+        self.__reload_mode = os.environ.get('PYWEBER_RELOAD_MODE') or kwargs.get('reload_mode', None) or config.get('session', 'reload_mode')
+        self.__cert_file = os.environ.get('PYWEBER_CERT_FILE') or kwargs.get('cert_file', None) or config.get('server', 'cert_file')
+        self.__key_file = os.environ.get('PYWEBER_KEY_FILE') or kwargs.get('key_file', None) or config.get('server', 'key_file')
+        self.__use_ssl = kwargs.get('https_enabled', None) or config.get('server', 'https_enabled')
+        self.__server_host = os.environ.get('PYWEBER_SERVER_HOST') or kwargs.get('host', None) or config.get('server', 'host')
+        self.__server_port = os.environ.get('PYWEBER_SERVER_PORT') or kwargs.get('port', None) or config.get('server', 'port')
+        self.__server_ws_port = os.environ.get('PYWEBER_WS_PORT') or kwargs.get('ws_port', None) or config.get('websocket', 'port')
+        self.__server_route = os.environ.get('PYWEBER_SERVER_ROUTE') or kwargs.get('route', None) or config.get('server', 'route')
         self.http_server = HttpServer(update_handler=self.update)
         self.ws_server = WsServer(
             host=self.__server_host,

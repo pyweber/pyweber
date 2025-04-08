@@ -23,8 +23,8 @@ class WsServer:
         self.cert_file = cert_file
         self.key_file = key_file
         self.ssl_context = None
-    
-        if self.use_ssl and self.cert_file and self.key_file:
+
+        if self.use_ssl in [True, 1, 'True', 'true'] and self.cert_file and self.key_file:
             self.ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             try:
                 self.ssl_context.load_cert_chain(certfile=self.cert_file, keyfile=self.key_file)
@@ -116,7 +116,7 @@ class WsServer:
 
     def ws_start(self):
         try:
-            if self.use_ssl and self.ssl_context:
+            if self.use_ssl in [True, 1, 'True', 'true'] and self.ssl_context:
                 with serve(self.ws_handler, self.host, self.port, ssl=self.ssl_context) as server:
                     server.serve_forever()
             else:

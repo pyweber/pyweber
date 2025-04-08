@@ -442,10 +442,10 @@ class Pyweber:
     def update(self):
         return self.__update_handler()
     
-    def run(self, target: Callable = None):
+    def run(self, target: Callable = None, **kwargs):
         from pyweber.models.run import run
-        return run(target=target)
-    
+        return run(target, **kwargs)
+        
     @property
     def __serve_static_framework_files(self):
         self.__routes['/_pyweber/static/{uuid}/.js'] = str(StaticFilePath.js_base.value)

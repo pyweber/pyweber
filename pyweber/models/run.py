@@ -1,5 +1,5 @@
 from threading import Thread
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from pyweber.models.create_app import CreatApp
 from pyweber.models.request import RequestASGI
 
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 WS_RUNNING = False
 
-def run(target: callable = None):
+def run(target: Callable = None, **kwargs):
     """
     For running the pyweber project.
     ```python
@@ -44,9 +44,9 @@ def run(target: callable = None):
     if target and not callable(target):
         raise TypeError('The target must be callable function')
 
-    CreatApp(target=target).run()
+    CreatApp(target=target, **kwargs).run()
 
-async def run_as_asgi(scope, response, send, app: 'Pyweber', target: callable = None):
+async def run_as_asgi(scope, response, send, app: 'Pyweber', target: Callable = None):
     global WS_RUNNING
 
     create_app = CreatApp(target=None)
@@ -58,7 +58,7 @@ async def run_as_asgi(scope, response, send, app: 'Pyweber', target: callable = 
         WS_RUNNING = True
         ws_server.app = app
 
-        if target:
+        if target and callable(target):
             target(app)
 
         Thread(target=ws_server.ws_start, daemon=True).start()

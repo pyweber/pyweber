@@ -130,7 +130,7 @@ class HttpServer:
     def run(self, route: str, port: int, host: str, use_https: bool, cert_file: str, key_file: str):
         self.route, self.port, self.host, self.use_https = route, port, host, use_https
 
-        if use_https:
+        if use_https in [True, 1, 'True']:
             if not cert_file or not key_file:
                 PrintLine(text=f"{Colors.YELLOW}HTTPS requested but no certificate/key provided. Use `pyweber cert mkcert` to generate before...{Colors.RESET}")
 

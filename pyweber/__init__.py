@@ -1,5 +1,8 @@
 # pyweber run
-from .models.run import run
+from .models.run import (
+    run,
+    run_as_asgi
+)
 
 # pyweber sessions
 from .connection.session import sessions
@@ -38,7 +41,9 @@ from .utils.types import (
     JWTAlgorithms,
     NonSelfClosingHTMLTags,
     WebSocketStatusCode,
-    WindowEventType
+    WindowEventType,
+    Icons,
+    GetBy
 )
 from .utils.exceptions import (
     InvalidRouteFormatError,
@@ -48,10 +53,14 @@ from .utils.exceptions import (
     RouterError
 )
 
+# Pyweber Components
+from .components.components import Icon
+
 __all__ = [
     'Template',
     'Pyweber',
     'run',
+    'run_as_asgi',
     'Request',
     'RequestASGI',
     'Response',
@@ -67,6 +76,8 @@ __all__ = [
     'ContentTypes',
     'EventType',
     'HTMLTag',
+    'GetBy',
+    'Icons',
     'HTTPStatusCode',
     'JWTAlgorithms',
     'NonSelfClosingHTMLTags',
@@ -76,5 +87,6 @@ __all__ = [
     'RouteAlreadyExistError',
     'InvalidTemplateError',
     'RouteNotFoundError',
-    'RouterError'
+    'RouterError',
+    'Icon'
 ]
