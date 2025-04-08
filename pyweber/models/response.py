@@ -75,18 +75,18 @@ class Response:
         http_code: str = HTTPStatusCode.search_by_code(self.code)
         
         if http_code.startswith('3'):
-            return f'{http_code}\r\nLocation: {self.response_path}'
+            return f'{http_code}\\r\\nLocation: {self.response_path}'
         
         if http_code.startswith('4'):
             if http_code.startswith('401'):
-                return f"{http_code}\r\nWWW-Authenticate: Basic realm={config.get('app', 'name')}"
+                return f"{http_code}\\r\\nWWW-Authenticate: Basic realm={config.get('app', 'name')}"
             
             if http_code.startswith('405'):
-                return f'{http_code}\r\nAllow: GET, POST, PUT, DELETE'
+                return f'{http_code}\\r\\nAllow: GET, POST, PUT, DELETE'
         
         if http_code.startswith('5'):
             if http_code.startswith('503'):
-                return f'{http_code}\r\nRetry-After: 60'
+                return f'{http_code}\\r\\nRetry-After: 60'
         
         return http_code
     
@@ -116,7 +116,7 @@ class Response:
 
     @property
     def build_response(self) -> bytes:
-        response = f'{self.http_version} {self.status_code}\r\n'
+        response = f'{self.http_version} {self.status_code}\\r\\n'
         reset_color = Colors.RESET
         bold_white_color = Colors.BOLD_WHITE
         bold_red_color = Colors.BOLD_RED
@@ -126,15 +126,15 @@ class Response:
         for key, value in self.headers.items():
             if key == 'Set-Cookie':
                 for cookie in value:
-                    response += f'{key}: {cookie}\r\n'
+                    response += f'{key}: {cookie}\\r\\n'
             
             elif key == 'Response':
                 pass
             
             else:
-                response += f'{key}: {value}\r\n'
+                response += f'{key}: {value}\\r\\n'
         
-        response += '\r\n'
+        response += '\\r\\n'
 
-        PrintLine(text=f"{bold_white_color}{self.request._get_line_method_} {status_color}{self.status_code.replace('\r\n', ' ')}{reset_color}")
+        PrintLine(text=f"{bold_white_color}{self.request._get_line_method_} {status_color}{self.status_code.replace('\\r\\n', ' ')}{reset_color}")
         return response.encode() + self.response_content
