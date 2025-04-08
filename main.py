@@ -60,8 +60,4 @@ async def run_as_asgi(scope, receive, send):
     return await pw.run_as_asgi(scope, receive, send, app)
 
 if __name__ == '__main__':
-    pw.run(
-        cert_file='.pyweber/cert/pyweber-localhost-127.0.0.1.pem',
-        key_file='.pyweber/cert/pyweber-localhost-127.0.0.1-key.pem',
-        port=8800
-    )
+    pw.run()
