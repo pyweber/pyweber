@@ -20,8 +20,12 @@ class Button(pw.Element):
                 tag='a',
                 attrs={'href': '#', 'title': title},
                 content=title,
+                events=pw.TemplateEvents(onclick=self.print_hello)
             )
         ]
+    
+    def print_hello(self, e: pw.EventHandler):
+        print(e.window.session_storage)
 
 class SideBarButtons(pw.Element):
     def __init__(self):
@@ -60,4 +64,6 @@ async def run_as_asgi(scope, receive, send):
     return await pw.run_as_asgi(scope, receive, send, app)
 
 if __name__ == '__main__':
-    pw.run()
+    import uvicorn
+    # uvicorn.run(app=run_as_asgi, port=8800, ws='websockets')
+    app.run()

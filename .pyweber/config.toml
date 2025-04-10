@@ -13,8 +13,8 @@ host = "0.0.0.0"
 port = 8800
 route = "/"
 https_enabled = false
-cert_file = ".pyweber\\cert\\pyweber-localhost-127.0.0.1.pem"
-key_file = ".pyweber\\cert\\pyweber-localhost-127.0.0.1-key.pem"
+cert_file = ""
+key_file = ""
 
 [websocket]
 port = 8765
