@@ -1,18 +1,19 @@
 import json
 from pyweber.connection.session import sessions
-from pyweber.pyweber.pyweber import Pyweber
 from pyweber.core.element import Element
-from pyweber.core.window import (
-    Screen,
-    Location,
-    Orientation
-)
+
+from typing import TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from pyweber.connection.websocket import WsServer, WsServerAsgi
+
 class wsMessage:
-    def __init__(self, raw_message: dict[str, (str, float)], app: Pyweber):
+    def __init__(self, raw_message: dict[str, (str, float)], app, ws: Union['WsServer', 'WsServerAsgi']):
         self.__raw_message = raw_message
         self.__raw_window: dict[str, (int, str, float)] = self.get_raw_window()
         self.__values = self.get_form_values()
         self.__app = app
+        self.ws = ws
         self.route: str = self.get_value(key='route')
         self.type: str = self.get_value(key='type')
         self.event_ref: str = self.get_value(key='event_ref')
@@ -22,14 +23,18 @@ class wsMessage:
         self.template = self.get_template()
         self.window = self.get_window()
     
+    @property
+    def window_response(self) -> dict[str, (str, int)]:
+        return self.__raw_message.get('window_response', {})
+    
     def get_value(self, key: str):
         return self.__raw_message.get(key, None)
     
-    def get_template(self):
+    async def get_template(self):
         if self.session_id in sessions.all_sessions:
             session_template = sessions.get_session(session_id=self.session_id).template
         else:
-            session_template = self.__app.clone_template(route=self.route)
+            session_template = await self.__app.clone_template(route=self.route)
 
         if self.get_value(key='template'):
             session_template.root = session_template.parse_html(html=self.get_value('template'))
@@ -38,8 +43,11 @@ class wsMessage:
         return session_template
     
     def get_window(self):
-        window = self.__app.window
+        from pyweber.core.window import Screen, Location, Orientation, LocalStorage, SessionStorage
+        from pyweber.core.window import window
 
+        window._Window__ws = self.ws
+        window.session_id = self.session_id
         window.width = self.get_window_values(key='width')
         window.height = self.get_window_values(key='height')
         window.inner_width = self.get_window_values(key='innerWidth')
@@ -66,8 +74,16 @@ class wsMessage:
             route=self.get_window_values(key='location').get('pathname', None),
             origin=self.get_window_values(key='location').get('origin', None),
         )
-        window.session_storage = json.loads(self.get_window_values(key='sessionStorage'))
-        window.local_storage = json.loads(self.get_window_values(key='localStorage'))
+        window.session_storage = SessionStorage(
+            data=json.loads(self.get_window_values(key='sessionStorage')),
+            session_id=self.session_id,
+            ws=self.ws
+        )
+        window.local_storage = LocalStorage(
+            data=json.loads(self.get_window_values(key='localStorage')),
+            session_id=self.session_id,
+            ws=self.ws
+        )
 
         return window
     

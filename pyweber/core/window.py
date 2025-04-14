@@ -1,10 +1,15 @@
-from pyweber.utils.types import WindowEventType, OrientationType
-from pyweber.core.events import WindowEvents
-
+import asyncio
+import base64
+import json
+from uuid import uuid4
 from threading import Timer
+from typing import Callable, Union
+from pyweber.core.events import WindowEvents
+from pyweber.connection.websocket import WsServer, WsServerAsgi
+from pyweber.utils.types import WindowEventType, OrientationType, BaseStorage
 
 class Orientation:
-    def __init__(self, angle: int, type: OrientationType, on_change: callable = None):
+    def __init__(self, angle: int, type: OrientationType, on_change: Callable = None):
         self.angle = angle
         self.on_change = on_change
         self.type = type
@@ -14,7 +19,7 @@ class Orientation:
         return self.__on_change
     
     @on_change.setter
-    def on_change(self, event: callable):
+    def on_change(self, event: Callable):
         if not event:
             self.__on_change = None
             return
@@ -58,29 +63,123 @@ class Location:
         self.route = route
         self.protocol = protocol
 
-class LocalStorage:
+class LocalStorage(BaseStorage):
     """Localstorage"""
+    def __init__(self, data: dict[str, (int, float)], session_id: str, ws: Union[WsServer, WsServerAsgi]):
+        super().__init__(data=data)
+        self.__ws = ws
+        self.sesssion_id = session_id
 
-class SessionStorage:
+    def set(self, key: str, value):
+        if value:
+            self.data[key] = value if not isinstance(value, dict) else json.dumps(value)
+            self.__send__()
+    
+    def clear(self):
+        self.data.clear()
+        self.__send__()
+    
+    def pop(self, key: str):
+        value = self.data.pop(key, None)
+        if value:
+            self.__send__()
+        
+        try:
+            return json.loads(value)
+        except (TypeError, json.JSONDecodeError):
+            return value
+
+    def __send__(self):
+        try:
+            asyncio.get_running_loop()
+            asyncio.create_task(self.__ws.async_send_message(
+                data={'localstorage': self.data},
+                session_id=self.__ws
+            ))
+        except RuntimeError:
+            asyncio.run(self.__ws.async_send_message(
+                data={'localstorage': self.data},
+                session_id=self.__ws
+            ))
+
+class SessionStorage(BaseStorage):
     """SessionStorage"""
+    def __init__(self, data: dict[str, (int, float)], session_id: str, ws: Union[WsServer, WsServerAsgi]):
+        super().__init__(data=data)
+        self.__ws = ws
+        self.sesssion_id = session_id
 
+    def set(self, key: str, value):
+        if value:
+            self.data[key] = value if not isinstance(value, dict) else json.dumps(value)
+            self.__send__()
+
+    
+    def clear(self):
+        self.data.clear()
+        self.__send__()
+    
+    def pop(self, key: str):
+        value = self.data.pop(key, None)
+        if value:
+            self.__send__()
+        return value
+
+    def __send__(self):
+        try:
+            asyncio.get_running_loop()
+            asyncio.create_task(self.__ws.async_send_message(
+                data={'sessionstorage': self.data},
+                session_id=self.sesssion_id
+            ))
+        except RuntimeError:
+            asyncio.run(self.__ws.async_send_message(
+                data={'sessionstorage': self.data},
+                session_id=self.sesssion_id
+            ))
+
+class Confirm:
+    def __init__(self, confirm_result: str, confirm_id: str):
+        self.result=confirm_result
+        self.id=confirm_id
+    
+    def __repr__(self):
+        return f'result={self.result}, id={self.id}'
+
+class Prompt:
+    def __init__(self, prompt_result: str, prompt_id: str):
+        self.result=prompt_result
+        self.id=prompt_id
+    
+    def __repr__(self):
+        return f'result={self.result}, id={self.id}'
 
 class Window:
     def __init__(self):
-        self.__events_dict: dict[str, callable] = {}
+        self.__events_dict: dict[str, Callable] = {}
         self.width: float = 0.0
         self.height: float = 0.0
         self.inner_width: float = 0.0
         self.inner_height: float = 0.0
-        self.local_storage: LocalStorage = {}
-        self.session_storage: SessionStorage = {}
+        self.session_id: str = None
+        self.__ws: Union[WsServer, WsServerAsgi] = None
         self.scroll_x: float = 0.0
         self.scroll_y: float = 0.0
         self.screen: Screen = None
         self.location: Location = None
         self.events = WindowEvents()
+        self.local_storage: LocalStorage = LocalStorage(
+            data=None,
+            ws=self.__ws,
+            session_id=self.session_id
+        )
+        self.session_storage: SessionStorage = SessionStorage(
+            data=None,
+            ws=self.__ws,
+            session_id=self.session_id
+        )
     
-    def get_event(self, event_id: str) -> callable:
+    def get_event(self, event_id: str) -> Callable:
         return self.__events_dict.get(event_id, None)
     
     @property
@@ -114,7 +213,7 @@ class Window:
         self.__events = event
         self.__set_event_id()
     
-    def add_event(self, event_type: WindowEventType, event: callable):
+    def add_event(self, event_type: WindowEventType, event: Callable):
         if not isinstance(event_type, event):
             raise TypeError('Event_type must be an EventType instance')
         
@@ -134,73 +233,97 @@ class Window:
     # Métodos da janela
     def alert(self, message: str):
         """Exibe um alerta na janela."""
-        print(f"ALERT: {message}")
+        self.__send__(data={'alert': message})
 
-    def confirm(self, message: str) -> bool:
+    async def confirm(self, message: str, timeout: int = 300) -> Confirm:
         """Exibe uma caixa de confirmação."""
-        response = input(f"CONFIRM: {message} (y/n): ").strip().lower()
-        return response == "y"
+        self.__ws.send_message(
+            data={'confirm': message, 'confirm_id': str(str(uuid4()))},
+            session_id=self.session_id
+        )
 
-    def prompt(self, message: str, default: str = "") -> str:
+        response = await asyncio.create_task(self.__ws.get_window_response(timeout=timeout))
+
+        return Confirm(
+            confirm_result=response.get('confirm_result', None),
+            confirm_id=response.get('confirm_id')
+        )
+
+    async def prompt(self, message: str, default: str = "", timeout: int = 300) -> Prompt:
         """Exibe uma caixa de prompt para entrada do usuário."""
-        return input(f"PROMPT: {message} [{default}]: ") or default
+        self.__ws.send_message(
+            data={'prompt': {'message': message, 'default': default}, 'prompt_id': str(uuid4())},
+            session_id=self.session_id
+        )
 
-    def open(self, url: str, target: str = "_blank", features: str = "") -> "Window":
-        """Abre uma nova janela."""
-        print(f"Opening {url} in {target} with features: {features}")
-        return Window()
+        response = await asyncio.create_task(self.__ws.get_window_response(timeout=timeout))
+
+        return Prompt(
+            prompt_result=response.get('prompt_result', None),
+            prompt_id=response.get('prompt_id', None)
+        )
+
+    def open(self, url: str, new_page: bool = False) -> "Window":
+        """Open a new window or redirect to new url."""
+        self.__send__(data={'open': {'path': url, 'new_page': new_page}})
 
     def close(self):
-        """Fecha a janela."""
-        print("Window closed.")
+        """Close the current window if it was openned with script."""
+        self.__send__(data={'close': True})
 
-    def scroll_to(self, x: float, y: float):
+    def scroll_to(self, x: float = None, y: float = None):
         """Rola a janela para a posição (x, y)."""
-        self.scroll_x = x
-        self.scroll_y = y
-        print(f"Scrolled to ({x}, {y}).")
+        self.scroll_x, self.scroll_y = x, y
+        self.__send__(data={'scroll_to': {'x': x or self.scroll_x, 'y': y or self.scroll_y}})
 
-    def scroll_by(self, x: float, y: float):
+    def scroll_by(self, x: float = 0, y: float = 0):
         """Rola a janela por um deslocamento (x, y)."""
-        self.scroll_x += x
-        self.scroll_y += y
-        print(f"Scrolled by ({x}, {y}).")
-
-    def set_timeout(self, callback: callable, delay: int):
-        """Executa uma função após um atraso (em milissegundos)."""
-        Timer(delay / 1000, callback).start()
-
-    def set_interval(self, callback: callable, interval: int):
-        """Executa uma função repetidamente com um intervalo fixo (em milissegundos)."""
-        def interval_callback():
-            callback()
-            Timer(interval / 1000, interval_callback).start()
-        interval_callback()
-
-    def clear_timeout(self, timer: Timer):
-        """Cancela um timeout."""
-        timer.cancel()
-
-    def clear_interval(self, timer: Timer):
-        """Cancela um intervalo."""
-        timer.cancel()
-
-    def request_animation_frame(self, callback: callable):
-        """Agenda uma função para ser executada antes do próximo repaint."""
-        import time
-        time.sleep(0.016)  # Simula 60 FPS
-        callback()
-
-    def cancel_animation_frame(self, frame_id):
-        """Cancela um requestAnimationFrame."""
-        print(f"Cancelled animation frame {frame_id}.")
-
+        self.scroll_x, self.scroll_y = self.scroll_x + x, self.scroll_y + y
+        self.__send__(data={'scroll_to': {'x': self.scroll_x, 'y': self.scroll_y}})
+    
     def atob(self, encoded_string: str) -> str:
         """Decodifica uma string codificada em Base64."""
-        import base64
         return base64.b64decode(encoded_string).decode("utf-8")
 
     def btoa(self, string: str) -> str:
         """Codifica uma string em Base64."""
-        import base64
         return base64.b64encode(string.encode("utf-8")).decode("utf-8")
+    
+    def set_timeout(self, callback: Callable, delay: int):
+        """Executa uma função após um atraso (em milissegundos)."""
+        raise NotImplementedError()
+
+    def set_interval(self, callback: Callable, interval: int):
+        """Executa uma função repetidamente com um intervalo fixo (em milissegundos)."""
+        raise NotImplementedError()
+
+    def clear_timeout(self, timer: Timer):
+        """Cancela um timeout."""
+        raise NotImplementedError()
+
+    def clear_interval(self, timer: Timer):
+        """Cancela um intervalo."""
+        raise NotImplementedError()
+
+    def request_animation_frame(self, callback: callable):
+        """Agenda uma função para ser executada antes do próximo repaint."""
+        raise NotImplementedError()
+    
+    def cancel_animation_frame(self, frame_id):
+        """Cancela um requestAnimationFrame."""
+        raise NotImplementedError()
+    
+    def __send__(self, data: dict[str, (int, float)]):
+        try:
+            asyncio.get_running_loop()
+            asyncio.create_task(self.__ws.async_send_message(
+                data=data,
+                session_id=self.session_id
+            ))
+        except RuntimeError:
+            asyncio.run(self.__ws.async_send_message(
+                data=data,
+                session_id=self.session_id
+            ))
+
+window = Window()

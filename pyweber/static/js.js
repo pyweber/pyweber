@@ -32,16 +32,16 @@ function connectWebSocket() {
     };
 
     socket.onmessage = function(event) {
-        if (event.data === 'reload') {
-            location.reload();
-            return
-        };
-
         const data = JSON.parse(event.data);
+
+        if (data.reload) {
+            location.reload();
+            return;
+        }
+
         if (data.setSessionId) {
             setSessionId(data.setSessionId);
             return;
-
         };
         
         if (data.template) {
@@ -49,10 +49,152 @@ function connectWebSocket() {
             const parser = new DOMParser();
             const doc = parser.parseFromString(decodedHTML, 'text/html');
             document.body.innerHTML = doc.body.outerHTML
+            return;
+        };
 
-        } else if (data.Error) {
+        // Window methods
+        if (data.alert) {
+            window.alert(data.alert);
+            return;
+        };
+
+        if (data.open) {
+            if (data.open.new_page) {
+                window.open(data.open.path, '_blank');
+            } else {
+                window.location.href = data.open.path;
+            }
+            return;
+        };
+
+        if (data.confirm) {
+            const result = window.confirm(data.confirm);
+            socket.send(
+                JSON.stringify(getEventData({window_response: { confirm_result: result, confirm_id: data.confirm_id }}))
+            );
+            return;
+        };
+
+        if (data.prompt) {
+            const result = window.prompt(data.prompt.message, data.prompt.default || "");
+            socket.send(
+                JSON.stringify(getEventData({window_response: { prompt_result: result, prompt_id: data.prompt_id }}))
+            );
+            return;
+        };
+
+        if (data.close) {
+            window.close();
+            return;
+        };
+
+        if (data.scroll_to) {
+            window.scrollTo(data.scroll_to.x, data.scroll_to.y);
+            return;
+        };
+
+        if (data.scroll_by) {
+            window.scrollBy(data.scroll_by.x, data.scroll_by.y);
+            return;
+        };
+
+        if (data.set_timeout) {
+            const timerId = setTimeout(() => {
+                // Notificar o Python que o timeout foi concluído
+                socket.send(
+                    JSON.stringify(getEventData({window_response: { timeout_completed: true, timeout_id: data.set_timeout.id }}))
+                );
+            }, data.set_timeout.delay);
+            
+            // Armazenar o ID do timer para poder cancelá-lo mais tarde
+            window.pyTimers = window.pyTimers || {};
+            window.pyTimers[data.set_timeout.id] = timerId;
+            return;
+        };
+
+        if (data.set_interval) {
+            const intervalId = setInterval(() => {
+                // Notificar o Python que o intervalo foi executado
+                socket.send(
+                    JSON.stringify(getEventData({window_response: { interval_executed: true, interval_id: data.set_interval.id }}))
+                );
+            }, data.set_interval.interval);
+            
+            // Armazenar o ID do intervalo para poder cancelá-lo mais tarde
+            window.pyIntervals = window.pyIntervals || {};
+            window.pyIntervals[data.set_interval.id] = intervalId;
+            return;
+        };
+
+        if (data.clear_timeout) {
+            if (window.pyTimers && window.pyTimers[data.clear_timeout.id]) {
+                clearTimeout(window.pyTimers[data.clear_timeout.id]);
+                delete window.pyTimers[data.clear_timeout.id];
+            }
+            return;
+        };
+
+
+        if (data.clear_interval) {
+            if (window.pyIntervals && window.pyIntervals[data.clear_interval.id]) {
+                clearInterval(window.pyIntervals[data.clear_interval.id]);
+                delete window.pyIntervals[data.clear_interval.id];
+            }
+            return;
+        };
+
+        // request_animation_frame
+        if (data.request_animation_frame) {
+            const frameId = requestAnimationFrame(() => {
+                // Notificar o Python que o frame foi processado
+                socket.send(
+                    JSON.stringify(getEventData({window_response: { animation_frame_executed: true, frame_id: data.request_animation_frame.id }}))
+                );
+            });
+            
+            // Armazenar o ID do frame para poder cancelá-lo mais tarde
+            window.pyAnimationFrames = window.pyAnimationFrames || {};
+            window.pyAnimationFrames[data.request_animation_frame.id] = frameId;
+            return;
+        };
+        
+        // cancel_animation_frame
+        if (data.cancel_animation_frame) {
+            if (window.pyAnimationFrames && window.pyAnimationFrames[data.cancel_animation_frame.id]) {
+                cancelAnimationFrame(window.pyAnimationFrames[data.cancel_animation_frame.id]);
+                delete window.pyAnimationFrames[data.cancel_animation_frame.id];
+            }
+            return;
+        };
+
+        if (data.localstorage) {
+            const values = Object.entries(data.localstorage);
+            localStorage.clear();
+
+            values.forEach(([key, value]) => {
+                localStorage.setItem(key, value);
+            })
+        };
+
+        if (data.sessionstorage) {
+            const values = Object.entries(data.sessionstorage);
+            const sessionId = getsessionId();
+            sessionStorage.clear();
+            
+            values.forEach(([key, value]) => {
+                if (key !== '_pyweber_sessionId') {
+                    sessionStorage.setItem(key, value);
+                } else {
+                    sessionStorage.setItem(key, sessionId);
+                };
+            })
+        };
+
+        
+        if (data.Error) {
             console.log(data)
         };
+
     };
 
     return socket
@@ -68,9 +210,9 @@ function setSessionId(sessionId) {
     }
 }
 
-function sendEvent({type, event, event_ref}) {
+function sendEvent({type, event, event_ref, window_response}) {
     const target = event.target instanceof HTMLElement ? event.target : null;
-    const eventData = getEventData({type, event, event_ref});
+    const eventData = getEventData({type, event, event_ref, window_response});
 
     if (socket.readyState === WebSocket.OPEN) {
         if (target) {
@@ -93,7 +235,7 @@ function fromBase64(base64) {
     return new TextDecoder().decode(Uint8Array.from(atob(base64), c => c.charCodeAt(0)));
 };
 
-function getEventData({type=null, event=null, event_ref=null}) {
+function getEventData({type=null, event=null, event_ref=null, window_response=null}) {
     let target;
 
     if (event){
@@ -117,6 +259,7 @@ function getEventData({type=null, event=null, event_ref=null}) {
             timestamp: Date.now()
         },
         window_data: JSON.stringify(getWindowData()),
+        window_response: window_response ? window_response : {},
         sessionId: getsessionId()
     };
 

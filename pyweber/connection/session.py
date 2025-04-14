@@ -6,9 +6,10 @@ if TYPE_CHECKING:
     from pyweber.core.window import Window
 
 class Session:
-    def __init__(self, template: 'Template', window: 'Window'):
+    def __init__(self, template: 'Template', window: 'Window', session_id: str):
         self.template = template
         self.window = window
+        self.session_id = session_id
         self.create_at = time()
 
 class SessionManager:

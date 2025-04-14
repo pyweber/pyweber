@@ -3,12 +3,13 @@ import asyncio
 import hashlib
 from time import time
 from watchdog.observers import Observer
+from typing import Union, Callable, Awaitable
 from watchdog.events import FileSystemEventHandler
 
 from pyweber.utils.utils import Colors, PrintLine
 
 class ReloadServer:
-    def __init__(self, ws_reload: callable, http_reload: callable, watch_path: str = '.'):
+    def __init__(self, ws_reload: Callable[..., Awaitable], http_reload: Callable, watch_path: str = '.'):
         self.ws_reload = ws_reload
         self.http_reload = http_reload
         self.watch_path = watch_path
@@ -70,5 +71,5 @@ class ReloadHandler(FileSystemEventHandler):
                 PrintLine(text=f'♻  Server restarted...')
                 PrintLine(text=f'♻  Reloading client...')
 
-                self.reload_server.ws_reload()
+                asyncio.run(self.reload_server.ws_reload(data={'reload': True}, session_id=None))
                 self.hash_files[event.src_path] = new_hash

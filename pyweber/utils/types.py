@@ -1,6 +1,29 @@
 import os
+import json
 from enum import Enum
 from importlib.resources import files
+
+class BaseStorage:
+    def __init__(self, data: dict[str, (str, int)]):
+        self.data = data or {}
+
+    def get(self, key: str, /, default: str = None):
+        try:
+            return json.loads(self.data.get(key, default))
+        except (TypeError, json.JSONDecodeError):
+            return self.data.get(key, default)
+    
+    def keys(self):
+        return self.data.keys()
+    
+    def values(self):
+        return self.data.values()
+    
+    def items(self):
+        return self.data.items()
+    
+    def __repr__(self):
+        return repr(self.data)
 
 class Colors:
     RESET = "\033[0m"

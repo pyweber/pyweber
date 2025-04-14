@@ -253,12 +253,15 @@ class Template:
             html += f' style="{style_str}"'
             
         for key, value in element.attrs.items():
-            html += f" {key}{f'="{value}"' if value else ''}"
+            if value:
+                html += f" {key}='{value}'"
+            else:
+                html += f" {key}"
 
         for key, value in element.events.__dict__.items():
             if value is not None:
                 if isinstance(value, str) or callable(value):
-                    html += f" {f"_{key}"}='{self.__event_id(value) if callable(value) else value}'"
+                    html += f" _{key}='{self.__event_id(value) if callable(value) else value}'"
                 
                 else:
                     raise ValueError(f'Event {value} is an invalid callable ou event_id')
@@ -299,7 +302,8 @@ class Template:
 
     def __read_file(self, file_path: str) -> str:
         if file_path.endswith('.html'):
-            path = os.path.join('templates', file_path)
+            path = os.path.join('templates', file_path) if not os.path.isfile(file_path) else file_path
+            
             if os.path.isfile(path=path):
                 return LoadStaticFiles(path=path).load
             else:
@@ -338,7 +342,7 @@ class Template:
                 [
                     self.__create_default_element(
                         tag='script',
-                        content=f"window.PYWEBER_WS_PORT = {config['websocket'].get('port')}",
+                        content=f"window.PYWEBER_WS_PORT = {os.environ.get('UVICORN_PORT', None) or os.environ.get('PYWEBER_WS_PORT', None) or config.get('websocket', 'port')}",
                         attrs={'type': 'text/javascript'}
                     ),
                     self.__create_default_element(

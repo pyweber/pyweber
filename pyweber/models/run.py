@@ -1,7 +1,9 @@
-from threading import Thread
 from typing import TYPE_CHECKING, Callable
 from pyweber.models.create_app import CreatApp
 from pyweber.models.request import RequestASGI
+from pyweber.connection.websocket import WsServerAsgi
+from pyweber.config.config import config
+import os
 
 if TYPE_CHECKING:
     from pyweber.pyweber.pyweber import Pyweber
@@ -46,41 +48,48 @@ def run(target: Callable = None, **kwargs):
 
     CreatApp(target=target, **kwargs).run()
 
-async def run_as_asgi(scope, response, send, app: 'Pyweber', target: Callable = None):
+async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None):
     global WS_RUNNING
 
-    create_app = CreatApp(target=None)
-    ws_server = create_app.ws_server
     request = RequestASGI(raw_request=scope)
+    os.environ['PYWEBER_WS_PORT'] = str(request.port)
+    
+    ws_server = WsServerAsgi(app=app)
     __response = await app.get_route(request=request)
 
     if not WS_RUNNING:
         WS_RUNNING = True
-        ws_server.app = app
 
         if target and callable(target):
             target(app)
 
-        Thread(target=ws_server.ws_start, daemon=True).start()
+    if scope.get('type') == 'websocket':
+        await ws_server(scope, receive, send)
 
-    headers = [
-        (b'content-type', __response.response_type.encode()),
-        (b'content-length', str(len(__response.response_content)).encode()),
-        (b'connection', b'close'),
-        (b'date', __response.response_date.encode())
-    ]
+    elif scope.get('type') == 'lifespan':
+        pass
 
-    if app.cookies:
-        for cookie in app.cookies:
-            headers.append((b'set-cookie', cookie.encode()))
+    elif scope.get('type') == 'http':
+        os.environ['PYWEBER_WS_PORT'] = str(request.port) or str(10000)
+        
+        headers = [
+            (b'content-type', __response.response_type.encode()),
+            (b'content-length', str(len(__response.response_content)).encode()),
+            (b'connection', b'close'),
+            (b'date', __response.response_date.encode())
+        ]
 
-    await send({
-        'type': 'http.response.start',
-        'status': __response.code,
-        'headers': headers
-    })
+        if app.cookies:
+            for cookie in app.cookies:
+                headers.append((b'set-cookie', cookie.encode()))
 
-    await send({
-        'type': 'http.response.body',
-        'body': __response.response_content
-    })
+        await send({
+            'type': 'http.response.start',
+            'status': __response.code,
+            'headers': headers
+        })
+
+        await send({
+            'type': 'http.response.body',
+            'body': __response.response_content
+        })

@@ -1,15 +1,22 @@
 import os
+import sys
 import toml
+from pathlib import Path
 from pyweber.utils.types import ContentTypes, StaticFilePath
 
 class LoadStaticFiles:
     
     def __init__(self, path: str):
-        self.path = path[1:] if path.startswith('/') else path
+        self.__script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+        if sys.platform == 'win32':
+            self.__path = path[1:] if path.startswith('/') else path
+        else:
+            self.__path = path
+            self.__path_2 = str(Path(self.__script_dir) / path.removeprefix('/'))
     
     @property
     def load(self) -> str | bytes:
-        extension = self.path.split('.')[-1].strip()
+        extension = self.__path.split('.')[-1].strip()
         mode, encoding = 'r', 'utf-8'
 
         try:
@@ -18,12 +25,20 @@ class LoadStaticFiles:
         except ValueError:
             pass
         
-        if os.path.exists(self.path):
-            with open(self.path, mode=mode, encoding=encoding) as file:
-                return file.read()
+        if os.path.exists(self.__path):
+            return self.__read_file(path=self.__path, mode=mode, encoding=encoding)
+        
+        try:
+            if os.path.exists(self.__path_2):
+                return self.__read_file(path=self.__path_2, mode=mode, encoding=encoding)
+        except AttributeError:
+            pass
         
         raise FileNotFoundError('File not found, please ensure that path is correct')
-
+    
+    def __read_file(self, path: str, mode: str, encoding: str):
+        with open(path, mode=mode, encoding=encoding) as file:
+            return file.read()
 
 class StaticTemplates:
     

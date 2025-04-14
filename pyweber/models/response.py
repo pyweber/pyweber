@@ -136,5 +136,6 @@ class Response:
         
         response += '\r\n'
 
-        PrintLine(text=f"{bold_white_color}{self.request._get_line_method_} {status_color}{self.status_code.replace(r"\r\n", ' ')}{reset_color}")
+        to_replace = r'\r\n'
+        PrintLine(text=f"{bold_white_color}{self.request._get_line_method_} {status_color}{self.status_code.replace(to_replace, ' ')}{reset_color}")
         return response.encode() + self.response_content

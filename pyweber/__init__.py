@@ -7,12 +7,16 @@ from .models.run import (
 # pyweber sessions
 from .connection.session import sessions
 
+# pyweber config
+from .config.config import config
+
 # pyweber app
 from .pyweber.pyweber import Pyweber
 
 # pyweber core
 from .core.element import Element
 from .core.template import Template
+from .core.window import window
 
 # pyweber models
 from .models.response import Response
@@ -20,9 +24,6 @@ from .models.request import (
     Request,
     RequestASGI
 )
-
-# pyweber config
-from .config.config import config
 
 # pyweber events
 from .core.events import (
@@ -32,7 +33,13 @@ from .core.events import (
 )
 
 # pyweber utils
-from .utils.utils import PrintLine, WriteLine, Colors
+from .utils.loads import LoadStaticFiles
+from .utils.utils import (
+    PrintLine,
+    WriteLine,
+    Colors
+)
+
 from .utils.types import (
     ContentTypes,
     EventType,
@@ -69,10 +76,12 @@ __all__ = [
     'EventHandler',
     'Element',
     'sessions',
+    'window',
     'config',
     'Colors',
     'PrintLine',
     'WriteLine',
+    'LoadStaticFiles',
     'ContentTypes',
     'EventType',
     'HTMLTag',

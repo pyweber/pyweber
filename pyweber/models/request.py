@@ -165,6 +165,7 @@ class RequestASGI:
         self.path: str = self.__get_path()
         self.netloc: str = self.__get_netloc()
         self.host: str = self.__get_host()
+        self.port: str = self.__get_port()
         self.user_agent: str = self.__get_user_agent()
         self.referer: str = self.__get_referer()
         self.cookies: dict[str, str] = self.__get_cookies()
@@ -191,6 +192,9 @@ class RequestASGI:
             if key == b"host":
                 return value.decode().split(":")[0]
         return ""
+    
+    def __get_port(self):
+        return self.__raw_request.get('server')[-1]
     
     def __get_user_agent(self):
         return self.__get_header(b"user-agent")

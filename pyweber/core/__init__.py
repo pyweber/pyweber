@@ -1,6 +1,6 @@
 from .element import Element
 from .template import Template
-from .window import Window
+from .window import window
 from .events import (
     EventHandler,
     WindowEvents,
@@ -10,7 +10,7 @@ from .events import (
 __all__ = [
     'Element',
     'Template',
-    'Window',
+    'window',
     'EventHandler',
     'WindowEvents',
     'TemplateEvents'

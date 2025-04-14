@@ -1,5 +1,20 @@
 # PyWeber Changelog
 
+## [0.9.6] - 2025-04.14
+---
+### Bug Fixes
+- Resolved a `FileNotFoundError` that occurred when loading static files on Linux systems.
+
+### New Features
+- Added support for managing both `LocalStorage` and `SessionStorage`.
+I- ntroduced support for native browser window methods such as `alert`, `prompt`, `confirm`, `atob`, `btoa`, `open`, `close`, and `scroll events`.
+- Implemented a non-blocking system for handling both synchronous and asynchronous events, ensuring the main thread remains responsive.
+- Server configuration can now be set directly in the run method. Parameters such as `ws_port`, `host`, `port`, key_file, and `cert_file` can be passed using `**kwargs` via `app.run()` or `pw.run()`.
+
+### Improvements
+- The window object is now globally accessible through the main module via `pw.window`.
+- Removed window access from the app object — it is no longer available via `app.window`.
+
 ## [0.9.4] - 2025-04-08
 ---
 ### Bug Fixes

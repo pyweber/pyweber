@@ -1,6 +1,7 @@
 from importlib import import_module, reload
 from threading import Thread
 from typing import Callable
+import asyncio
 import os
 import sys
 
@@ -18,7 +19,6 @@ class CreatApp:
         self.__reload_mode = os.environ.get('PYWEBER_RELOAD_MODE') or kwargs.get('reload_mode', None) or config.get('session', 'reload_mode')
         self.__cert_file = os.environ.get('PYWEBER_CERT_FILE') or kwargs.get('cert_file', None) or config.get('server', 'cert_file')
         self.__key_file = os.environ.get('PYWEBER_KEY_FILE') or kwargs.get('key_file', None) or config.get('server', 'key_file')
-        self.__use_ssl = kwargs.get('https_enabled', None) or config.get('server', 'https_enabled')
         self.__server_host = os.environ.get('PYWEBER_SERVER_HOST') or kwargs.get('host', None) or config.get('server', 'host')
         self.__server_port = os.environ.get('PYWEBER_SERVER_PORT') or kwargs.get('port', None) or config.get('server', 'port')
         self.__server_ws_port = os.environ.get('PYWEBER_WS_PORT') or kwargs.get('ws_port', None) or config.get('websocket', 'port')
@@ -27,18 +27,17 @@ class CreatApp:
         self.ws_server = WsServer(
             host=self.__server_host,
             port=int(self.__server_ws_port),
-            use_ssl=self.__use_ssl,
             cert_file=self.__cert_file,
             key_file=self.__key_file
         )
-        self.reload_server = ReloadServer(ws_reload=self.ws_server.send_reload, http_reload=self.update)
+        self.reload_server = ReloadServer(ws_reload=self.ws_server.async_send_message, http_reload=self.update)
     
     @property
     def target(self):
         return self.__target
     
     @target.setter
-    def target(self, target: callable):
+    def target(self, target: Callable):
         if not target:
             self.__target = None
             return
@@ -53,7 +52,7 @@ class CreatApp:
     
     def run(self):
         self.load_target()
-        Thread(target=self.ws_server.ws_start, daemon=True).start()
+        Thread(target=asyncio.run, args=(self.ws_server.ws_start(),), daemon=True).start()
 
         if self.__reload_mode in [True, 'True', 1, '1']:
             Thread(target=self.reload_server.start, daemon=True).start()
@@ -62,7 +61,6 @@ class CreatApp:
             route=self.__server_route,
             port=int(self.__server_port),
             host=self.__server_host,
-            use_https=self.__use_ssl,
             cert_file=self.__cert_file,
             key_file=self.__key_file
         )
@@ -94,6 +92,7 @@ class CreatApp:
             getattr(self.module, self.target.__name__)(self.app)
         
         self.http_server.app = self.app
+        self.http_server.task_manager = self.ws_server.task_manager
         self.ws_server.app = self.app
 
     def update(self):

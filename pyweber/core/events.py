@@ -1,9 +1,12 @@
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Union
+from threading import Thread
+import asyncio
 
 if TYPE_CHECKING:
+    from pyweber.connection.websocket import WsServer, WsServerAsgi
+    from pyweber.connection.session import Session
     from pyweber.pyweber.pyweber import Pyweber
     from pyweber.core.template import Template, Element
-    from pyweber.models.ws_message import wsMessage
     from pyweber.core.window import Window
 
 class EventData:
@@ -29,9 +32,9 @@ class EventHandler:
         window: 'Window',
         event_data: EventData,
         app: 'Pyweber',
-        session_id: str,
-        update_hander: Callable,
-        reload_handler: Callable
+        session: 'Session',
+        ws: Union['WsServer', 'WsServerAsgi'],
+        send: Callable
     ):
         self.event_type = event_type
         self.route = route
@@ -40,59 +43,76 @@ class EventHandler:
         self.template = template
         self.window = window
         self.event_data = event_data
-        self.__update = update_hander
-        self.__reload = reload_handler
-        self.session_id = session_id
+        self.session = session
+        self.__send = send
+        self.__ws = ws
     
     def update(self):
-        return self.__update(self.session_id)
-    
+        data = {'template': self.session.template.build_html(), 'window': self.session.window.get_all_event_ids}
+        try:
+            asyncio.get_running_loop()
+            asyncio.create_task(self.__ws.async_send_message(data=data, session_id=self.session.session_id))
+        except RuntimeError:
+            asyncio.run(self.__ws.async_send_message(data=data, session_id=self.session.session_id))
+
     def reload(self):
-        self.__reload(self.session_id)
-        return self.update()
-    
+        try:
+            asyncio.get_running_loop()
+            asyncio.create_task(self.__ws.async_send_message(data={'reload': True}, session_id=self.session.session_id))
+        except:
+            asyncio.run(self.__ws.async_send_message(data={'reload': True}, session_id=self.session.session_id))
+
     def __repr__(self):
         return f'EventHandler(event_type: {self.event_type}, route: {self.route})'
 
 class EventConstrutor:
-    def __init__(self, ws_message: 'wsMessage', ws_update: Callable, ws_reload: Callable):
-        self.__ws_message = ws_message
-        self.__update = ws_update
-        self.__reload = ws_reload
+    def __init__(
+        self,
+        target_id: str,
+        app: 'Pyweber',
+        ws: Union['WsServer', 'WsServerAsgi'],
+        session: 'Session',
+        route: str,
+        event_data: dict[str, str],
+        event_type: str,
+        send: Callable = None
+    ):
+        self.__route = route
+        self.__event_data = event_data
+        self.event_type = event_type
+        self.__target_id = target_id
+        self.__ws = ws
+        self.__app = app
+        self.__session = session
+        self.__send = send
     
     @property
     def __template(self) -> 'Template':
-        return self.__ws_message.template
+        return self.__session.template
     
     @property
     def __window(self) -> 'Window':
-        return self.__ws_message.window
+        return self.__session.window
     
     @property
     def __target_element(self) -> 'Element':
         return self.__template.getElementByUUID(
-            element_uuid=self.__ws_message.target_uuid
+            element_uuid=self.__target_id
         )
-    
-    @property
-    def __app(self) -> 'Pyweber':
-        return self.__ws_message._wsMessage__app
     
     @property
     def build_event(self):
         return EventHandler(
-            event_type=self.__ws_message.type,
-            route=self.__ws_message.route,
+            event_type=self.event_type,
+            route=self.__route,
             element=self.__target_element,
             template=self.__template,
             window=self.__window,
-            event_data=EventData(
-                event_data=self.__ws_message.event_data
-            ),
+            event_data=EventData(event_data=self.__event_data),
             app=self.__app,
-            session_id=self.__ws_message.session_id,
-            update_hander=self.__update,
-            reload_handler=self.__reload
+            session=self.__session,
+            ws=self.__ws,
+            send=self.__send
         )
 
 class TemplateEvents:

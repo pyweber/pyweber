@@ -5,9 +5,8 @@ import asyncio
 import webbrowser
 import sys
 import traceback
-from typing import Union, Callable, Any
 from datetime import datetime
-from pyweber.core.window import Window
+from typing import Union, Callable, Any
 from pyweber.core.template import Template
 from pyweber.models.request import Request
 from pyweber.models.response import Response
@@ -33,7 +32,6 @@ class Pyweber:
         self.page_unauthorized = Template(template=StaticTemplates.PAGE_UNAUTHORIZED(), status_code=401)
         self.page_not_found = Template(template=StaticTemplates.PAGE_NOT_FOUND(), status_code=404)
         self.page_server_error = Template(template=StaticTemplates.PAGE_SERVER_ERROR(), status_code=500)
-        self.window = Window()
         self.data = None
     
     @property
@@ -341,8 +339,9 @@ class Pyweber:
         
         return await self.__get_response_to_non_file_request(path=path, **kwargs)
     
-    def clone_template(self, route: str) -> Template:
-        last_template = asyncio.run(self.get_template(route=route)).content
+    async def clone_template(self, route: str) -> Template:
+        last_template = await self.get_template(route=route)
+        last_template = last_template.content
         new_template = Template(last_template.template, status_code=last_template.status_code)
         new_template.root = last_template.root
         new_template._Template__events = last_template.events

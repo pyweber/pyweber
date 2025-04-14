@@ -50,19 +50,13 @@ class CLI:
         )
 
         parser.add_argument(
-            '--https',
-            action='store_true',
-            help='Run server with HTTPS enabled'
-        )
-
-        parser.add_argument(
-            '--cert',
+            '--cert-file',
             type=str,
             help='Path to SSL certificate file (required for HTTPS unless --auto-cert is used)'
         )
 
         parser.add_argument(
-            '--key',
+            '--key-file',
             type=str,
             help='Path to SSL key file (required for HTTPS unless --auto-cert is used)'
         )
@@ -242,9 +236,8 @@ class CLI:
                 run_kwargs = {
                     'file': getattr(args, 'file', self.default_file),
                     'reload': True,
-                    'https': getattr(args, 'https', False),
-                    'cert_file': getattr(args, 'cert', None),
-                    'key_file': getattr(args, 'key', None),
+                    'cert_file': getattr(args, 'cert_file', None),
+                    'key_file': getattr(args, 'key_file', None),
                     'auto_cert': getattr(args, 'auto_cert', False),
                     'port': getattr(args, 'port', 8800),
                     'host': getattr(args, 'host', '0.0.0.0'),
@@ -268,7 +261,6 @@ class CLI:
             elif args.command == 'run':
                 file = getattr(args, 'file', None)
                 reload = getattr(args, 'reload', None)
-                https_enabled = getattr(args, 'https', False)
                 cert_file = getattr(args, 'cert_file', None)
                 key_file = getattr(args, 'key_file', None)
                 auto_cert = getattr(args, 'auto_cert', False)
@@ -280,7 +272,6 @@ class CLI:
                 self.commands_funcs.run_app(
                     file=file,
                     reload=reload,
-                    https=https_enabled,
                     cert_file=cert_file,
                     key_file=key_file,
                     auto_cert=auto_cert,
@@ -401,45 +392,31 @@ class CommandFunctions:
         config['server']['route'] = route
         config['websocket']['port'] = ws_port
     
-    def check_https_context(self, is_https: bool, auto_cert: bool, cert_file: str, key_file: str):
-        if is_https:
-            os.environ['PYWEBER_HTTPS_ENABLED'] = str(is_https)
-            config['server']['https_enabled'] = is_https
+    def check_https_context(self, auto_cert: bool, cert_file: str, key_file: str):
+        if auto_cert:
+            cert_path, key_path = self.generate_mkcert()
+            os.environ['PYWEBER_CERT_FILE'] = cert_path
+            os.environ['PYWEBER_KEY_FILE'] = key_path
 
-            if auto_cert:
-                cert_path, key_path = self.generate_mkcert()
-                os.environ['PYWEBER_CERT_FILE'] = cert_path
-                os.environ['PYWEBER_KEY_FILE'] = key_path
+            config['server']['cert_file'] = cert_path
+            config['server']['key_file'] = key_path
 
-                config['server']['cert_file'] = cert_path
-                config['server']['key_file'] = key_path
+            self.log_message(
+                message=f'🔒 Using auto-generated self-signed certificate',
+                level='info'
+            )
+        
+        elif cert_file and key_file:
+            os.environ['PYWEBER_CERT_FILE'] = cert_file
+            os.environ['PYWEBER_KEY_FILE'] = key_file
 
-                self.log_message(
-                    message=f'🔒 Using auto-generated self-signed certificate',
-                    level='info'
-                )
-            
-            elif cert_file and key_file:
-                os.environ['PYWEBER_CERT_FILE'] = cert_file
-                os.environ['PYWEBER_KEY_FILE'] = key_file
+            config['server']['cert_file'] = cert_file
+            config['server']['key_file'] = key_file
 
-                config['server']['cert_file'] = cert_file
-                config['server']['key_file'] = key_file
-
-                self.log_message(
-                    message=f'🔒 Using provided certificate: {cert_file}',
-                    level='info'
-                )
-            
-            else:
-                self.log_message(
-                    message=f'❌ HTTPS requires either --auto-cert or both --cert and --key options',
-                    level='error'
-                )
-                return
-        else:
-            os.environ['PYWEBER_HTTPS_ENABLED'] = str(is_https)
-            config['server']['https_enabled'] = is_https
+            self.log_message(
+                message=f'🔒 Using provided certificate: {cert_file}',
+                level='info'
+            )
 
     def run_app(self, **kwargs):
 
@@ -447,7 +424,6 @@ class CommandFunctions:
             reload = kwargs.get('reload')
             cert_file = kwargs.get('cert_file')
             key_file = kwargs.get('key_file')
-            https = kwargs.get('https')
             file = kwargs.get('file')
             auto_cert = kwargs.get('auto_cert')
             port = kwargs.get('port')
@@ -461,7 +437,7 @@ class CommandFunctions:
             )
 
             self.set_eviron_variables(reload, port, host, route, ws_port)
-            self.check_https_context(https, auto_cert, cert_file, key_file)
+            self.check_https_context(auto_cert, cert_file, key_file)
 
             try:
                 config.save() if config.path else None

@@ -8,15 +8,20 @@ from threading import Thread
 from pyweber.pyweber.pyweber import Pyweber
 from pyweber.models.request import Request
 from pyweber.utils.utils import PrintLine, Colors
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pyweber.connection.websocket import TaskManager
 
 class HttpServer:
     def __init__(self, update_handler: callable):
         self.connections: list[socket.socket] = []
-        self.route, self.port, self.host, self.use_https = None, None, None, False
+        self.route, self.port, self.host = None, None, None
         self.current_directory = os.path.abspath(__file__)
         self.update_server = update_handler
         self.started = False
         self.ssl_context = None
+        self.task_manager: 'TaskManager' = None
 
     
     @property
@@ -35,13 +40,12 @@ class HttpServer:
 
         try:
             self.ssl_context.load_cert_chain(certfile=cert_file, keyfile=key_file)
-            self.use_https = True
             PrintLine(text=f"{Colors.GREEN}SSL configuration successful{Colors.RESET}")
         except Exception as e:
             PrintLine(text=f"{Colors.RED}SSL configuration failed: {e}{Colors.RESET}")
-            self.use_https = False
+            self.ssl_context = None
 
-    async def handle_response(self, client: socket.socket):
+    async def handle_response(self, client: socket.socket | ssl.SSLSocket):
         try:
 
             request = client.recv(1024).decode()
@@ -78,7 +82,7 @@ class HttpServer:
             try:
                 client_server.bind((self.host, self.port))
                 client_server.listen(5)
-                protocol = 'https' if self.use_https else 'http'
+                protocol = 'https' if self.ssl_context else 'http'
 
                 if not restart:
                     url = f"{protocol}://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}"
@@ -96,7 +100,7 @@ class HttpServer:
                                 if server is client_server:
                                     client_socket, _ = client_server.accept()
 
-                                    if self.use_https:
+                                    if self.ssl_context:
                                         try:
                                             client_socket = self.ssl_context.wrap_socket(
                                                 client_socket,
@@ -127,13 +131,10 @@ class HttpServer:
             except Exception as e:
                 PrintLine(text=f'Error [server] 1: {e}')
             
-    def run(self, route: str, port: int, host: str, use_https: bool, cert_file: str, key_file: str):
-        self.route, self.port, self.host, self.use_https = route, port, host, use_https
+    def run(self, route: str, port: int, host: str, cert_file: str, key_file: str):
+        self.route, self.port, self.host = route, port, host
 
-        if use_https in [True, 1, 'True']:
-            if not cert_file or not key_file:
-                PrintLine(text=f"{Colors.YELLOW}HTTPS requested but no certificate/key provided. Use `pyweber cert mkcert` to generate before...{Colors.RESET}")
-
+        if cert_file and key_file:
             self.setup_ssl(cert_file, key_file)
         
         self.create_server()
