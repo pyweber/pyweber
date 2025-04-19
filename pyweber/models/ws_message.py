@@ -1,10 +1,10 @@
 import json
+from typing import TYPE_CHECKING, Union
 from pyweber.connection.session import sessions
 from pyweber.core.element import Element
 
-from typing import TYPE_CHECKING, Union
-
 if TYPE_CHECKING:
+    from pyweber.pyweber.pyweber import Pyweber
     from pyweber.connection.websocket import WsServer, WsServerAsgi
 
 class wsMessage:
@@ -31,6 +31,7 @@ class wsMessage:
         return self.__raw_message.get(key, None)
     
     async def get_template(self):
+        self.__app: 'Pyweber' = self.__app
         if self.session_id in sessions.all_sessions:
             session_template = sessions.get_session(session_id=self.session_id).template
         else:

@@ -11,9 +11,11 @@ from websockets.asyncio.server import serve as async_serve
 from pyweber.models.ws_message import wsMessage
 from pyweber.utils.utils import PrintLine, Colors
 from pyweber.connection.session import sessions, Session
+from pyweber.models.template_diff import TemplateDiff
 
 if TYPE_CHECKING:
     from pyweber.pyweber.pyweber import Pyweber
+    from pyweber.core.template import Template
 
 class WsServer:
     def __init__(self, host: str, port: int, cert_file: str, key_file: str):
@@ -28,6 +30,7 @@ class WsServer:
         self.ssl_context = None
         self.task_manager = TaskManager()
         self.window_response: dict[str, (int, str)] = {}
+        self.old_template: 'Template' = None
     
     async def ws_handler(self, websocket: ws.server.ServerConnection):
         try:
@@ -36,14 +39,15 @@ class WsServer:
 
                 message = wsMessage(raw_message=raw_message, app=self.app, ws=self)
                 self.window_response = message.window_response
-                message.template = await message.template
+                sync_template = await message.template
+                self.old_template = sync_template.clone
 
                 if not message.session_id or message.session_id not in sessions.all_sessions:
                     websocket.id = message.session_id or str(websocket.id)
                     sessions.add_session(
                         session_id=websocket.id,
                         Session=Session(
-                            template=message.template,
+                            template= sync_template,
                             window=message.window,
                             session_id=websocket.id
                         )
@@ -51,8 +55,8 @@ class WsServer:
                     self.ws_connections.add(websocket)
                     await websocket.send(json.dumps({'setSessionId': websocket.id}))
                 
-                if message.type and message.event_ref:
-                    sessions.get_session(session_id=message.session_id).template = message.template
+                if message.type and message.event_ref and not event_is_running(message=message, task_manager=self.task_manager):
+                    sessions.get_session(session_id=message.session_id).template = sync_template
                     sessions.get_session(session_id=message.session_id).window = message.window
                     await self.ws_message(message=message)
         
@@ -89,8 +93,10 @@ class WsServer:
                     await self.task_manager.create_task_async(
                         session_id=message.session_id,
                         event_id=event_id,
-                        handler=handler(event_handler)
+                        handler=handler,
+                        event_handler=event_handler
                     )
+
                 else:
                     self.task_manager.create_task(
                         session_id=message.session_id,
@@ -101,11 +107,17 @@ class WsServer:
         
         self.send_message(
             data={
-                'template': sessions.get_session(session_id=message.session_id).template.build_html(),
+                'template': self.get_template_diff(
+                    old_template=self.old_template,
+                    new_template=sessions.get_session(session_id=message.session_id).template
+                ),
                 'window': sessions.get_session(session_id=message.session_id).window.get_all_event_ids
             },
             session_id=message.session_id
         )
+    
+    def get_template_diff(self, old_template: 'Template', new_template: 'Template'):
+        return get_template_diff(old_template=old_template, new_template=new_template)
     
     def send_message(self, data: dict[str, (str, int)], session_id: str):
         ws_conn = next((ws for ws in self.ws_connections if ws.id == session_id), None)
@@ -188,6 +200,7 @@ class WsServerAsgi:
         self.ws_connections: set[str] = set()
         self.task_manager = TaskManager()
         self.window_response: dict[str, (int, str)] = {}
+        self.old_template: 'Template' = None
         self.send=None
     
     async def ws_handler(self, scope, receive, send):
@@ -207,14 +220,15 @@ class WsServerAsgi:
                         raw_message = json.loads(text)
                         message = wsMessage(raw_message=raw_message, app=self.app, ws=self)
                         self.window_response = message.window_response
-                        message.template = await message.template
+                        sync_template = await message.template
+                        self.old_template = sync_template.clone
 
                         if not message.session_id or message.session_id not in sessions.all_sessions:
                             ws_id = message.session_id or str(uuid4())
                             sessions.add_session(
                                 session_id=ws_id,
                                 Session=Session(
-                                    template=message.template,
+                                    template=sync_template,
                                     window=message.window,
                                     session_id=ws_id
                                 )
@@ -225,9 +239,9 @@ class WsServerAsgi:
                                 session_id=message.session_id
                             )
 
-                        if message.type and message.event_ref:
+                        if message.type and message.event_ref and not event_is_running(message=message, task_manager=self.task_manager):
                             ws_id = message.session_id
-                            sessions.get_session(session_id=message.session_id).template = message.template
+                            sessions.get_session(session_id=message.session_id).template = sync_template
                             sessions.get_session(session_id=message.session_id).window = message.window
                             await self.ws_message(send, message=message)
 
@@ -265,11 +279,21 @@ class WsServerAsgi:
                 handler = template_events.get(event_id)
 
                 if inspect.iscoroutinefunction(handler):
-                    await self.task_manager.create_task_async(
-                        session_id=message.session_id,
-                        event_id=event_id,
-                        handler=handler(event_handler)
-                    )
+                    if message.session_id in self.task_manager.active_handlers_async:
+                        if event_id not in self.task_manager.active_handlers_async[message.session_id]:
+                            await self.task_manager.create_task_async(
+                                session_id=message.session_id,
+                                event_id=event_id,
+                                handler=handler,
+                                event_handler=event_handler
+                            )
+                    else:
+                        await self.task_manager.create_task_async(
+                            session_id=message.session_id,
+                            event_id=event_id,
+                            handler=handler,
+                            event_handler=event_handler
+                        )
                 else:
                     self.task_manager.create_task(
                         session_id=message.session_id,
@@ -280,11 +304,17 @@ class WsServerAsgi:
         
         self.send_message(
             data= {
-                'template': sessions.get_session(message.session_id).template.build_html(),
+                'template': self.get_template_diff(
+                    old_template=self.old_template,
+                    new_template=sessions.get_session(message.session_id).template
+                ),
                 'window': sessions.get_session(message.session_id).window.get_all_event_ids
             },
             session_id=message.session_id
         )
+    
+    def get_template_diff(self, old_template: 'Template', new_template: 'Template'):
+        return get_template_diff(old_template=old_template, new_template=new_template)
         
     def send_message(self, data: dict[str, (str, int)], session_id: str):
         try:
@@ -333,7 +363,7 @@ class TaskManager:
         self.active_handlers: dict[str, dict[str, Future]] = {}
         self.active_handlers_async: dict[str, dict[str, Future]] = {}
     
-    async def create_task_async(self, session_id: str, event_id: str, handler: Awaitable):
+    async def create_task_async(self, session_id: str, event_id: str, handler: Awaitable, event_handler):
         
         if session_id not in self.active_handlers_async:
             self.active_handlers_async[session_id] = {}
@@ -346,20 +376,20 @@ class TaskManager:
                 # Tarefa já em execução, não criar uma nova
                 return event_id
         
-        task = asyncio.create_task(self.__run_task_async(session_id, event_id, handler))
+        task = asyncio.create_task(self.__run_task_async(session_id, event_id, handler, event_handler))
         self.active_handlers_async[session_id][event_id] = task
         
         return event_id
 
-    async def __run_task_async(self, session_id: str, event_id: str, handler):
+    async def __run_task_async(self, session_id: str, event_id: str, handler, event_handler):
         try:
-            return await handler
+            return await handler(event_handler)
         except asyncio.CancelledError:
             # Tarefa foi cancelada normalmente
             raise
         except Exception as e:
             # Capturar qualquer outra exceção
-            print(f"Erro na tarefa assíncrona ({session_id}/{event_id}): {e}")
+            print(f"Error on async handler ({session_id}/{event_id}): {e}")
             return None
         finally:
             if session_id in self.active_handlers_async and event_id in self.active_handlers_async[session_id]:
@@ -412,6 +442,7 @@ class TaskManager:
         except Exception as e:
             PrintLine(text=f'Error on sync handler: {e}')
             raise
+
         finally:
             if session_id in self.active_handlers:
                 if event_id in self.active_handlers[session_id]:
@@ -439,3 +470,17 @@ class TaskManager:
     
     def shutdown(self):
         self.executor.shutdown(wait=False, cancel_futures=True)
+
+def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool:
+    """Check if event is running"""
+    if message.session_id in task_manager.active_handlers_async:
+        template = sessions.get_session(session_id=message.session_id).template
+        event_id = template.getElementByUUID(message.target_uuid).events.__dict__.get(f'on{message.type}')
+
+        if event_id in task_manager.active_handlers_async[message.session_id]:
+            return True
+    
+    return False
+
+def get_template_diff(old_template: 'Template', new_template: 'Template'):
+    return TemplateDiff(new_element=new_template.root, old_element=old_template.root).differences

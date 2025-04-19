@@ -34,23 +34,21 @@ function connectWebSocket() {
     socket.onmessage = function(event) {
         const data = JSON.parse(event.data);
 
+        if (data.template) {
+            applyDifferences(data.template);
+            return;
+        };
+
         if (data.reload) {
             location.reload();
             return;
-        }
+        };
 
         if (data.setSessionId) {
             setSessionId(data.setSessionId);
             return;
         };
         
-        if (data.template) {
-            const decodedHTML = data.template;
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(decodedHTML, 'text/html');
-            document.body.innerHTML = doc.body.outerHTML
-            return;
-        };
 
         // Window methods
         if (data.alert) {
@@ -198,6 +196,58 @@ function connectWebSocket() {
     };
 
     return socket
+}
+
+function applyDifferences(differences) {
+    Object.keys(differences).forEach(key => {
+        const diff = differences[key];
+        
+        // Se não tem parent, só pode ser uma mudança no elemento raiz
+        if (!diff.parent) {
+            if (diff.status === 'Changed') {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(diff.element, 'text/html');
+                document.documentElement.innerHTML = doc.documentElement.innerHTML;
+            }
+            return;
+        }
+        
+        // Para elementos com parent
+        const parentElement = document.querySelector(`[uuid="${diff.parent}"]`);
+        if (!parentElement) return;
+        
+        switch(diff.status) {
+            case 'Added':
+                const temp = document.createElement('div');
+                temp.innerHTML = diff.element;
+                parentElement.appendChild(temp.firstChild);
+                break;
+                
+            case 'Removed':
+                const toRemove = parentElement.querySelector(`[uuid="${diff.element}"]`);
+                if (toRemove) toRemove.remove();
+                break;
+                
+                case 'Changed':
+                    let uuid;
+                    if (typeof diff.element === 'string' && diff.element.startsWith('<')) {
+                        const match = diff.element.match(/uuid=['"]([^'"]+)['"]/);
+                        uuid = match ? match[1] : null;
+                    } else {
+                        uuid = diff.element;
+                    }
+                    
+                    if (uuid) {
+                        const toChange = parentElement.querySelector(`[uuid="${uuid}"]`);
+                        if (toChange) {
+                            const temp = document.createElement('div');
+                            temp.innerHTML = diff.element;
+                            toChange.parentNode.replaceChild(temp.firstChild, toChange);
+                        }
+                    }
+                    break;
+        }
+    });
 }
 
 function getsessionId() {

@@ -45,6 +45,36 @@ form = pw.Element(
 | `events` | TemplateEvents | Event handlers for this element |
 | `uuid` | str | Unique identifier (auto-generated) |
 | `data` | Any | Custom data that can be attached to the element |
+| `clone` | property | Returns a deep copy of the element with all children |
+
+## Cloning Elements
+
+PyWeber provides a powerful cloning mechanism to create independent copies of elements:
+
+```python
+# Create an element with children
+original = pw.Element(
+    tag="div",
+    classes=["container"],
+    childs=[
+        pw.Element(tag="p", content="Hello world"),
+        pw.Element(tag="button", content="Press")
+    ]
+)
+
+# Create an independent deep copy
+copy = original.clone
+
+# Modify the copy without affecting the original
+copy.add_class("main")
+copy.childs[0].content = "Modified content"
+```
+
+The `clone` property performs a deep copy of the entire element tree, ensuring that:
+- All properties are copied
+- All children are cloned recursively
+- UUIDs are preserved for consistent referencing
+- Parent-child relationships are maintained
 
 ## Advanced Content with Child Elements
 
@@ -71,6 +101,48 @@ button.content = f"{{{icon.uuid}}} Start Process"
 ```
 
 This creates a button with the icon followed by the text "Start Process". The `{uuid}` syntax is a placeholder that will be replaced with the rendered child element.
+
+## Form Components
+
+PyWeber provides pre-built components for common form elements with proper HTML attributes:
+
+```python
+# Text input
+username = pw.InputText(
+    name="username",
+    id="user-input",
+    placeholder="Enter username",
+    required=True,
+    autocomplete="username"
+)
+
+# Password input with toggleable visibility
+password = pw.InputPassword(
+    name="password",
+    id="password-input",
+    placeholder="Enter password",
+    showpassword=False,
+    autocomplete="current-password"
+)
+
+# Text area
+comments = pw.TextArea(
+    name="comments",
+    id="comments-area",
+    placeholder="Enter your comments",
+    rows=5,
+    cols=40
+)
+
+# Other input types
+email = pw.InputEmail(name="email", required=True)
+number = pw.InputNumber(name="quantity", min=1, max=10)
+checkbox = pw.InputCheckbox(name="terms", value="accept", checked=False)
+date = pw.InputDate(name="birthdate")
+file = pw.InputFile(name="upload", accept=".pdf,.jpg")
+```
+
+All form components properly handle their specific attributes and events, ensuring correct HTML rendering and behavior.
 
 ### Creating Custom Components
 
@@ -187,19 +259,61 @@ element.getElements(by="style", value="color:blue")
 
 Elements can respond to user interactions through event handlers:
 
-from pyweber.utils.types import EventType
 ```python
+from pyweber.utils.types import EventType
+
 # Method 1: Using events property
 button.events.onclick = self.handle_click
 input.events.oninput = self.validate_input
 
-# Method 2: Using add_event method
+# Method 2: Using properties directly on form elements
+text_input.onchange = self.handle_change
+text_input.onfocus = self.handle_focus
+text_input.onblur = self.handle_blur
+
+# Method 3: Using add_event method
 button.add_event(EventType.CLICK, self.handle_click)
 form.add_event(EventType.SUBMIT, self.handle_submit)
 
 # Remove events
 button.remove_event(EventType.CLICK)
 ```
+
+## Efficient DOM Updates with TemplateDiff
+
+PyWeber uses an intelligent diffing algorithm to efficiently update the DOM:
+
+```python
+from pyweber import TemplateDiff
+
+# Create original element structure
+original = pw.Element(
+    tag="div",
+    classes=["container"],
+    childs=[
+        pw.Element(tag="p", content="Hello world"),
+        pw.Element(tag="button", content="Press")
+    ]
+)
+
+# Create a clone and modify it
+modified = original.clone
+modified.add_class("main")
+modified.childs[0].content = "Updated content"
+modified.remove_child(modified.childs[1])
+modified.add_child(pw.Element(tag="span", content="New element"))
+
+# Generate diff between versions
+diff = TemplateDiff(new_element=modified, old_element=original)
+
+# The diff contains only the actual changes:
+# - Added class to container
+# - Updated content of paragraph
+# - Removed button
+# - Added span element
+```
+
+This diffing system allows PyWeber to send only the necessary changes to the client, minimizing network traffic and improving performance.
 
 ## Example: Clock Component
 
@@ -218,84 +332,71 @@ class Text(pw.Element):
             pw.Element(tag="span", content=title)
         ]
 
+class Box(pw.Element):
+    def __init__(self, content: str):
+        super().__init__(tag="div", classes=["time-box"], content=content)
+
 class Button(pw.Element):
-    def __init__(self, id: str, content: str, events: pw.TemplateEvents = None, classes: list[str] = None):
-        super().__init__(tag="button", id=id, events=events)
-        # Create icon element
-        self.icon = pw.Element(tag="i", classes=classes or [])
-        # Add icon as child
-        self.childs = [self.icon]
-        # Set content with placeholder for the icon
-        self.content = f"{{{self.icon.uuid}}} {content}"
+    def __init__(self, value: str, events: pw.TemplateEvents = None):
+        super().__init__(
+            tag="button", 
+            classes=["time-button"],
+            value=value,
+            events=events
+        )
 
 class Title(pw.Element):
-    def __init__(self, title: str):
-        super().__init__(tag="h2", classes=['time-title'])
-        # Create icon element
-        self.icon = pw.Element(tag="i", classes=['bi', 'bi-alarm'])
-        # Add icon as child
-        self.childs = [self.icon]
-        # Set content with placeholder for the icon
-        self.content = f"{{{self.icon.uuid}}} {title}"
+    def __init__(self, content: str):
+        super().__init__(tag="h2", classes=['time-title'], content=content)
 
-class Clock(pw.Template):
-    def __init__(self, app: pw.Pyweber):
-        super().__init__(template="index.html")
-        self.app = app
-        self.container = self.querySelector(".container")
-
-        # Create time display elements
-        self.hours = Text(title="hours", value="00")
-        self.minutes = Text(title="minutes", value="00")
-        self.seconds = Text(title="seconds", value="00")
-
-        # Create time container
-        self.time_container = pw.Element(
-            tag="div",
-            classes=["time-values"],
-            childs=[self.hours, self.minutes, self.seconds]
-        )
-
-        # Create start button
-        self.start_button = Button(
-            id="startbtn",
-            content="Start",
-            classes=["bi", "bi-play-fill"],
-            events=pw.TemplateEvents(onclick=self.start_clock)
-        )
-
-        # Create buttons container
-        self.buttons_container = pw.Element(
-            tag="div",
-            classes=["time-buttons"],
-            childs=[self.start_button]
-        )
-
-        # Add all elements to container
-        self.container.childs = [
-            Title(title="Clock"),
-            self.time_container,
-            self.buttons_container
+class ClockSpace(pw.Element):
+    def __init__(self):
+        super().__init__(tag='div', classes=['clock-space'])
+        self.childs = [
+            Title(content='Clock'),
+            pw.Element(
+                tag='div',
+                classes=['clock-text'],
+                childs=[Box(content='00'), Box(content='00'), Box(content='00')]
+            ),
+            pw.Element(
+                tag='div',
+                classes=['clock-buttons'],
+                childs=[
+                    Button(value='start', events=pw.TemplateEvents(onclick=self.start_clock)),
+                    Button(value='stop', events=pw.TemplateEvents(onclick=self.stop_clock))
+                ]
+            )
         ]
-
+    
     async def start_clock(self, e: pw.EventHandler):
-        while True:
-            now = datetime.now()
-            self.hours.childs[0].content = now.strftime("%H")
-            self.minutes.childs[0].content = now.strftime("%M")
-            self.seconds.childs[0].content = now.strftime("%S")
+        self.is_running = True
+        hour, minutes, seconds = e.template.querySelectorAll('.time-box')
+        while self.is_running:
+            hour.content, minutes.content, seconds.content = await self.get_hour()
             e.update()
             await asyncio.sleep(1)
+    
+    async def stop_clock(self, e: pw.EventHandler):
+        self.is_running = not self.is_running
+        hour, minutes, seconds = e.template.querySelectorAll('.time-box')
+        hour.content, minutes.content, seconds.content = '00:00:00'.split(':')
+        e.update()
+
+    async def get_hour(self) -> tuple[str, str, str]:
+        return datetime.now().strftime('%H:%M:%S').split(':')
 ```
 
 ## Best Practices
 
 1. **Use Custom Components**: Create reusable components by extending Element
-2. **Combine Content and Children**: Use the `{uuid}` placeholder syntax to mix text and elements
-3. **Maintain Element Hierarchy**: Keep parent-child relationships consistent
-4. **Update the UI**: Always call `e.update()` after making changes
-5. **Use Semantic HTML**: Choose appropriate HTML tags for their intended purpose
-6. **Organize Event Handlers**: Keep event handlers focused on specific tasks
+2. **Use Form Components**: Leverage the built-in form components for proper HTML attributes
+3. **Leverage Clone**: Use the clone property when you need independent copies
+4. **Combine Content and Children**: Use the `{uuid}` placeholder syntax to mix text and elements
+5. **Maintain Element Hierarchy**: Keep parent-child relationships consistent
+6. **Update the UI**: Always call `e.update()` after making changes
+7. **Use Semantic HTML**: Choose appropriate HTML tags for their intended purpose
+8. **Organize Event Handlers**: Keep event handlers focused on specific tasks
 
 ## Advanced Techniques
 

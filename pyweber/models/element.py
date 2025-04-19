@@ -1,7 +1,7 @@
 from uuid import uuid4
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Union
 from pyweber.core.events import TemplateEvents
-from pyweber.utils.types import EventType, HTMLTag
+from pyweber.utils.types import EventType, HTMLTag, NonSelfClosingHTMLTags
 
 if TYPE_CHECKING:
     from pyweber.core.template import Template
@@ -18,7 +18,9 @@ class ElementConstrutor:
         attrs: dict[str, str],
         childs: list['ElementConstrutor'],
         events: 'TemplateEvents',
+        **kwargs
     ):
+        self.kwargs = kwargs
         self.tag = tag
         self.id = id
         self.content = content
@@ -28,6 +30,7 @@ class ElementConstrutor:
         self.attrs = attrs or {}
         self.childs = childs or []
         self.events = events or TemplateEvents()
+        self.parent = None
         self.data = None
     
     @property
@@ -105,7 +108,7 @@ class ElementConstrutor:
         if not isinstance(class_name, str):
             raise TypeError('Class element must be a string')
         
-        if class_name and not any(val not in self.__classes for val in class_name.split(' ')):
+        if class_name and any(val not in self.__classes for val in class_name.split(' ')):
             self.__classes.extend(class_name.split(' '))
     
     def remove_class(self, class_name: str):
@@ -217,62 +220,6 @@ class ElementConstrutor:
                 raise ValueError(f"Could not convert value to string: {e}")
     
     @property
-    def parent(self):
-        return self.__parent
-    
-    @parent.setter
-    def parent(self, value: 'ElementConstrutor'):
-        if value is None:
-            self.__parent = None
-            return
-        
-        if not isinstance(value, ElementConstrutor):
-            raise TypeError("Parent must be an Element instance")
-
-        self.__parent = value
-    
-    @property
-    def childs(self):
-        return self.__childs
-    
-    @childs.setter
-    def childs(self, value: list['ElementConstrutor']):
-        if not isinstance(value, list):
-            raise TypeError("Children must be a list")
-        
-        if not all(isinstance(child, ElementConstrutor) for child in value):
-            raise TypeError("All children must be Element instances")
-        
-        for child in value:
-            child.parent = self
-        
-        self.__childs = value
-    
-    def add_child(self, child: 'ElementConstrutor'):
-        if not isinstance(child,  ElementConstrutor):
-            raise TypeError("Child must be Element instances")
-        
-        self.__childs.append(child)
-        child.parent = self
-    
-    def remove_child(self, child: 'ElementConstrutor'):
-        if child not in self.__childs:
-            raise IndexError('Child not defined for this parent Element')
-        
-        self.__childs.remove(child)
-        child.parent = None
-
-    def pop_child(self, index: int = -1):
-        if not isinstance(index, int):
-            raise TypeError(f'Index must be a integer, but you got {type(index).__name__}')
-
-        try:
-            self.__childs.pop(index)
-        
-        except IndexError as e:
-            raise IndexError(str(e))
-    
-    @property
     def events(self):
         return self.__events
     
@@ -297,6 +244,106 @@ class ElementConstrutor:
             raise TypeError('Event_type must a be EventType instance')
         
         setattr(self.__events, event_type.value, None)
+    
+    def to_html(self, element: 'ElementConstrutor' = None, indent: int = 0):
+        if not element:
+            element = self
+        
+        if not isinstance(element, ElementConstrutor):
+            raise TypeError(f'element must be an Element instances, but got {type(element).__name__}')
+        
+        indentation = ' ' * indent
+        html = f"{indentation}<{element.tag} uuid='{element.uuid}'" if element.tag != 'comment' else f'{indentation}<!--'
+
+        if element.id:
+            html += f' id="{element.id}"'
+        if element.classes and len(element.classes) > 0:
+            html += f' class="{" ".join(element.classes)}"'
+        if element.value:
+            html += f' value="{element.value}"'
+
+        if element.style and len(element.style) > 0:
+            style_str = '; '.join([f"{key}: {value}" for key, value in element.style.items()])
+            html += f' style="{style_str}"'
+            
+        for key, value in element.attrs.items():
+            if value:
+                html += f" {key}='{value}'"
+            else:
+                html += f" {key}"
+
+        for key, value in element.events.__dict__.items():
+            if value is not None:
+                html += f" _{key}='{self.create_event_id(value)}'"
+            
+        if not element.content and not element.childs and element.tag not in NonSelfClosingHTMLTags.non_autoclosing_tags():
+            if element.tag == 'comment':
+                return html + '-->'
+            else:
+                return html + '>'
+        
+        if element.tag != 'comment':
+            html += '>'
+        
+        final_content = str((self.__render_dynamic_values(content=element.content) or ''))
+        has_children = bool(element.childs)
+        
+        if has_children or '\n' in final_content:
+            html += '\n'
+        
+        for child in element.childs:
+            child_html = self.to_html(child, indent + 4)
+            uuid_placeholder = f'{{{child.uuid}}}'
+            
+            if uuid_placeholder in final_content:
+                final_content = final_content.replace(uuid_placeholder, child_html)
+            else:
+                final_content += '\n' + child_html
+        
+        if final_content:
+            if has_children or '\n' in final_content:
+                html += ' ' * (indent + 4) + final_content.strip() + '\n' + indentation
+            else:
+                html += final_content.strip()
+        
+        html += f'</{element.tag}>' if element.tag != 'comment' else '-->'
+
+        return html
+    
+    def __render_dynamic_values(self, content: str):
+        if content:
+            begin = content.find('{{')
+            if begin != -1:
+                end = content.find('}}')
+                key = content[begin:end+2].removeprefix('{{').removesuffix('}}').strip()
+                new_content = self.kwargs.get(key, None)
+                
+                if new_content:
+                    if isinstance(new_content, ElementConstrutor):
+                        new_content = self.to_html(element=new_content)
+                    content = content.replace(content[begin:end+2], new_content)
+        
+        return content
+
+    def create_event_id(self, event: Union[Callable, str]):
+        if isinstance(event, str) or callable(event):
+            from pyweber.core.events import EventBook
+
+            if isinstance(event, str):
+                event_id = EventBook.get(event, None)
+
+                if not event_id:
+                    raise KeyError(f'{event} not in Pyweber EventBook.')
+                
+                return event
+
+            elif callable(event):
+                event_id = f'event_{id(event)}'
+                EventBook[event_id] = event
+            
+                return event_id
+
+        raise ValueError(f'Event {event.__name__} is an invalid callable ou event_id')
     
     def __repr__(self):
         return (

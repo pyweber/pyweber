@@ -1,5 +1,4 @@
 from typing import TYPE_CHECKING, Callable, Union
-from threading import Thread
 import asyncio
 
 if TYPE_CHECKING:
@@ -48,7 +47,13 @@ class EventHandler:
         self.__ws = ws
     
     def update(self):
-        data = {'template': self.session.template.build_html(), 'window': self.session.window.get_all_event_ids}
+        data = {
+                'template': self.__ws.get_template_diff(
+                        old_template=self.__ws.old_template,
+                        new_template=self.session.template
+                    ),
+                'window': self.session.window.get_all_event_ids
+            }
         try:
             asyncio.get_running_loop()
             asyncio.create_task(self.__ws.async_send_message(data=data, session_id=self.session.session_id))
@@ -114,6 +119,8 @@ class EventConstrutor:
             ws=self.__ws,
             send=self.__send
         )
+
+EventBook: dict[str, Callable] = {}
 
 class TemplateEvents:
     def __init__(

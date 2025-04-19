@@ -61,7 +61,37 @@ from .utils.exceptions import (
 )
 
 # Pyweber Components
-from .components.components import Icon
+from .components.form import Form
+from .components.general import (
+    Icon,
+    Style,
+    Script,
+    Label,
+    TextArea
+)
+
+from .components.input import (
+    Input,
+    InputButton,
+    InputCheckbox,
+    InputCheckbox,
+    InputColor,
+    InputDate,
+    InputEmail,
+    InputFile,
+    InputHidden,
+    InputNumber,
+    InputPassword,
+    InputRadio,
+    InputReset,
+    InputRange,
+    InputSearch,
+    InputSubmit,
+    InputTel,
+    InputText,
+    InputTime,
+    InputUrl
+)
 
 __all__ = [
     'Template',
@@ -97,5 +127,30 @@ __all__ = [
     'InvalidTemplateError',
     'RouteNotFoundError',
     'RouterError',
-    'Icon'
+    'Icon',
+    'Style',
+    'Script',
+    'Form',
+    'Input',
+    'InputButton',
+    'InputCheckbox',
+    'InputCheckbox',
+    'InputColor',
+    'InputDate',
+    'InputEmail',
+    'InputFile',
+    'InputHidden',
+    'InputNumber',
+    'InputPassword',
+    'InputRadio',
+    'InputReset',
+    'InputRange',
+    'InputSearch',
+    'InputSubmit',
+    'InputTel',
+    'InputText',
+    'InputTime',
+    'InputUrl',
+    'Label',
+    'TextArea',
 ]

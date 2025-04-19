@@ -1,5 +1,4 @@
 import os
-from typing import Callable
 from uuid import uuid4
 import lxml.html as HTMLPARSER
 from lxml.etree import Element as LXML_Element
@@ -7,7 +6,7 @@ from pyweber.core.events import TemplateEvents
 from pyweber.core.element import Element
 from pyweber.utils.loads import LoadStaticFiles
 from pyweber.config.config import config
-from pyweber.utils.types import HTTPStatusCode, NonSelfClosingHTMLTags
+from pyweber.utils.types import HTTPStatusCode
 
 class Template:
     def __init__(self, template: str, status_code: int = 200, **kwargs):
@@ -15,7 +14,6 @@ class Template:
         self.kwargs = kwargs
         self.data = None
         self.__status_code = status_code
-        self.__events: dict[str, Callable] = {}
         self.__icon: str = self.get_icon()
         self.__root = self.parse_html()
     
@@ -47,7 +45,8 @@ class Template:
 
     @property
     def events(self):
-        return self.__events
+        from pyweber.core.events import EventBook
+        return EventBook
 
     def get_icon(self):
         return str(config['app'].get('icon'))
@@ -58,11 +57,10 @@ class Template:
         
         return self.__inject_default_elements(root=self.__parse_html(html=html))
 
-    def build_html(self, element: Element = None, include_doctype: bool = True):
-        element = element or self.__root
-        html = self.__build_html(element=element)
+    def build_html(self, include_doctype: bool = True):
+        html = self.root.to_html()
         
-        if include_doctype and element.tag == 'html':
+        if include_doctype:
             html = f'<!DOCTYPE html>\n{html}'
         
         return html
@@ -206,7 +204,8 @@ class Template:
             content=content,
             events=event_obj,
             style=style_dict,
-            attrs=dict(HTMLElement.attrib)
+            attrs=dict(HTMLElement.attrib),
+            **self.kwargs
         )
         element.parent = parent
         element.template = self
@@ -236,69 +235,6 @@ class Template:
                     content = content.replace(content[begin:end+2], new_content)
         
         return content
-    
-    def __build_html(self, element: Element, indent: int = 0) -> str:
-        indentation = ' ' * indent
-        html = f"{indentation}<{element.tag} uuid='{element.uuid}'" if element.tag != 'comment' else f'{indentation}<!--'
-
-        if element.id:
-            html += f' id="{element.id}"'
-        if element.classes and len(element.classes) > 0:
-            html += f' class="{" ".join(element.classes)}"'
-        if element.value:
-            html += f' value="{element.value}"'
-
-        if element.style and len(element.style) > 0:
-            style_str = '; '.join([f"{key}: {value}" for key, value in element.style.items()])
-            html += f' style="{style_str}"'
-            
-        for key, value in element.attrs.items():
-            if value:
-                html += f" {key}='{value}'"
-            else:
-                html += f" {key}"
-
-        for key, value in element.events.__dict__.items():
-            if value is not None:
-                if isinstance(value, str) or callable(value):
-                    html += f" _{key}='{self.__event_id(value) if callable(value) else value}'"
-                
-                else:
-                    raise ValueError(f'Event {value} is an invalid callable ou event_id')
-            
-        if not element.content and not element.childs and element.tag not in NonSelfClosingHTMLTags.non_autoclosing_tags():
-            if element.tag == 'comment':
-                return html + '-->'
-            else:
-                return html + '>'
-        
-        if element.tag != 'comment':
-            html += '>'
-        
-        final_content = str((self.__render_dynamic_values(content=element.content) or ''))
-        has_children = bool(element.childs)
-        
-        if has_children or '\n' in final_content:
-            html += '\n'
-        
-        for child in element.childs:
-            child_html = self.__build_html(child, indent + 4)
-            uuid_placeholder = f'{{{child.uuid}}}'
-            
-            if uuid_placeholder in final_content:
-                final_content = final_content.replace(uuid_placeholder, child_html)
-            else:
-                final_content += '\n' + child_html
-        
-        if final_content:
-            if has_children or '\n' in final_content:
-                html += ' ' * (indent + 4) + final_content.strip() + '\n' + indentation
-            else:
-                html += final_content.strip()
-        
-        html += f'</{element.tag}>' if element.tag != 'comment' else '-->'
-        
-        return html
 
     def __read_file(self, file_path: str) -> str:
         if file_path.endswith('.html'):
@@ -389,7 +325,14 @@ class Template:
         
         return root
     
-    def __event_id(self, event: callable):
-        key = f'event_{id(event)}'
-        self.__events[key] = event
-        return key
+    @property
+    def clone(self):
+        tpl = Template(
+            template=self.template,
+            status_code=self.status_code,
+            **self.kwargs
+        )
+        tpl.data = self.data
+        tpl.root = self.root.clone
+
+        return tpl

@@ -1,6 +1,34 @@
 # PyWeber Changelog
 
-## [0.9.6] - 2025-04.14
+## [0.9.7] - 2025-04-19
+---
+### New Features
+- Implemented TemplateDiff system for efficient DOM updates:
+  - Added intelligent diffing algorithm to detect exact changes between templates
+  - Implemented efficient client-side patching to apply only necessary DOM updates
+  - Reduced network traffic by sending only changed elements instead of full templates
+- Added comprehensive deep cloning system for Element and Template objects:
+  - Introduced `.clone` property for creating independent copies with preserved structure
+  - Implemented support for cloning of nested elements with proper parent references
+- Added component-based architecture with new HTML form elements:
+  - Introduced `InputText`, `InputPassword`, `InputNumber`, `InputFile`, and other form components
+  - Added comprehensive `TextArea` component with proper event handling
+  - Implemented proper attribute management for all form components
+- Enhanced WebSocket communication with optimized payload structure
+
+### Improvements
+- Optimized template rendering pipeline for better performance
+- Improved event handling system with better event targeting
+- Enhanced session management system for multiple browser tabs
+- Refined UUID-based element tracking for more precise DOM manipulation
+- Updated client-side JavaScript for efficient template diff application
+
+### Bug Fixes
+- Fix `pyweber run` and `pyweber -r` commands to run pyweber projects in linux system
+- Fixed event handling for dynamically created elements
+- Resolved issues with component attribute inheritance
+
+## [0.9.6] - 2025-04-14
 ---
 ### Bug Fixes
 - Resolved a `FileNotFoundError` that occurred when loading static files on Linux systems.

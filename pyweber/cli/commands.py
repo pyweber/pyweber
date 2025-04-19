@@ -444,11 +444,10 @@ class CommandFunctions:
             except FileNotFoundError:
                 pass
             
-            (
+            if sys.platform == 'win32':
                 subprocess.run(['python', file], check=True, shell=True)
-                if sys.platform == 'win32' else
+            else:
                 subprocess.run(['python3', file], check=True, shell=True)
-            )
         
         except subprocess.CalledProcessError as e:
             self.log_message(
@@ -478,7 +477,7 @@ class CommandFunctions:
             else:
                 # No Linux/Mac, executar em segundo plano
                 subprocess.Popen(
-                    ['python', temp_script],
+                    ['python3', temp_script],
                     start_new_session=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE

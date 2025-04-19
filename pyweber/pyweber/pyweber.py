@@ -261,12 +261,14 @@ class Pyweber:
             try:
                 resp_content = await self.async_get_content(content, **kwargs)
             except Exception as error:
-                PrintLine(text=f'{self.__error_traceback()}')
+                PrintLine(text=error)
                 resp_content = self.page_server_error
                 error_element = resp_content.querySelector('.error-content')
 
                 if error_element:
                     error_element.content = str(error)
+                
+                raise
 
             return resp_content
         
@@ -302,11 +304,10 @@ class Pyweber:
 
             if isinstance(response_content, Template):
                 content_type = ContentTypes.html
-                status_code = (
-                    302 if self.is_redirected(path)
-                    and not str(response_content.status_code).startswith('3')
-                    else response_content.status_code
-                )
+                if self.is_redirected(path) and not str(response_content.status_code).startswith('3'):
+                    status_code = 302
+                else:
+                    status_code = response_content.status_code
 
             elif isinstance(response_content, dict):
                 response_content = json.dumps(response_content, ensure_ascii=False)
@@ -341,12 +342,7 @@ class Pyweber:
     
     async def clone_template(self, route: str) -> Template:
         last_template = await self.get_template(route=route)
-        last_template = last_template.content
-        new_template = Template(last_template.template, status_code=last_template.status_code)
-        new_template.root = last_template.root
-        new_template._Template__events = last_template.events
-        new_template._Template__icon = last_template.get_icon()
-        new_template.data = last_template.data
+        new_template = last_template.content.clone
         return new_template
     
     def get_content_type(self, route: str) -> ContentTypes:
@@ -474,17 +470,10 @@ class Pyweber:
 
             if response:
                 return status_code, response
-    
-    def __error_traceback(self):
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        error_details = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        error_message = ''.join(error_details)
-        return error_message
 
     def __repr__(self):
-        return f'Pyweber(routes={len(self.list_routes)}, window={self.window})'
+        return f'Pyweber(routes={len(self.list_routes)})'
     
-
 class ResponseStruct:
     def __init__(self, content: Union[Template, str], status_code: int, content_type: ContentTypes, route: str):
         self.content = content
