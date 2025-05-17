@@ -1,8 +1,7 @@
 from typing import TYPE_CHECKING, Callable
 from pyweber.models.create_app import CreatApp
-from pyweber.models.request import RequestASGI
+from pyweber.models.request import Request, request
 from pyweber.connection.websocket import WsServerAsgi
-from pyweber.config.config import config
 import os
 
 if TYPE_CHECKING:
@@ -50,12 +49,20 @@ def run(target: Callable = None, **kwargs):
 
 async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None):
     global WS_RUNNING
+    global request
 
-    request = RequestASGI(raw_request=scope)
-    os.environ['PYWEBER_WS_PORT'] = str(request.port)
+    body = b""
+    if scope["type"] == "http":
+        more_body = True
+        while more_body:
+            message = await receive()
+            body += message.get("body", b"")
+            more_body = message.get("more_body", False)
+
+    requests = Request(headers=scope, body=body)
+    request = requests
     
     ws_server = WsServerAsgi(app=app)
-    __response = await app.get_route(request=request)
 
     if not WS_RUNNING:
         WS_RUNNING = True
@@ -70,13 +77,14 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
         pass
 
     elif scope.get('type') == 'http':
-        os.environ['PYWEBER_WS_PORT'] = str(request.port) or str(10000)
+        os.environ['PYWEBER_WS_PORT'] = str(request.port)
+        response = await app.get_response(request=request)
         
         headers = [
-            (b'content-type', __response.response_type.encode()),
-            (b'content-length', str(len(__response.response_content)).encode()),
+            (b'content-type', response.response_type.encode()),
+            (b'content-length', str(len(response.response_content)).encode()),
             (b'connection', b'close'),
-            (b'date', __response.response_date.encode())
+            (b'date', response.response_date.encode())
         ]
 
         if app.cookies:
@@ -85,11 +93,11 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
 
         await send({
             'type': 'http.response.start',
-            'status': __response.code,
+            'status': response.code,
             'headers': headers
         })
 
         await send({
             'type': 'http.response.body',
-            'body': __response.response_content
+            'body': response.response_content
         })

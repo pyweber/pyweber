@@ -86,6 +86,8 @@ class ContentTypes(Enum):
     txt = "text/plain"
     csv = "text/csv"
     rtf = "application/rtf"
+    form_encode = "application/x-www-form-urlencoded"
+    form_data = 'multipart/form-data'
 
     # Documentos de texto Office (abríveis como texto em alguns casos)
     doc = "application/msword"
@@ -161,6 +163,9 @@ class StaticFilePath(Enum):
     config_default = files(framework).joinpath(os.path.join('static', 'config.toml'))
     pyweber_css = files(framework).joinpath(os.path.join('static', 'pyweber.css'))
     update_file = files(framework).joinpath(os.path.join('static', 'update.py'))
+    admin_page = files(framework).joinpath(os.path.join('admin', 'index.html'))
+    admin_css_file = files(framework).joinpath(os.path.join('admin', 'src', 'style.css'))
+    admin_js_file = files(framework).joinpath(os.path.join('admin', 'src', 'script.js'))
 
     @classmethod
     def all_static_files(cls):

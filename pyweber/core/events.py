@@ -33,7 +33,6 @@ class EventHandler:
         app: 'Pyweber',
         session: 'Session',
         ws: Union['WsServer', 'WsServerAsgi'],
-        send: Callable
     ):
         self.event_type = event_type
         self.route = route
@@ -43,7 +42,6 @@ class EventHandler:
         self.window = window
         self.event_data = event_data
         self.session = session
-        self.__send = send
         self.__ws = ws
     
     def update(self):
@@ -80,7 +78,6 @@ class EventConstrutor:
         route: str,
         event_data: dict[str, str],
         event_type: str,
-        send: Callable = None
     ):
         self.__route = route
         self.__event_data = event_data
@@ -89,7 +86,6 @@ class EventConstrutor:
         self.__ws = ws
         self.__app = app
         self.__session = session
-        self.__send = send
     
     @property
     def __template(self) -> 'Template':
@@ -116,8 +112,7 @@ class EventConstrutor:
             event_data=EventData(event_data=self.__event_data),
             app=self.__app,
             session=self.__session,
-            ws=self.__ws,
-            send=self.__send
+            ws=self.__ws
         )
 
 EventBook: dict[str, Callable] = {}

@@ -201,14 +201,13 @@ class WsServerAsgi:
         self.task_manager = TaskManager()
         self.window_response: dict[str, (int, str)] = {}
         self.old_template: 'Template' = None
-        self.send=None
+        self.send_connectins: dict[str, Callable] = {}
     
     async def ws_handler(self, scope, receive, send):
         ws_id = None
         try:
             while True:
                 raw_message = await receive()
-                self.send = send
                 
                 if raw_message.get('type') == 'websocket.connect':
                     await send({'type': 'websocket.accept'})
@@ -234,16 +233,19 @@ class WsServerAsgi:
                                 )
                             )
 
+                            self.send_connectins[message.session_id] = send
+
                             self.send_message(
                                 data={'setSessionId': ws_id},
                                 session_id=message.session_id
                             )
-
+                        
                         if message.type and message.event_ref and not event_is_running(message=message, task_manager=self.task_manager):
                             ws_id = message.session_id
+                            self.send_connectins[message.session_id] = send
                             sessions.get_session(session_id=message.session_id).template = sync_template
                             sessions.get_session(session_id=message.session_id).window = message.window
-                            await self.ws_message(send, message=message)
+                            await self.ws_message(message=message)
 
                 else:
                     break
@@ -258,7 +260,7 @@ class WsServerAsgi:
             self.ws_connections.discard(ws_id)
             sessions.remove_session(session_id=ws_id)
     
-    async def ws_message(self, send, message: wsMessage):
+    async def ws_message(self, message: wsMessage):
         from pyweber.core.events import EventConstrutor
         event_handler = EventConstrutor(
             target_id=message.target_uuid,
@@ -267,8 +269,7 @@ class WsServerAsgi:
             session=sessions.get_session(session_id=message.session_id),
             route=message.route,
             event_data=message.event_data,
-            event_type=message.type,
-            send=send
+            event_type=message.type
         ).build_event
 
         if event_handler.element:
@@ -318,8 +319,10 @@ class WsServerAsgi:
         
     def send_message(self, data: dict[str, (str, int)], session_id: str):
         try:
+            send = self.send_connectins.get(session_id)
+
             asyncio.create_task(
-                self.send({
+                send({
                     'type': 'websocket.send',
                     'text': json.dumps(data, ensure_ascii=False, indent=4)
                 })
@@ -331,7 +334,9 @@ class WsServerAsgi:
     
     async def async_send_message(self, data: dict[str, (str, int)], session_id: str):
         try:
-            await self.send({
+            send = self.send_connectins.get(session_id)
+
+            await send({
                 'type': 'websocket.send',
                 'text': json.dumps(data, ensure_ascii=False, indent=4)
             })

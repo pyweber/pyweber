@@ -1,20 +1,21 @@
 import socket
 import select
+import re
 import os
 import ssl
 import shutil
 import asyncio
 from threading import Thread
 from pyweber.pyweber.pyweber import Pyweber
-from pyweber.models.request import Request
+from pyweber.models.request import Request, request
 from pyweber.utils.utils import PrintLine, Colors
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from pyweber.connection.websocket import TaskManager
 
 class HttpServer:
-    def __init__(self, update_handler: callable):
+    def __init__(self, update_handler: Callable):
         self.connections: list[socket.socket] = []
         self.route, self.port, self.host = None, None, None
         self.current_directory = os.path.abspath(__file__)
@@ -23,7 +24,6 @@ class HttpServer:
         self.ssl_context = None
         self.task_manager: 'TaskManager' = None
 
-    
     @property
     def app(self):
         return self.__app
@@ -33,7 +33,7 @@ class HttpServer:
         self.__app = value
     
     def is_file_request(self, request: Request):
-        return '.' in request.path.split('/')[-1]
+        return '.' in request.path.split('/')[-1] if request.path else ''
     
     def setup_ssl(self, cert_file: str, key_file: str):
         self.ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -44,24 +44,61 @@ class HttpServer:
         except Exception as e:
             PrintLine(text=f"{Colors.RED}SSL configuration failed: {e}{Colors.RESET}")
             self.ssl_context = None
+    
+    async def process_request(self, client: socket.socket) -> tuple[bytes, bytes]:
+        request_data = b''
+
+        while b'\r\n\r\n' not in request_data:
+            chunk = client.recv(1024)
+
+            if not chunk:
+                break
+
+            request_data += chunk
+        
+        header_bytes, _, body_start = request_data.partition(b'\r\n\r\n')
+        header_text = header_bytes.decode('iso-8859-1')
+
+        content_length = 0
+        content_match = re.search(r"Content-Length: (\d+)", header_text, re.IGNORECASE)
+
+        if content_match:
+            content_length = int(content_match.group(1))
+        
+        body = body_start
+        while len(body) < content_length:
+            chunk = client.recv(4096)
+
+            if not chunk:
+                break
+
+            body += chunk
+        
+        return header_bytes, body
 
     async def handle_response(self, client: socket.socket | ssl.SSLSocket):
+        global request
+        
         try:
+            request_tuple = await self.process_request(client=client)
 
-            request = client.recv(1024).decode()
+            if request_tuple:
+                requests=Request(
+                    headers=request_tuple[0].decode('iso-8859-1'),
+                    body=request_tuple[-1]
+                )
+                request = requests
 
-            if request:
-                request=Request(raw_request=request)
+                if request.path:
+                    if self.started:
+                        if not self.is_file_request(request):
+                            self.update_server()
+                    
+                    response = await self.app.get_response(request=request)
+                    client.sendall(response.build_response)
 
-                if self.started:
                     if not self.is_file_request(request):
-                        self.update_server()
-                
-                response = await self.app.get_route(request=request)
-                client.sendall(response.build_response)
-
-                if not self.is_file_request(request):
-                    self.started = True
+                        self.started = True
         
         except BlockingIOError:
             pass
@@ -123,7 +160,7 @@ class HttpServer:
                         shutil.rmtree('__pycache__', ignore_errors=True)
                         PrintLine(text='Server offline')
                         break
-
+        
             except OSError as e:
                 PrintLine(text=f'Error to running server: ')
                 return

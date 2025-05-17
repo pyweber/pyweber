@@ -19,8 +19,9 @@ class Input(Element):
         onchange: Callable,
         oninput: Callable,
         onclick: Callable,
+        **kwargs
     ):
-        super().__init__(tag='input')
+        super().__init__(tag='input', **kwargs)
         self.type = type
         self.style = style or {}
         self.id = id

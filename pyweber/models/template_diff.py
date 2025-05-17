@@ -1,4 +1,3 @@
-from pyweber.core.template import Template
 from pyweber.core.element import Element
 from typing import Literal
 

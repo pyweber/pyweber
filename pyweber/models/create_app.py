@@ -82,9 +82,9 @@ class CreatApp:
         return Pyweber(update_handler=self.update)
     
     def load_target(self):
-        self.app.clear_routes
-        self.app.clear_after_request
-        self.app.clear_before_request
+        self.app.clear_routes()
+        self.app.clear_before_request_middleware()
+        self.app.clear_after_request_middleware()
         self.module = self.import_module()
         self.app = self.get_app_instances()
 

@@ -24,8 +24,9 @@ class Form(Element):
         novalidate: bool = True,
         autocapitalize: bool = False,
         spellcheck: bool = False,
+        **kwargs
     ):
-        super().__init__(tag='form', classes=classes, style=style, id=id, childs=childs)
+        super().__init__(tag='form', classes=classes, style=style, id=id, childs=childs, **kwargs)
         self.method = method
         self.name = name
         self.action = action

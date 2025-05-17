@@ -1,5 +1,5 @@
 from pyweber.utils.types import ContentTypes, HTTPStatusCode
-from pyweber.models.request import Request, RequestASGI
+from pyweber.models.request import Request
 from pyweber.config.config import config
 from pyweber.utils.utils import PrintLine, Colors
 from datetime import datetime, timezone
@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 class Response:
     def __init__(
         self,
-        request: Request | RequestASGI,
+        request: Request,
         response_content: bytes,
         code: int,
         cookies: list[str],
@@ -21,7 +21,7 @@ class Response:
             "Content-Length": len(response_content),
             "Connection": 'Close',
             "Method": request.method,
-            "Http-Version": request._get_line_method_.split(' ')[2] if isinstance(request, Request) else 'HTTP/1.1', 
+            "Http-Version": request.scheme, 
             "Status": code,
             "Server": 'Pyweber/1.0',
             "Date": datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT"),
@@ -35,7 +35,7 @@ class Response:
         return self.__headers
     
     @property
-    def request(self) -> Request | RequestASGI:
+    def request(self) -> Request:
         return self.__request
     
     @property
@@ -102,10 +102,12 @@ class Response:
         else:
             return {}
     
-    def add_header(self, key: str, value: str):
+    def set_header(self, key: str, value: str):
+        """Add new header in Response"""
         self.__headers[key] = value
     
-    def set_header(self, key: str, /, value: str | bytes | int | float):
+    def update_header(self, key: str, /, value: str | bytes | int | float):
+        """Update header value if it exist in Response"""
         if key in self.__headers:
             self.__headers[key] = value
     
@@ -137,5 +139,5 @@ class Response:
         response += '\r\n'
 
         to_replace = r'\r\n'
-        PrintLine(text=f"{bold_white_color}{self.request._get_line_method_} {status_color}{self.status_code.replace(to_replace, ' ')}{reset_color}")
+        PrintLine(text=f"{bold_white_color}{self.request.first_line} {status_color}{self.status_code.replace(to_replace, ' ')}{reset_color}")
         return response.encode() + self.response_content

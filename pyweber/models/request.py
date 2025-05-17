@@ -1,259 +1,361 @@
-from urllib.parse import urlparse, parse_qs
+import re
+import cgi
+import json
+from enum import Enum
+from io import BytesIO
+from typing import Union
+from urllib.parse import parse_qs
+from pyweber.utils.types import ContentTypes
+
+class RequestMode(Enum):
+    asgi = 'asgi'
+    wsgi = 'wsgi'
+
+    def __repr__(self):
+        return self.value
+
+class Header:
+    def __init__(
+        self,
+        url: str,
+        method: str = 'GET',
+        content_type: ContentTypes = ContentTypes.html,
+        content_length: int = None,
+        cookie: dict[str, str] = None,
+        user_agent: str = None,
+        http_version: str = 1.1,
+        **headers: str
+    ):
+        self.url = url
+        self.method = method
+        self.content_type = content_type
+        self.content_length = content_length
+        self.cookie = cookie or {}
+        self.user_agent = user_agent
+        self.http_version = http_version
+        self.kwargs = headers
+    
+    @property
+    def cookie(self): return self.__cookie
+    @property
+    def user_agent(self): return self.__user_agent
+    @property
+    def content_length(self): return self.__content_length
+    @property
+    def content_type(self): return self.__content_type
+    @property
+    def method(self): return self.__method
+    @property
+    def url(self): return self.__url
+    @property
+    def http_version(self): return self.__http_version
+    @property
+    def host(self): return self.__host
+    @property
+    def path(self): return self.__path
+
+    @http_version.setter
+    def http_version(self, value: float):
+        if value not in [1.0, 1.1, 2.0]:
+            raise ValueError('http_version is not valid, must be 1.0, 1.1 or 2.0 instead')
+        
+        self.__http_version = f'HTTP/{str(value)}'
+
+    @cookie.setter
+    def cookie(self, value: dict[str, str]):
+        if value and not isinstance(value, dict):
+            raise TypeError(self.__typeerror_sentence(var='cookie', t='dict'))
+        
+        self.__cookie = '&'.join([f'{k}={v}' for k, v in value.items()])
+    
+    @content_type.setter
+    def content_type(self, value: ContentTypes):
+        if not value:
+            value = ContentTypes.html
+        
+        if not isinstance(value, ContentTypes):
+            raise TypeError(self.__typeerror_sentence(var='content_type', t='ContentTypes'))
+        
+        self.__content_type = value.value
+    
+    @user_agent.setter
+    def user_agent(self, value: str):
+        if value and not isinstance(value, str):
+            raise TypeError(self.__typeerror_sentence(var='user_agent', t='str'))
+        
+        self.__user_agent = value
+    
+    @content_length.setter
+    def content_length(self, value: int):
+        if value and not isinstance(value, int):
+            raise TypeError(self.__typeerror_sentence(var='content_length', t='int'))
+        
+        self.__content_length = value or 0
+    
+    @method.setter
+    def method(self, value: str):
+        if not value:
+            value = 'GET'
+        
+        self.__method = str(value).upper()
+    
+    @url.setter
+    def url(self, value: str):
+        if not value:
+            raise ValueError('url must not be an empty value')
+        
+        pattern = r'''
+            ^(
+                (?:http://|https://|www.|ftp://) # prefix
+                (?:
+                    (?:[a-zA-Z0-9]*[a-zA-Z0-9\-\.]*[a-zA-Z0-9](?:\.[a-zA-Z]{1,5})) # domain
+                    |
+                    (?:\d{1,3}(?:\.\d{1,3}){3}|localhost) # host ipv4 
+                )
+                (?::(\d+))? # port
+            )
+            (/[^\s]*)?
+            $
+        '''
+
+        validate_url = re.match(pattern, value, re.VERBOSE)
+        if validate_url is None:
+            raise ValueError(f'{value} is not valid url')
+        
+        self.__host = validate_url.group(1)
+        self.__path = validate_url.group(3) or '/'
+        self.__url = value
+    
+    @property
+    def text(self):
+        t = f'{self.method.upper()} {self.path} {self.http_version}\r\n'
+        t += f'{str('Host:'):<18} {self.host}\r\n'
+
+        for key, value in self.__dict__.items():
+            if value:
+                if value in [self.host, self.path, self.url, self.method]:
+                    continue
+
+                if isinstance(value, dict):
+                    for k, v in value.items():
+                        header_name=f'{str(k).removeprefix('_Header__').replace('_', '-').capitalize()}:'
+                        t += f'{header_name:<18} {v}\r\n'
+                    
+                    continue
+
+                header_name=f'{str(key).removeprefix('_Header__').replace('_', '-').capitalize()}:'
+                t += f'{header_name:<18} {value}\r\n'
+        
+        return t
+    
+    @property
+    def json(self) -> dict[str, tuple[str, str]]:
+        j, v = {}, []
+        for key, value in self.__dict__.items():
+            if value:
+                if isinstance(value, dict):
+                    for k, i in value.items():
+                        v.append((str(k).removeprefix('_Header__').replace('_', '-').encode(), str(i).encode()))
+                    continue
+
+                v.append((str(key).removeprefix('_Header__').replace('_', '-').encode(), str(value).encode()))
+        
+        j['headers'] = v
+
+        return j
+    
+    def __typeerror_sentence(self, var: str, t=str):
+        return f'{var} must be a {t} instances, but got {type(var).__name__}'
+
+class File:
+    def __init__(self, file: cgi.FieldStorage):
+        self.filename = file.filename
+        self.content = file.value
+        self.size = len(self.content)
+        self.type = file.type
+    
+    def __len__(self):
+        return self.size
+    
+    def __repr__(self):
+        return f'File(filename={self.filename}, size={self.size}, type={self.type})'
 
 class Request:
-    def __init__(self, raw_request: str):
-        self.__raw_request = raw_request.strip().splitlines()
-        self.method: str = self.__get_method
-        self.path: str = self.__get_path
-        self.netloc: str = self.__get_netloc
-        self.user_agent: str = self.__get_user_agent
-        self.host: str = self.__get_host
-        self.cookies: dict[str, str] = self.__get_cookies
-        self.referer: str = self.__get_referer
-        self.accept: list[str] = self.__get_accept
-        self.accept_encoding: list[str] = self.__get_accept_encoding
-        self.accept_language: list[str] = self.__get_accept_language
-        self.authorization: str = self.__get_authorization
-        self.params: dict[str, None] = self.__get_params
-        self.fragment: str = self.__get_fragment
-        self.session_id: str = self.__get_session_id
-    
-    @property
-    def __get_method(self):
-        lines = self.__split_lines().split()
-        if lines:
-            method = lines[0].strip()
-            return  method if method in self.__http_methods else None
-        
-        return None
-    
-    @property
-    def __get_path(self):
-        if self.method:
-            path_line = self.__split_lines(splitter=self.method).split()
-            if self.__get_netloc and not any('/' in l for l in path_line):
-                return '/'
+    def __init__(self, headers: Union[str, dict[str, Union[tuple[str, str], str]]], body: Union[bytes] = None):
+        if isinstance(headers, str):
+            self.request_mode = RequestMode.wsgi
+            self.__raw_request_wsgi = headers
+            self.__raw_headers = headers
+            self.__raw_body = body
+
+        elif isinstance(headers, dict):
+            self.request_mode = RequestMode.asgi
+            self.__raw_request_asgi = headers
+            self.__raw_body = body or b''
+            self.__raw_headers: list[tuple[bytes, bytes]] = headers.get('headers', [])
             
-            return self.include_scheme(path_line[0]).path.strip() if path_line else None
-
-        return None
-    
-    @property
-    def __get_params(self):
-        if self.method:
-            path_line = self.__split_lines(splitter=self.method).split()
-            params = path_line[0].split('?')
-
-            if len(params) > 1:
-                par = params[-1].split('#')[0]
-                return {val.split('=')[0]:val.split('=')[1] for val in par.split('&')}
+        else:
+            raise TypeError('Request type does not valid')
         
-        return {}
+        self.__additions_headers()
     
     @property
-    def __get_fragment(self):
-        if self.method:
-            path_line = self.__split_lines(splitter=self.method).split()
-            params = path_line[0].split('#')
-
-            if len(params) > 1:
-                    return params[-1]
+    def request_mode(self):
+        return self.__request_mode
+    
+    @request_mode.setter
+    def request_mode(self, value):
+        if not isinstance(value, RequestMode):
+            raise TypeError('Request mode does not valid')
         
-        return None
+        self.__request_mode = value
+        
+    @property
+    def raw_request(self):
+        if self.request_mode.value == 'asgi':
+            return self.__raw_request_asgi
+        
+        return self.__raw_request_wsgi
     
     @property
-    def __get_netloc(self):
-        if self.method:
-            path_line = self.__split_lines(splitter=self.method).split()
-            return self.include_scheme(path_line[0]).netloc.strip() if path_line else None
-        return None
+    def host(self):
+        return self.headers.get('host')
     
     @property
-    def __get_host(self):
-        return self.__split_lines(splitter='Host:') or None
+    def port(self):
+        try:
+            return int(self.headers.get('host', '0').split(':')[-1])
+        except:
+            return 0
+    
+    @property
+    def content_length(self):
+        return int(self.headers.get('content-length'))
+    
+    @property
+    def content_type(self):
+        return self.headers.get('content-type', '')
+    
+    @property
+    def user_agent(self):
+        return self.headers.get('user-agent')
+    
+    @property
+    def origin(self):
+        return self.headers.get('origin')
+    
+    @property
+    def referrer(self):
+        return self.headers.get('referrer')
+    
+    @property
+    def accept(self):
+        return [val.strip().split(';') for val in self.headers.get('accept', '').split(',') if val]
+    
+    @property
+    def accept_encoding(self):
+        return [val.strip().split(';') for val in self.headers.get('accept-encoding', '').split(',') if val]
+    
+    @property
+    def accept_language(self):
+        return [val.strip().split(';') for val in self.headers.get('accept-language', '').split(',') if val]
+    
+    @property
+    def cookies(self):
+        return {cookie.split('=')[0]: cookie.split('=')[-1] for cookie in self.headers.get('cookie', '').split(';') if cookie}
 
     @property
-    def __get_user_agent(self):
-        return self.__split_lines('User-Agent:') or None
-    
-    @property
-    def __get_referer(self):
-        return self.__split_lines('Referer:') or None
-    
-    @property
-    def __get_authorization(self):
-        return self.__split_lines('Authorization:') or None
-    
-    @property
-    def __get_session_id(self):
-        return self.__split_lines('Session-ID:') or None
-    
-    @property
-    def __get_cookies(self) -> dict[str, str]:
-        cookies = self.__split_lines('Cookie:')
-        if cookies:
-            return {cookie.split('=')[0]: cookie.split('=')[1].strip() for cookie in cookies.split(';')}
+    def headers(self):
+        if self.request_mode.value == 'asgi':
+            return {header[0].decode(): header[1].decode() for header in self.__raw_headers}
         
-        return {}
+        return self.__parse_headers_wsgi()
     
     @property
-    def __get_accept(self) -> list[str]:
-        return self.__split_list(splitter='Accept:', sep=',')
+    def body(self) -> Union[str, dict[str, Union[list[File], str]]]:
+        if self.content_type == ContentTypes.json.value:
+            return json.loads(self.__raw_body)
+        elif self.content_type == ContentTypes.form_encode.value:
+            return {key: '; '.join(value) for key, value in parse_qs(self.__raw_body).items()}
+        elif ContentTypes.form_data.value in self.content_type:
+            return self.__parse_form_data_wsgi()
+        else:
+            return self.__raw_body
     
     @property
-    def __get_accept_encoding(self):
-        return self.__split_list(splitter='Accept-Encoding:', sep=',')
+    def first_line(self):
+        if self.request_mode.value == 'wsgi':
+            return self.__raw_headers.split(self.__line_splitter, 1)[0].strip()
+        
+        full_path = f'{self.path}?{'&'.join([f'{key}={value}' for key, value in self.query_params.items()])}' if self.query_params else self.path
+        return f'{self.method} {full_path} {self.scheme}'
     
-    @property
-    def __get_accept_language(self) -> list[str]:
-        return self.__split_list(splitter='Accept-Language:', sep=',')
-    
-    @property
-    def __http_methods(self) -> list[str]:
-        return ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE", "CONNECT"]
-    
-    def __split_list(self, splitter: str, sep: str) -> list[str]:
-        value_string = self.__split_lines(splitter=splitter)
-        if value_string:
-            return [value.strip() for value in value_string.split(sep=sep)]
+    def __parse_form_data_wsgi(self) -> dict[str, list[str | File] | str]:
+        boundary_match = re.search(r'boundary=(.+)', self.content_type)
+        if not boundary_match:
+            return {}
 
-        return []
+        boundary = boundary_match.group(1)
+        environ = {
+            'REQUEST_METHOD': self.method,
+            'CONTENT_TYPE': self.content_type,
+            'CONTENT_LENGTH': str(len(self.__raw_body.encode() if isinstance(self.__raw_body, str) else self.__raw_body))
+        }
 
-    def __split_lines(self, splitter: str = '') -> str:
-        for line in self.__raw_request:
-            if splitter in line:
-                return line.removeprefix(splitter).strip()
+        fp = BytesIO(self.__raw_body.encode() if isinstance(self.__raw_body, str) else self.__raw_body)
+        form = cgi.FieldStorage(
+            fp=fp,
+            environ=environ,
+            headers={'content-type': self.content_type},
+            keep_blank_values=True
+        )
+
+        data: dict[str, list[str | File]] = {}
+        for key in form.keys():
+            field = form[key]
+
+            if isinstance(field, list):
+                # Pode conter arquivos ou campos múltiplos com mesmo nome
+                items = []
+                for item in field:
+                    if item.filename:
+                        items.append(File(item))  # seu wrapper
+                    else:
+                        items.append(item.value)
+                data[key] = items
+            elif field.filename:
+                data[key] = [File(field)]
+            else:
+                data[key] = field.value
+
+        return data
+    
+    def __additions_headers(self):
+        if self.request_mode.value == 'asgi':
+            self.method: str = self.raw_request.get('method')
+            self.scheme: str = f"{self.raw_request.get('scheme')}/{self.raw_request.get('http_version')}".lower()
+            self.path: str = self.raw_request.get('raw_path', b'').decode()
+            self.query_params = {key: ';'.join(val) for key, val in parse_qs(self.raw_request.get('query_string', b'').decode()).items() if val}
+
+        else:
+            line_info = self.raw_request.split(self.__line_splitter, 1)[0].split()
+            self.method = line_info[0] if len(line_info) > 0 else None
+            self.path = line_info[1].split('?', 1)[0] if len(line_info) >= 2 else None
+            self.scheme = line_info[2] if len(line_info) >= 3 else None
+            self.query_params = {key: ';'.join(val) for key, val in parse_qs(line_info[1].split('?', 1)[-1]).items() if val} if len(line_info) >= 2 else {}
         
-        return ''
+    def __parse_headers_wsgi(self) -> dict[str, str]:
+        return {header.split(':', 1)[0].strip().lower(): header.split(':', 1)[-1].strip() for header in self.__raw_headers.split(self.__line_splitter)[1::]}
     
     @property
-    def _get_line_method_(self):
-        return self.__split_lines()
+    def __line_splitter(self):
+        return '\r\n'
     
     @property
-    def get_url(self):
-        return self.__split_lines(splitter=self.method).split()[0]
-    
-    def include_scheme(self, url: str):
-        if not url.startswith(('https://', 'http://')):
-            url = 'http://' + url
-        
-        return urlparse(url)
-    
+    def request_parts_splitter(self):
+        return '\r\n\r\n'
+
     def __repr__(self):
-        return f"""
-Request(
-    method= {self.method}
-    path= {self.path}
-    net_loc= {self.netloc}
-    host= {self.host}
-    user_agent= {self.user_agent}
-    referer= {self.referer}
-    url= {self.get_url}
-    cookies= {self.cookies}
-    accept= {self.accept}
-    accept_encoding= {self.accept_encoding}
-    accept_language= {self.accept_language}
-    params= {self.params}
-    fragment= {self.fragment}
-)""".strip()
+        return f'Request(method={self.method}, mode={self.request_mode})'
 
-class RequestASGI:
-    def __init__(self, raw_request: dict):
-        self.__raw_request = raw_request
-        self.method: str = self.__get_method()
-        self.path: str = self.__get_path()
-        self.netloc: str = self.__get_netloc()
-        self.host: str = self.__get_host()
-        self.port: str = self.__get_port()
-        self.user_agent: str = self.__get_user_agent()
-        self.referer: str = self.__get_referer()
-        self.cookies: dict[str, str] = self.__get_cookies()
-        self.accept: list[str] = self.__get_accept()
-        self.accept_encoding: list[str] = self.__get_accept_encoding()
-        self.accept_language: list[str] = self.__get_accept_language()
-        self.authorization: str = self.__get_authorization()
-        self.params: dict[str, list[str]] = self.__get_params()
-        self.fragment: str = self.__get_fragment()
-        self.session_id: str = self.__get_session_id()
-    
-    def __get_method(self):
-        return self.__raw_request.get("method", "").upper()
-    
-    def __get_path(self) -> str:
-        return self.__raw_request.get("path", "")
-    
-    def __get_netloc(self):
-        scheme = self.__get_path().split(':', 1)[0]
-        return scheme if scheme in ['http', 'https'] else None
-    
-    def __get_host(self):
-        for key, value in self.__raw_request.get("headers", []):
-            if key == b"host":
-                return value.decode().split(":")[0]
-        return ""
-    
-    def __get_port(self):
-        return self.__raw_request.get('server')[-1]
-    
-    def __get_user_agent(self):
-        return self.__get_header(b"user-agent")
-    
-    def __get_referer(self):
-        return self.__get_header(b"referer")
-    
-    def __get_authorization(self):
-        return self.__get_header(b"authorization")
-    
-    def __get_session_id(self):
-        return self.__get_header(b"session-id")
-    
-    def __get_cookies(self):
-        cookie_header = self.__get_header(b"cookie")
-        if cookie_header:
-            return {c.split("=")[0]: c.split("=")[1] for c in cookie_header.split("; ")}
-        return {}
-    
-    def __get_accept(self):
-        return self.__split_header(b"accept", ",")
-    
-    def __get_accept_encoding(self):
-        return self.__split_header(b"accept-encoding", ",")
-    
-    def __get_accept_language(self):
-        return self.__split_header(b"accept-language", ",")
-    
-    def __get_params(self):
-        query_string = self.__raw_request.get("query_string", b"").decode()
-        return parse_qs(query_string)
-    
-    def __get_fragment(self):
-        return None  # ASGI requests geralmente não incluem fragmentos
-    
-    def __get_header(self, key: bytes):
-        for h_key, h_value in self.__raw_request.get("headers", []):
-            if h_key == key:
-                return h_value.decode()
-        return ""
-    
-    def __split_header(self, key: bytes, separator: str):
-        header_value = self.__get_header(key)
-        return [v.strip() for v in header_value.split(separator)] if header_value else []
-    
-    def __repr__(self):
-        return f"""
-RequestASGI(
-    method={self.method}
-    path={self.path}
-    netloc={self.netloc}
-    host={self.host}
-    user_agent={self.user_agent}
-    referer={self.referer}
-    url={self.path}
-    cookies={self.cookies}
-    accept={self.accept}
-    accept_encoding={self.accept_encoding}
-    accept_language={self.accept_language}
-    params={self.params}
-    fragment={self.fragment}
-)""".strip()
+request: Request = None

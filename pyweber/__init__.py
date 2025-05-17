@@ -20,9 +20,12 @@ from .core.window import window
 
 # pyweber models
 from .models.response import Response
+from .models.routes import Route
 from .models.request import (
+    Header,
     Request,
-    RequestASGI
+    File,
+    request
 )
 
 # pyweber events
@@ -98,8 +101,11 @@ __all__ = [
     'Pyweber',
     'run',
     'run_as_asgi',
+    'Route',
+    'Header',
+    'File',
     'Request',
-    'RequestASGI',
+    'request',
     'Response',
     'TemplateEvents',
     'WindowEvents',

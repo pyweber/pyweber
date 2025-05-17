@@ -49,7 +49,6 @@ function connectWebSocket() {
             return;
         };
         
-
         // Window methods
         if (data.alert) {
             window.alert(data.alert);
@@ -228,24 +227,24 @@ function applyDifferences(differences) {
                 if (toRemove) toRemove.remove();
                 break;
                 
-                case 'Changed':
-                    let uuid;
-                    if (typeof diff.element === 'string' && diff.element.startsWith('<')) {
-                        const match = diff.element.match(/uuid=['"]([^'"]+)['"]/);
-                        uuid = match ? match[1] : null;
-                    } else {
-                        uuid = diff.element;
+            case 'Changed':
+                let uuid;
+                if (typeof diff.element === 'string' && diff.element.startsWith('<')) {
+                    const match = diff.element.match(/uuid=['"]([^'"]+)['"]/);
+                    uuid = match ? match[1] : null;
+                } else {
+                    uuid = diff.element;
+                }
+                
+                if (uuid) {
+                    const toChange = parentElement.querySelector(`[uuid="${uuid}"]`);
+                    if (toChange) {
+                        const temp = document.createElement('div');
+                        temp.innerHTML = diff.element;
+                        toChange.parentNode.replaceChild(temp.firstChild, toChange);
                     }
-                    
-                    if (uuid) {
-                        const toChange = parentElement.querySelector(`[uuid="${uuid}"]`);
-                        if (toChange) {
-                            const temp = document.createElement('div');
-                            temp.innerHTML = diff.element;
-                            toChange.parentNode.replaceChild(temp.firstChild, toChange);
-                        }
-                    }
-                    break;
+                }
+                break;
         }
     });
 }
