@@ -20,9 +20,12 @@ from .core.window import window
 
 # pyweber models
 from .models.response import Response
-from .models.routes import Route
+from .models.routes import (
+    Route,
+    RedirectRoute
+)
 from .models.request import (
-    Header,
+    Headers,
     Request,
     File,
     request
@@ -102,7 +105,8 @@ __all__ = [
     'run',
     'run_as_asgi',
     'Route',
-    'Header',
+    'RedirectRoute',
+    'Headers',
     'File',
     'Request',
     'request',

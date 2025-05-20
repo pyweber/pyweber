@@ -5,6 +5,7 @@ from pyweber.models.response import Response
 from pyweber.core.element import Element
 from pyweber.core.template import Template
 from pyweber.utils.types import HTTPStatusCode
+from pyweber.models.routes import RouteManager
 
 class MiddlewareManager:
     def __init__(self):
@@ -37,22 +38,24 @@ class MiddlewareManager:
     def clear_after_request_middleware(self):
         self.__after_request.clear()
     
-    async def process_middleware(self, resp: Union[Request, Response], middlewares: list[dict[str, Union[int, Callable]]]) -> None | tuple[int, Response | Template | Element | str | dict]:
+    async def process_middleware(self, resp: Union[Request, Response, str], middlewares: list[dict[str, Union[int, Callable]]]) -> None | tuple[int, Response | Template | Element | str | dict]:
         for middle_dict in middlewares:
             status_code, middle, _ = middle_dict.values()
-            params = inspect.signature(middle).parameters
-            args, kwargs = [], {}
 
-            for name, param in params.items():
-                if param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY):
-                    args.append(resp)
-                elif param.kind == inspect.Parameter.KEYWORD_ONLY:
-                    kwargs[name] = resp
+            variables = RouteManager.inspect_function(callback=middle)
+            var = []
+
+            for vars in variables:
+                for k in vars.keys():
+                    var.append(k)
             
+            kwargs = {key: resp for key in var}
+            kwargs = RouteManager.validate_callable_args(middle, **kwargs)
+
             if inspect.iscoroutinefunction(middle):
-                response = await middle(*args, **kwargs)
+                response = await middle(**kwargs)
             else:
-                response = middle(*args, **kwargs)
+                response = middle(**kwargs)
 
             if response:
                 return status_code, response

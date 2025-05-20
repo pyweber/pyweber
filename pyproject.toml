@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyweber"
-version = "0.9.80"
+version = "0.9.90"
 description = "A lightweight Python framework for building and managing web applications."
 readme = "README.md"
 authors = [

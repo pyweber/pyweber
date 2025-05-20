@@ -14,7 +14,7 @@ class RequestMode(Enum):
     def __repr__(self):
         return self.value
 
-class Header:
+class Headers:
     def __init__(
         self,
         url: str,
@@ -182,6 +182,9 @@ class File:
 
 class Request:
     def __init__(self, headers: Union[str, dict[str, Union[tuple[str, str], str]]], body: Union[bytes] = None):
+        if isinstance(headers, Headers):
+            headers = headers.text
+
         if isinstance(headers, str):
             self.request_mode = RequestMode.wsgi
             self.__raw_request_wsgi = headers
@@ -276,7 +279,7 @@ class Request:
         if self.content_type == ContentTypes.json.value:
             return json.loads(self.__raw_body)
         elif self.content_type == ContentTypes.form_encode.value:
-            return {key: '; '.join(value) for key, value in parse_qs(self.__raw_body).items()}
+            return {key.decode(): '; '.join([v.decode() for v in value]) for key, value in parse_qs(self.__raw_body).items()}
         elif ContentTypes.form_data.value in self.content_type:
             return self.__parse_form_data_wsgi()
         else:

@@ -1,5 +1,7 @@
 import inspect
 import json
+import os
+import re
 import webbrowser
 from datetime import datetime
 from typing import Union, Callable, Literal
@@ -15,8 +17,11 @@ from pyweber.core.window import window
 from pyweber.models.middleware import MiddlewareManager
 from pyweber.models.error_pages import ErrorPages
 from pyweber.models.cookies import CookieManager
-from pyweber.models.routes import RouteManager
-from pyweber.models.routes import Route
+from pyweber.models.routes import (
+    Route,
+    RedirectRoute,
+    RouteManager
+)
 
 
 class Pyweber:
@@ -28,6 +33,7 @@ class Pyweber:
         self.error_pages = ErrorPages()
         self.__add_framework_routes()
         self.data = None
+        self.__visited__ = set()
     
     # Error pages
 
@@ -95,14 +101,16 @@ class Pyweber:
     
     @property
     def list_routes(self): return self.__route_manager.list_routes
+    @property
+    def list_redirected_routes(self): return self.__route_manager.list_redirected_routes
 
     def exists(self, route: str): return self.__route_manager.exists(route=route)
     def is_redirected(self, route: str): return self.__route_manager.is_redirected(route=route)
-    def route_info(self, route: str, group: str): return self.__route_manager.route_info(route=route, group=group)
-    def full_route(self, route: str, group: str): return self.__route_manager.full_route(route=route, group=group)
+    def route_info(self, target: str): return self.__route_manager.route_info(target=target)
+    def full_route(self, route: str, group: str=None): return self.__route_manager.full_route(route=route, group=group)
 
     def clear_routes(self): return self.__route_manager.clear_routes()
-    def remove_route(self, route: str, group: str): return self.__route_manager.remove_route(route=route, group=group)
+    def remove_route(self, route: str, group: str=None): return self.__route_manager.remove_route(route=route, group=group)
     def remove_redirected_route(self, route: str): return self.__route_manager.remove_redirected_route(route=route)
 
     def add_group_routes(self, routes: list[str], group: str = None): return self.__route_manager.add_group_routes(routes=routes, group=group)
@@ -110,20 +118,31 @@ class Pyweber:
     def get_group_routes(self, group: str = None): return self.__route_manager.get_group_routes(group=group)
     def get_group_by_route(self, route: str): return self.__route_manager.get_group_by_route(route=route)
 
-    def get_route_by_path(self, route: str): return self.__route_manager.get_route_by_path(route=route)
+    def get_route_by_path(self, route: str, follow_redirect: bool = True): return self.__route_manager.get_route_by_path(route=route, follow_redirect=follow_redirect)
     def get_route_by_name(self, name: str): return self.__route_manager.get_route_by_name(name=name)
     def get_redirected_route(self, route: str): return self.__route_manager.get_redirected_route(route=route)
 
     def resolve_path(self, route: str): return self.__route_manager.resolve_path(route=route)
+    def build_route(self, route: str, **kwargs): return self.__route_manager.build_route(route=route, **kwargs)
 
-    def route(self, route: str, methods: list[str] = None, group: str = None, name: str = None, middlewares: list[str] = None, status_code: int = None):
+    def route(
+        self,
+        route: str,
+        methods: list[str] = None,
+        group: str = None,
+        name: str = None,
+        middlewares: list[str] = None,
+        status_code: int = None,
+        content_type: ContentTypes = None
+    ):
         return self.__route_manager.route(
             route=route,
             methods=methods,
             group=group,
             name=name,
             middlewares=middlewares,
-            status_code=status_code
+            status_code=status_code,
+            content_type=content_type
         )
     
     def add_route(
@@ -134,7 +153,8 @@ class Pyweber:
         group: str = None,
         name: str = None,
         middlewares: list[Callable] = None,
-        status_code: int = None
+        status_code: int = None,
+        content_type: ContentTypes = None
     ):
         return self.__route_manager.add_route(
             route=route,
@@ -143,17 +163,23 @@ class Pyweber:
             group=group,
             name=name,
             middlewares=middlewares,
-            status_code=status_code
+            status_code=status_code,
+            content_type=content_type
         )
     
     def update_route(self, route: str, group: str=None, **kwargs):
         return self.__route_manager.update_route(route=route, group=group, **kwargs)
     
-    def redirect(self, from_route: str, to_route: str, group: str):
-        return self.__route_manager.redirect(from_route=from_route, to_route=to_route, group=group)
+    def redirect(self, from_route: str, target: str, status_code: int = 302, **kwargs):
+        return self.__route_manager.redirect(from_route=from_route, target=target, status_code=status_code, **kwargs)
     
-    # Response
+    def to_route(self, target: str, status_code=302, **kwargs):
+        return self.__route_manager.to_route(target=target, status_code=status_code, **kwargs)
+    
+    def inspect_function(self, callback: Callable):
+        return self.__route_manager.inspect_function(callback=callback)
 
+    # Response
     async def get_response(self, request: Request):
         if not isinstance(request, Request):
             raise TypeError(f'request must be a Request instances, but got {type(request).__name__}')
@@ -173,20 +199,9 @@ class Pyweber:
                 route=request.path
             )
         
-        if self.is_file_requested(route=request.path):
-            status_code, content = self.get_static_files(route=request.path)
+        status_code, content_type, redirect_path, template = await self.get_template(route=request.path)
 
-            return Response(
-                request=request,
-                code=status_code,
-                response_content=content if isinstance(content, bytes) else str(content).encode(),
-                response_type=self.get_content_type(route=request.path),
-                route=request.path,
-                cookies=self.cookies
-            )
-        
-        status_code, template = await self.get_non_static_files(route=request.path, method=request.method)
-        content_type, content = self.template_to_bytes(template=template)
+        content_type, content = self.template_to_bytes(template=template, content_type=content_type)
         
         response = Response(
             request=request,
@@ -194,7 +209,7 @@ class Pyweber:
             code=status_code,
             cookies=self.cookies,
             response_type=content_type,
-            route=request.path
+            route=redirect_path
         )
         
         # process after request middlewares
@@ -209,8 +224,13 @@ class Pyweber:
         return response
     
     # Utils
-    def template_to_bytes(self, template: Union[Template, Element, dict, str]) -> tuple[ContentTypes, bytes]:
-        content_type = ContentTypes.html
+    def template_to_bytes(self, template: Union[Template, Element, dict, str, bytes], content_type: ContentTypes = ContentTypes.html) -> tuple[ContentTypes, bytes]:
+        template_str = None
+        template_bytes = b''
+
+        if not isinstance(content_type, ContentTypes):
+            PrintLine(template)
+            raise TypeError(f'content_type does not NoneType')
 
         if isinstance(template, Template):
             template_str = template.build_html()
@@ -219,12 +239,21 @@ class Pyweber:
         elif isinstance(template, dict):
             template_str = json.dumps(template)
             content_type = ContentTypes.json
+        elif isinstance(template, bytes):
+            template_bytes = template
+            content_type = content_type or ContentTypes.unkown
+        elif isinstance(template, str):
+            if content_type.value in ['text/html', 'text/plain']:
+                template_str = Template(template=template).build_html()
+                content_type = ContentTypes.html
+            else:
+                template_str = template
         else:
             template_str = Template(template=str(template)).build_html()
         
-        return content_type, template_str.encode()
-    
-    def is_file_requested(self, route: str): return '.' in route.split('?')[0].split('/')[-1]
+        template_bytes = template_str.encode() if isinstance(template_str, str) else template_bytes
+        
+        return content_type, template_bytes
 
     def get_content_type(self, route: str) -> ContentTypes:
         if self.is_file_requested(route=route):
@@ -234,84 +263,157 @@ class Pyweber:
                     return getattr(ContentTypes, ext)
             return ContentTypes.unkown
         return ContentTypes.html
-    
-    def get_static_files(self, route: str):
-        route, _ = self.resolve_path(route=route)
-        try:
-            if self.exists(route=route):
-                content =  LoadStaticFiles(path=self.get_route_by_path(route=route).template).load
-            else:
-                content = LoadStaticFiles(path=route).load
-            status_code =200
 
-        except:
-            content = b'File not found'
-            status_code = 404
-        
-        return status_code, content
-
-    async def get_non_static_files(self, route: str, method: str = 'GET'):
+    async def get_template(self, route: str):
         path, kwargs = self.resolve_path(route=route)
+        status_code, content_type, redirect_path, template = 404, ContentTypes.html, route, path
+        if self.exists(route=path):
+            status_code, _kwargs = 200, {}
 
-        if self.is_redirected(route=path) or self.exists(route=path):
             if self.is_redirected(route=path):
-                group, value = self.get_redirected_route(route=route).items()
-                path = self.full_route(route=value, group=group)
+                redirected_route = self.get_redirected_route(route=path)
+                _kwargs = redirected_route.kwargs
+                status_code = redirected_route.status_code
+                _route = redirected_route.route
+                kwargs = redirected_route.kwargs or kwargs
+                redirect_path = self.build_route(_route.full_route, **kwargs)
+            else:
+                _route = self.get_route_by_path(route=route, follow_redirect=False)
+            
+            template = _route.template
+            
+            kwargs = _kwargs or kwargs
+            status_code = status_code or _route.status_code
+            content_type = _route.content_type
 
-            _route = self.get_route_by_path(route=path)
+            if _route.middlewares:
+                self.__visited__.add(route)
+                _status_code, _template = await self.process_route_middleware(
+                    resp=route,
+                    middlewares=_route.middlewares,
+                    status_code=status_code
+                )
 
-            if str(method).upper() in _route.methods:
-                template = _route.template
-                status_code = _route.status_code if not self.is_redirected(route=path) else 302
+                if _template:
+                    return await self.final_response(
+                        template=_template,
+                        status_code=_status_code,
+                        redirect_path=redirect_path,
+                        content_type=content_type,
+                        **kwargs
+                    )
+                
+        if template == path:
+            status_code, content_type, template =  404, ContentTypes.html, self.error_pages.page_not_found
 
-                if _route.middlewares:
-                    route_middleware = await self.process_middleware(
-                        resp=route,
-                        middlewares=[
-                            {
-                                'status_code': None,
-                                'middleware': middleware,
-                                'order': None
-                            } for middleware in _route.middlewares
-                        ]
+        return await self.final_response(
+            template=template,
+            status_code=status_code,
+            redirect_path=redirect_path,
+            content_type=content_type,
+            **kwargs
+        )
+
+    async def final_response(self, template, status_code, content_type, redirect_path, **kwargs):
+        _status_code, _content_type, _redirect_path, template = await self.process_templates(template=template, **kwargs)
+
+        status_code = _status_code or status_code
+        redirect_path = _redirect_path or redirect_path
+        content_type = _content_type or content_type
+
+        if isinstance(template, str) and (self.is_static_file(route=template) or self.is_file_requested(route=template)):
+            content_type = self.get_content_type(route=self.normaize_path(route=template))
+            if self.is_static_file(route=template):
+                status_code = 200 if status_code == 404 else status_code
+                template = self.load_static_files(path=template)
+
+            else:
+                status_code, template = status_code, b'Not found'
+        
+        if isinstance(template, str):
+            if content_type.value in ['text/html', 'text/plain']:
+                template = Template(template=template)
+                content_type = ContentTypes.html
+
+        return status_code, content_type, redirect_path, template     
+
+    async def process_templates(self, template: Union[Callable, Template, Element, dict, str], **kwargs):
+        status_code: int = None
+        content_type: ContentTypes = None
+        redirect_path = None
+
+        while callable(template) or isinstance(template, RedirectRoute):
+            if callable(template):
+                template = await template(**kwargs) if inspect.iscoroutinefunction(template) else template(**kwargs)
+            
+            if isinstance(template, RedirectRoute):
+                builded_route = self.build_route(route=template.route.full_route, **kwargs)
+
+                if builded_route in self.__visited__:
+                    raise RecursionError(f'Recursion detected for route {builded_route}')
+                self.__visited__.add(builded_route)
+
+                kwargs = template.kwargs or kwargs
+                status_code = status_code or template.status_code
+                content_type = template.route.content_type
+                redirect_path = builded_route
+                kwargs = template.kwargs or kwargs
+
+                if template.route.middlewares:
+                    status_code, template = await self.process_route_middleware(
+                        resp=builded_route,
+                        middlewares=template.route.middlewares,
+                        status_code=status_code
                     )
 
-                    if route_middleware:
-                        _, template = route_middleware
-                try:
-                    content = await self.process_templates(template=template, **kwargs)
-                except Exception as error:
-                    status_code = 500
-                    content = Template(template=self.error_pages.page_server_error.build_html(), error=str(error))
-                    PrintLine(error)
-            else:
-                status_code = 404
-                content = self.error_pages.page_not_found
+                    if not callable(template) or not isinstance(template, RedirectRoute):
+                        return await self.final_response(
+                            template=template,
+                            status_code=status_code,
+                            content_type=content_type,
+                            redirect_path=redirect_path,
+                            **kwargs
+                        )
+                
+                template = template.route.template
 
-        else:
-            status_code = 404
-            content = self.error_pages.page_not_found
-        
-        return status_code, content
-    
-    async def process_templates(self, template: Union[Callable, Response, Template, Element, dict, str], **kwargs):
-        if callable(template):
-            if inspect.iscoroutinefunction(template):
-                response: Template | Element | dict | str = await template(**kwargs)
-            else:
-                response: Template | Element | dict | str = template(**kwargs)
-            
-            template = response
-        
         if isinstance(template, Element):
             response = Template(template=template.to_html())
-        elif isinstance(template, str):
-            response = Template(template=template)
+        
         else:
             response = template
-
-        return response
+        
+        return status_code, content_type, redirect_path, response
     
+    async def process_route_middleware(self, resp: str, middlewares: list[Callable], status_code: int):
+        status_code, response = status_code, None
+        if isinstance(middlewares, list):
+            midd_resp = await self.process_middleware(
+                resp=resp,
+                middlewares=[{
+                    'status_code': status_code,
+                    'middleware': middleware,
+                    'order': None
+                } for middleware in middlewares]
+            )
+
+            if midd_resp:
+                status_code, response = midd_resp[0], midd_resp[-1]
+        
+        return status_code, response
+    
+    def is_file_requested(self, route: str):
+        return re.match(r".*(\.[a-zA-Z0-9]+)+$", route.split('?')[0].split('/')[-1]) is not None
+    
+    def is_static_file(self, route: str):
+        return os.path.isfile(self.normaize_path(route=route))
+    
+    def normaize_path(self, route: str):
+        return os.path.normpath(path=route.removeprefix('/'))
+    
+    def load_static_files(self, path: os.path):
+        return LoadStaticFiles(path=path).load
+
     def __add_framework_routes(self):
         self.add_group_routes(
             routes=[
@@ -321,29 +423,34 @@ class Pyweber:
                 ),
                 Route(
                     route='/_pyweber/admin/{uuid}/.css',
-                    template=str(StaticFilePath.admin_css_file.value)
+                    template=str(StaticFilePath.admin_css_file.value),
+                    content_type=ContentTypes.css
                 ),
                 Route(
                     route='/_pyweber/admin/{uuid}/.js',
-                    template=str(StaticFilePath.admin_js_file.value)
+                    template=str(StaticFilePath.admin_js_file.value),
+                    content_type=ContentTypes.js
                 ),
                 Route(
                     route='/_pyweber/static/favicon.ico',
-                    template=str(StaticFilePath.favicon_path.value.joinpath('favicon.ico'))
+                    template=str(StaticFilePath.favicon_path.value.joinpath('favicon.ico')),
+                    content_type=ContentTypes.ico
                 ),
                 Route(
                     route='/_pyweber/static/{uuid}/.css',
-                    template=str(StaticFilePath.pyweber_css.value)
+                    template=str(StaticFilePath.pyweber_css.value),
+                    content_type=ContentTypes.css
                 ),
                 Route(
                     route='/_pyweber/static/{uuid}/.js',
-                    template=str(StaticFilePath.js_base.value)
+                    template=str(StaticFilePath.js_base.value),
+                    content_type=ContentTypes.js
                 )
             ]
         )
     
     async def clone_template(self, route: str):
-        _, last_template = await self.get_non_static_files(route=route)
+        _, _, _, last_template = await self.get_template(route=route)
         
         return last_template.clone
 
