@@ -1,9 +1,11 @@
 # PyWeber Changelog
 
-## [0.9.8] - 2025-05-18
+## [0.9.9] - 2025-05-24
+---
 ### Bug Fixes
-- Corrigido erro ao serializar dados de formulario para dict de dados do formulário usando
-- Corrigido o erro ao tentar redirecionar rotas dinamicas.
+- Fixed error when serializing form data to form data dict using
+- Fixed error when trying to redirect dynamic routes.
+- Fixed error with `value` attribute of Elements that have events defined
 
 ## [0.9.7] - 2025-04-19
 ---

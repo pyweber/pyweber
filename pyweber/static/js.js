@@ -12,7 +12,10 @@ const EventRef = new Proxy(
 function connectWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.hostname;
+    const wsEnabled = window.PYWEBER_WS_ENABLED ?? false
     const wsPort = window.PYWEBER_WS_PORT || 8765;
+    const maxReconnectAttempts = 2
+    let reconnectAttemps = 0
     socket = new WebSocket(`${wsProtocol}//${wsHost}:${wsPort}`);
 
     socket.onopen = function() {
@@ -26,9 +29,12 @@ function connectWebSocket() {
     };
 
     socket.onclose = function() {
-        console.log('Websocket connection closed. Trying again in 1 second...');
-        setTimeout(connectWebSocket, 1000);
-        location.reload();
+        if (reconnectAttemps <= maxReconnectAttempts) {
+            reconnectAttemps ++;
+            console.log('Websocket connection closed. Trying again in 1 second...');
+            setTimeout(connectWebSocket, 1000);
+            location.reload();
+        };
     };
 
     socket.onmessage = function(event) {

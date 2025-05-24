@@ -192,9 +192,9 @@ class Template:
         childrens: list[HTMLPARSER.HtmlElement] = HTMLElement.getchildren()
         
         event_obj = TemplateEvents()
-        for key, value in events_dict.items():
+        for key, event in events_dict.items():
             if hasattr(event_obj, key):
-                setattr(event_obj, key, value)
+                setattr(event_obj, key, event)
 
         element = Element(
             tag=name,

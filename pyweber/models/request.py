@@ -1,11 +1,10 @@
 import re
-import cgi
 import json
 from enum import Enum
-from io import BytesIO
-from typing import Union
+from typing import Union, Optional
 from urllib.parse import parse_qs
 from pyweber.utils.types import ContentTypes
+from dataclasses import dataclass
 
 class RequestMode(Enum):
     asgi = 'asgi'
@@ -167,18 +166,102 @@ class Headers:
     def __typeerror_sentence(self, var: str, t=str):
         return f'{var} must be a {t} instances, but got {type(var).__name__}'
 
+@dataclass
+class Field:
+    name: Optional[str] = None
+    filename: Optional[str] = None
+    value: Optional[bytes] = b''
+    content_type: Optional[str] = None
+
+    def __repr__(self):
+        return f"Field(name={self.name}, value_length={len(self.value)})"
+
 class File:
-    def __init__(self, file: cgi.FieldStorage):
-        self.filename = file.filename
-        self.content = file.value
+    def __init__(self, field: Field):
+        self.filename = field.filename
+        self.content = field.value
         self.size = len(self.content)
-        self.type = file.type
+        self.content_type = field.content_type
     
     def __len__(self):
         return self.size
     
     def __repr__(self):
-        return f'File(filename={self.filename}, size={self.size}, type={self.type})'
+        return f'File(filename={self.filename}, size={self.size}, type={self.content_type})'
+
+class FieldStorage:
+    def __init__(self, content_type: str, callbacks: bytes):
+        self.boundary = content_type
+        self.callbacks = callbacks
+    
+    @property
+    def boundary(self) -> str: return self.__boundary
+
+    @boundary.setter
+    def boundary(self, value: str):
+        boundary = re.search(f"boundary=(.+)", value)
+        if not boundary:
+            raise TypeError('None boundary was detected')
+        
+        self.__boundary = boundary.group(1)
+    
+    @property
+    def callbacks(self): return self.__callbacks
+
+    @callbacks.setter
+    def callbacks(self, value: bytes):
+        if not value or not isinstance(value, bytes):
+            raise TypeError('callbacks must be bytes instances')
+        
+        if not value.startswith(f"--{self.boundary}\r\n".encode()) and not value.endswith(f"--{self.boundary}--\r\n".encode()):
+            raise ValueError(f'callbacks invalid for boundary {self.boundary}')
+        
+        self.__callbacks = value
+    
+    def fields(self) -> list[Field]:
+        init_delimiter = f"--{self.boundary}\r\n"
+        end_delimiter = f"--{self.boundary}--\r\n"
+
+        values = [
+            b.removesuffix('\r\n'.encode()) for b in self.callbacks.removeprefix(
+                init_delimiter.encode()
+            ).removesuffix(
+                end_delimiter.encode()
+            ).split(init_delimiter.encode())
+        ]
+
+        fids: list[Field] = []
+
+        for value in values:
+            k, _, v = value.partition("\r\n\r\n".encode())
+            keys = k.decode()
+
+            name = re.search(r"name=\"(.+)\"", keys)
+            filename = re.search(r"filename=\"(.+)\"", keys)
+            content_type = re.search(r"Content-Type: (.+)", keys)
+            field = Field()
+
+            if filename:
+                field.content_type = content_type.group(1)
+                field.name = name.group(1).split('";')[0]
+                field.filename = filename.group(1)
+                field.value = v
+
+                fids.append(field)
+            elif name:
+                field.name = name.group(1)
+                field.content_type = None
+                field.value = v.decode()
+                field.filename = None
+                fids.append(field)
+        
+        return fids
+    
+    def __len__(self):
+        return len(self.fields())
+    
+    def __repr__(self):
+        return f'FileStorage(files={self.__len__()})'
 
 class Request:
     def __init__(self, headers: Union[str, dict[str, Union[tuple[str, str], str]]], body: Union[bytes] = None):
@@ -281,7 +364,7 @@ class Request:
         elif self.content_type == ContentTypes.form_encode.value:
             return {key.decode(): '; '.join([v.decode() for v in value]) for key, value in parse_qs(self.__raw_body).items()}
         elif ContentTypes.form_data.value in self.content_type:
-            return self.__parse_form_data_wsgi()
+            return self.__parse_form_data()
         else:
             return self.__raw_body
     
@@ -292,46 +375,28 @@ class Request:
         
         full_path = f'{self.path}?{'&'.join([f'{key}={value}' for key, value in self.query_params.items()])}' if self.query_params else self.path
         return f'{self.method} {full_path} {self.scheme}'
-    
-    def __parse_form_data_wsgi(self) -> dict[str, list[str | File] | str]:
-        boundary_match = re.search(r'boundary=(.+)', self.content_type)
-        if not boundary_match:
-            return {}
 
-        boundary = boundary_match.group(1)
-        environ = {
-            'REQUEST_METHOD': self.method,
-            'CONTENT_TYPE': self.content_type,
-            'CONTENT_LENGTH': str(len(self.__raw_body.encode() if isinstance(self.__raw_body, str) else self.__raw_body))
-        }
+    def __parse_form_data(self):
+        fs = FieldStorage(self.content_type, callbacks=self.__raw_body)
+        body: dict[str, list[File] | str] = {}
 
-        fp = BytesIO(self.__raw_body.encode() if isinstance(self.__raw_body, str) else self.__raw_body)
-        form = cgi.FieldStorage(
-            fp=fp,
-            environ=environ,
-            headers={'content-type': self.content_type},
-            keep_blank_values=True
-        )
-
-        data: dict[str, list[str | File]] = {}
-        for key in form.keys():
-            field = form[key]
-
-            if isinstance(field, list):
-                # Pode conter arquivos ou campos múltiplos com mesmo nome
-                items = []
-                for item in field:
-                    if item.filename:
-                        items.append(File(item))  # seu wrapper
-                    else:
-                        items.append(item.value)
-                data[key] = items
-            elif field.filename:
-                data[key] = [File(field)]
+        for field in fs.fields():
+            if field.filename:
+                body.setdefault(field.name, []).append(
+                    File(field)
+                )
             else:
-                data[key] = field.value
+                if field.name in body:
+                    if not isinstance(body.get(field.name), list):
+                        last_value = body.pop(field.name)
+                        body.setdefault(field.name, []).append(last_value)
 
-        return data
+                    body[field.name].append(field.value)
+                else:
+                    body[field.name] = field.value 
+                
+        return body
+    
     
     def __additions_headers(self):
         if self.request_mode.value == 'asgi':

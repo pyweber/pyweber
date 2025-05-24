@@ -17,7 +17,7 @@ class Form(Element):
         childs: list[Input] = None,
         autocomplete: str = None,
         target: str = None,
-        enctype: str = None,
+        enctype: Literal['text/plain', 'multipart/form-data', 'application/x-www-form-urlencoded'] = 'application/x-www-form-urlencoded',
         accept_charset: None = None,
         rel: str = None,
         tabindex: int = None,

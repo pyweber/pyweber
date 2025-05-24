@@ -28,6 +28,8 @@ from .models.request import (
     Headers,
     Request,
     File,
+    FieldStorage,
+    Field,
     request
 )
 
@@ -108,6 +110,8 @@ __all__ = [
     'RedirectRoute',
     'Headers',
     'File',
+    'FieldStorage',
+    'Field',
     'Request',
     'request',
     'Response',
