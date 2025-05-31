@@ -471,11 +471,7 @@ class Pyweber:
         window.open(url=url, new_page=new_page)
         return Element(
             tag='p',
-            content=message or f"Redirected to {Element(
-                tag='a',
-                attrs={'href': url},
-                content=url
-            ).to_html()}"
+            content=message or f"Redirected to {Element( tag='a', attrs={'href': url}, content=url).to_html()}"
         )
     
     def run(self, target: Callable = None, **kwargs):
