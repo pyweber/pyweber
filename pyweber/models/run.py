@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Callable
 from pyweber.models.create_app import CreatApp
-from pyweber.models.request import Request, request
+from pyweber.models.request import Request
 from pyweber.connection.websocket import WsServerAsgi
 import os
 
@@ -48,8 +48,8 @@ def run(target: Callable = None, **kwargs):
     CreatApp(target=target, **kwargs).run()
 
 async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None):
+    from pyweber.models.request import request
     global WS_RUNNING
-    global request
 
     body = b""
     if scope["type"] == "http":

@@ -199,7 +199,10 @@ class Pyweber:
                 route=request.path
             )
         
-        status_code, content_type, redirect_path, template = await self.get_template(route=request.path)
+        status_code, content_type, redirect_path, template = await self.get_template(
+            route=request.path,
+            method=request.method
+        )
 
         content_type, content = self.template_to_bytes(template=template, content_type=content_type)
         
@@ -264,7 +267,7 @@ class Pyweber:
             return ContentTypes.unkown
         return ContentTypes.html
 
-    async def get_template(self, route: str):
+    async def get_template(self, route: str, method: str = 'GET'):
         path, kwargs = self.resolve_path(route=route)
         status_code, content_type, redirect_path, template = 404, ContentTypes.html, route, path
         if self.exists(route=path):
@@ -280,31 +283,35 @@ class Pyweber:
             else:
                 _route = self.get_route_by_path(route=route, follow_redirect=False)
             
-            template = _route.template
-            
-            kwargs = _kwargs or kwargs
-            status_code = status_code or _route.status_code
-            content_type = _route.content_type
+            if str(method).upper() in _route.methods:
+                template = _route.template
+                
+                kwargs = _kwargs or kwargs
+                status_code = status_code or _route.status_code
+                content_type = _route.content_type
 
-            if _route.middlewares:
-                self.__visited__.add(route)
-                _status_code, _template = await self.process_route_middleware(
-                    resp=route,
-                    middlewares=_route.middlewares,
-                    status_code=status_code
-                )
-
-                if _template:
-                    return await self.final_response(
-                        template=_template,
-                        status_code=_status_code,
-                        redirect_path=redirect_path,
-                        content_type=content_type,
-                        **kwargs
+                if _route.middlewares:
+                    self.__visited__.add(route)
+                    _status_code, _template = await self.process_route_middleware(
+                        resp=route,
+                        middlewares=_route.middlewares,
+                        status_code=status_code
                     )
+
+                    if _template:
+                        return await self.final_response(
+                            template=_template,
+                            status_code=_status_code,
+                            redirect_path=redirect_path,
+                            content_type=content_type,
+                            **kwargs
+                        )
                 
         if template == path:
-            status_code, content_type, template =  404, ContentTypes.html, self.error_pages.page_not_found
+            if self.is_static_file(route=path):
+                status_code, content_type, template = 200, self.get_content_type(route=path), self.load_static_files(path=path)
+            else:
+                status_code, content_type, template =  404, ContentTypes.html, self.error_pages.page_not_found
 
         return await self.final_response(
             template=template,
@@ -460,8 +467,16 @@ class Pyweber:
     def launch_url(self, url: str, new_page: bool = False):
         return webbrowser.open(url=url, new=new_page)
     
-    def to_url(self, url: str, new_page: bool = False):
-        return window.open(url=url, new_page=new_page)
+    def to_url(self, url: str, new_page: bool = False, message: str = None):
+        window.open(url=url, new_page=new_page)
+        return Element(
+            tag='p',
+            content=message or f'Redirected to {Element(
+                tag='a',
+                attrs={'href': url},
+                content=url
+            ).to_html()}'
+        )
     
     def run(self, target: Callable = None, **kwargs):
         from pyweber.models.run import run

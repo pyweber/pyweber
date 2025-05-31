@@ -7,7 +7,7 @@ import shutil
 import asyncio
 from threading import Thread
 from pyweber.pyweber.pyweber import Pyweber
-from pyweber.models.request import Request, request
+from pyweber.models.request import Request
 from pyweber.utils.utils import PrintLine, Colors
 from typing import TYPE_CHECKING, Callable
 
@@ -33,7 +33,7 @@ class HttpServer:
         self.__app = value
     
     def is_file_request(self, request: Request):
-        return '.' in request.path.split('/')[-1] if request.path else ''
+        return self.app.is_file_requested(route=request.path)
     
     def setup_ssl(self, cert_file: str, key_file: str):
         self.ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -77,7 +77,7 @@ class HttpServer:
         return header_bytes, body
 
     async def handle_response(self, client: socket.socket | ssl.SSLSocket):
-        global request
+        from pyweber.models.request import request
         
         try:
             request_tuple = await self.process_request(client=client)

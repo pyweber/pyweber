@@ -1,6 +1,12 @@
 # PyWeber Changelog
 
-## [0.9.9] - 2025-05-24
+## [0.9.92] - 2025-05-29
+---
+### Bug Fixes
+- Fixed request validation method using https methods
+- Fixed error when accessing static files
+
+## [0.9.90] - 2025-05-24
 ---
 ### Bug Fixes
 - Fixed error when serializing form data to form data dict using
