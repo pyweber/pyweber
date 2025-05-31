@@ -1,0 +1,46 @@
+name: Run Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+        pip install pytest-cov
+        pip install coveralls
+        pip install .
+    
+    - name: Run tests and send coverage to Coveralls
+      run: |
+        source venv/bin/activate
+        pytest --cov=pyweber --cov-report=term-missing --disable-warnings
+        coveralls
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Run tests
+      run: |
+        source venv/bin/activate
+        pytest tests --maxfail=1 --disable-warnings -q
