@@ -373,7 +373,7 @@ class Request:
         if self.request_mode.value == 'wsgi':
             return self.__raw_headers.split(self.__line_splitter, 1)[0].strip()
         
-        full_path = f"{self.path}?{'&'.join([f"{key}={value}" for key, value in self.query_params.items()])}" if self.query_params else self.path
+        full_path = f"{self.path}?{'&'.join(['{key}={value}'.format(key=key, value=value) for key, value in self.query_params.items()])}" if self.query_params else self.path
         return f"{self.method} {full_path} {self.scheme}"
 
     def __parse_form_data(self):
