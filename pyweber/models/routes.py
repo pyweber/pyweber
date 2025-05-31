@@ -3,7 +3,6 @@ from pyweber.core.element import Element
 from pyweber.utils.types import HTTPStatusCode, ContentTypes
 
 import inspect
-import re
 from string import punctuation
 from pyweber.utils.exceptions import (
     InvalidRouteFormatError,
@@ -88,7 +87,7 @@ class Route:
         self.kwargs = kwargs
     
     @property
-    def full_route(self): return f'/{self.group.removeprefix('__')}{self.route}' if self.group != self.default_group() else self.route
+    def full_route(self): return f"/{self.group.removeprefix('__')}{self.route}" if self.group != self.default_group() else self.route
     
     @property
     def template(self): return self.__template

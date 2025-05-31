@@ -58,14 +58,14 @@ class Headers:
         if value not in [1.0, 1.1, 2.0]:
             raise ValueError('http_version is not valid, must be 1.0, 1.1 or 2.0 instead')
         
-        self.__http_version = f'HTTP/{str(value)}'
+        self.__http_version = f"HTTP/{str(value)}"
 
     @cookie.setter
     def cookie(self, value: dict[str, str]):
         if value and not isinstance(value, dict):
-            raise TypeError(self.__typeerror_sentence(var='cookie', t='dict'))
+            raise TypeError(self.__typeerror_sentence(var="cookie", t="dict"))
         
-        self.__cookie = '&'.join([f'{k}={v}' for k, v in value.items()])
+        self.__cookie = "&".join([f"{k}={v}" for k, v in value.items()])
     
     @content_type.setter
     def content_type(self, value: ContentTypes):
@@ -73,28 +73,28 @@ class Headers:
             value = ContentTypes.html
         
         if not isinstance(value, ContentTypes):
-            raise TypeError(self.__typeerror_sentence(var='content_type', t='ContentTypes'))
+            raise TypeError(self.__typeerror_sentence(var="content_type", t="ContentTypes"))
         
         self.__content_type = value.value
     
     @user_agent.setter
     def user_agent(self, value: str):
         if value and not isinstance(value, str):
-            raise TypeError(self.__typeerror_sentence(var='user_agent', t='str'))
+            raise TypeError(self.__typeerror_sentence(var="user_agent", t="str"))
         
         self.__user_agent = value
     
     @content_length.setter
     def content_length(self, value: int):
         if value and not isinstance(value, int):
-            raise TypeError(self.__typeerror_sentence(var='content_length', t='int'))
+            raise TypeError(self.__typeerror_sentence(var="content_length", t="int"))
         
         self.__content_length = value or 0
     
     @method.setter
     def method(self, value: str):
         if not value:
-            value = 'GET'
+            value = "GET"
         
         self.__method = str(value).upper()
     
@@ -119,16 +119,16 @@ class Headers:
 
         validate_url = re.match(pattern, value, re.VERBOSE)
         if validate_url is None:
-            raise ValueError(f'{value} is not valid url')
+            raise ValueError(f"{value} is not valid url")
         
         self.__host = validate_url.group(1)
-        self.__path = validate_url.group(3) or '/'
+        self.__path = validate_url.group(3) or "/"
         self.__url = value
     
     @property
     def text(self):
-        t = f'{self.method.upper()} {self.path} {self.http_version}\r\n'
-        t += f'{str('Host:'):<18} {self.host}\r\n'
+        t = f"{self.method.upper()} {self.path} {self.http_version}\r\n"
+        t += f"{str('Host:'):<18} {self.host}\r\n"
 
         for key, value in self.__dict__.items():
             if value:
@@ -137,13 +137,13 @@ class Headers:
 
                 if isinstance(value, dict):
                     for k, v in value.items():
-                        header_name=f'{str(k).removeprefix('_Header__').replace('_', '-').capitalize()}:'
-                        t += f'{header_name:<18} {v}\r\n'
+                        header_name=f"{str(k).removeprefix('_Header__').replace('_', '-').capitalize()}:"
+                        t += f"{header_name:<18} {v}\r\n"
                     
                     continue
 
-                header_name=f'{str(key).removeprefix('_Header__').replace('_', '-').capitalize()}:'
-                t += f'{header_name:<18} {value}\r\n'
+                header_name=f"{str(key).removeprefix('_Header__').replace('_', '-').capitalize()}:"
+                t += f"{header_name:<18} {value}\r\n"
         
         return t
     
@@ -154,17 +154,17 @@ class Headers:
             if value:
                 if isinstance(value, dict):
                     for k, i in value.items():
-                        v.append((str(k).removeprefix('_Header__').replace('_', '-').encode(), str(i).encode()))
+                        v.append((str(k).removeprefix("_Header__").replace("_", "-").encode(), str(i).encode()))
                     continue
 
-                v.append((str(key).removeprefix('_Header__').replace('_', '-').encode(), str(value).encode()))
+                v.append((str(key).removeprefix("_Header__").replace("_", "-").encode(), str(value).encode()))
         
-        j['headers'] = v
+        j["headers"] = v
 
         return j
     
     def __typeerror_sentence(self, var: str, t=str):
-        return f'{var} must be a {t} instances, but got {type(var).__name__}'
+        return f"{var} must be a {t} instances, but got {type(var).__name__}"
 
 @dataclass
 class Field:
@@ -187,7 +187,7 @@ class File:
         return self.size
     
     def __repr__(self):
-        return f'File(filename={self.filename}, size={self.size}, type={self.content_type})'
+        return f"File(filename={self.filename}, size={self.size}, type={self.content_type})"
 
 class FieldStorage:
     def __init__(self, content_type: str, callbacks: bytes):
@@ -223,7 +223,7 @@ class FieldStorage:
         end_delimiter = f"--{self.boundary}--\r\n"
 
         values = [
-            b.removesuffix('\r\n'.encode()) for b in self.callbacks.removeprefix(
+            b.removesuffix("\r\n".encode()) for b in self.callbacks.removeprefix(
                 init_delimiter.encode()
             ).removesuffix(
                 end_delimiter.encode()
@@ -373,8 +373,8 @@ class Request:
         if self.request_mode.value == 'wsgi':
             return self.__raw_headers.split(self.__line_splitter, 1)[0].strip()
         
-        full_path = f'{self.path}?{'&'.join([f'{key}={value}' for key, value in self.query_params.items()])}' if self.query_params else self.path
-        return f'{self.method} {full_path} {self.scheme}'
+        full_path = f"{self.path}?{'&'.join([f"{key}={value}" for key, value in self.query_params.items()])}" if self.query_params else self.path
+        return f"{self.method} {full_path} {self.scheme}"
 
     def __parse_form_data(self):
         fs = FieldStorage(self.content_type, callbacks=self.__raw_body)
@@ -424,6 +424,6 @@ class Request:
         return '\r\n\r\n'
 
     def __repr__(self):
-        return f'Request(method={self.method}, mode={self.request_mode})'
+        return f"Request(method={self.method}, mode={self.request_mode})"
 
 request: Request = None
