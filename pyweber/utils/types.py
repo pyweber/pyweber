@@ -1,13 +1,14 @@
 import os
 import json
 from enum import Enum
+from typing import Dict, Any, Union
 from importlib.resources import files
 
 class BaseStorage:
     def __init__(self, data: dict[str, (str, int)]):
         self.data = data or {}
 
-    def get(self, key: str, /, default: str = None):
+    def get(self, key: str, /, default: Any = None) -> Union[Dict[str, Any], Any]:
         try:
             return json.loads(self.data.get(key, default))
         except (TypeError, json.JSONDecodeError):
@@ -17,13 +18,20 @@ class BaseStorage:
         return self.data.keys()
     
     def values(self):
-        return self.data.values()
+        return self.__filter_data().values()
     
     def items(self):
-        return self.data.items()
+        return self.__filter_data().items()
+    
+    def __filter_data(self):
+        try:
+            return {key: json.loads(value) for key, value in self.data.items()}
+        
+        except (TypeError, json.JSONDecodeError):
+            return self.data
     
     def __repr__(self):
-        return repr(self.data)
+        return repr(self.__filter_data())
 
 class Colors:
     RESET = "\033[0m"

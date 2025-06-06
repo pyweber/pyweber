@@ -12,7 +12,6 @@ const EventRef = new Proxy(
 function connectWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.hostname;
-    const wsEnabled = window.PYWEBER_WS_ENABLED ?? false
     const wsPort = window.PYWEBER_WS_PORT || 8765;
     const maxReconnectAttempts = 2
     let reconnectAttemps = 0
@@ -223,9 +222,8 @@ function applyDifferences(differences) {
         
         switch(diff.status) {
             case 'Added':
-                const temp = document.createElement('div');
-                temp.innerHTML = diff.element;
-                parentElement.appendChild(temp.firstChild);
+                const temp = createElementFromHTML(diff.element);
+                parentElement.appendChild(temp);
                 break;
                 
             case 'Removed':
@@ -245,15 +243,41 @@ function applyDifferences(differences) {
                 if (uuid) {
                     const toChange = parentElement.querySelector(`[uuid="${uuid}"]`);
                     if (toChange) {
-                        const temp = document.createElement('div');
-                        temp.innerHTML = diff.element;
-                        toChange.parentNode.replaceChild(temp.firstChild, toChange);
+                        const temp = createElementFromHTML(diff.element);
+                        toChange.parentNode.replaceChild(temp, toChange);
                     }
                 }
                 break;
         }
     });
 }
+
+function createElementFromHTML(html) {
+    const containerMap = {
+        tr: ['table', 'tbody'],
+        td: ['table', 'tbody', 'tr'],
+        th: ['table', 'tbody', 'tr'],
+        li: ['ul'],
+        option: ['select'],
+    };
+
+    const match = html.trim().match(/^<([a-z0-9-]+)/i);
+    const tag = match ? match[1].toLowerCase() : null;
+
+    let container = document.createElement('div');
+
+    if (tag in containerMap) {
+        for (const tagName of containerMap[tag]) {
+            const el = document.createElement(tagName);
+            container.appendChild(el);
+            container = el;
+        }
+    }
+
+    container.innerHTML = html;
+    return container.firstElementChild;
+}
+
 
 function getsessionId() {
     return sessionStorage.getItem('_pyweber_sessionId') || null;

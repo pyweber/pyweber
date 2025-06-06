@@ -1,5 +1,5 @@
 from uuid import uuid4
-from typing import Union
+from typing import Union, Any
 from pyweber.utils.types import HTMLTag, GetBy
 from pyweber.models.element import ElementConstrutor
 
@@ -15,10 +15,12 @@ class Element(ElementConstrutor):
         attrs = None,
         childs: list['Element'] = None,
         events = None,
+        data: Any = None,
         **kwargs
     ):
         super().__init__(tag, id, content, value, classes, style, attrs, childs, events, **kwargs)
         self.uuid = getattr(self, 'uuid', None) or str(uuid4())
+        self.data = data
     
     @property
     def parent(self):
@@ -70,7 +72,7 @@ class Element(ElementConstrutor):
             raise TypeError(f'Index must be a integer, but you got {type(index).__name__}')
 
         try:
-            self.__childs.pop(index)
+            return self.__childs.pop(index)
         
         except IndexError as e:
             raise IndexError(str(e))

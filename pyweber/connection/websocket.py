@@ -394,8 +394,9 @@ class TaskManager:
             raise
         except Exception as e:
             # Capturar qualquer outra exceção
-            print(f"Error on async handler ({session_id}/{event_id}): {e}")
-            return None
+            PrintLine(f"Error on async handler ({event_id}): {e}")
+            raise e
+
         finally:
             if session_id in self.active_handlers_async and event_id in self.active_handlers_async[session_id]:
                 del self.active_handlers_async[session_id][event_id]
@@ -445,8 +446,8 @@ class TaskManager:
             result = handler(event_handler)
             return result
         except Exception as e:
-            PrintLine(text=f'Error on sync handler: {e}')
-            raise
+            PrintLine(text=f'Error on sync handler ({event_id}): {e}')
+            raise e
 
         finally:
             if session_id in self.active_handlers:

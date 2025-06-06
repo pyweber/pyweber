@@ -113,7 +113,6 @@ class SessionStorage(BaseStorage):
         if value:
             self.data[key] = value if not isinstance(value, dict) else json.dumps(value)
             self.__send__()
-
     
     def clear(self):
         self.data.clear()

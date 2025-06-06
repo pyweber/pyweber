@@ -32,4 +32,3 @@ def test_template_to_bytes(app):
     assert isinstance(app.template_to_bytes(template={'message': 'Hello world'})[-1], bytes)
     assert isinstance(app.template_to_bytes(template=Element(tag='p', content='Hello world'))[-1], bytes)
     assert isinstance(app.template_to_bytes(template=b'Hello world')[-1], bytes)
-

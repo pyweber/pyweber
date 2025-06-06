@@ -1,5 +1,12 @@
 # PyWeber Changelog
 
+## [0.9.93] - 2025-06-06
+---
+### Bug Fixes
+- Fixed virtualdom error when trying to parse incompatible elements of the `div` and `tr` type
+- Added the `data` parameter to the element
+- Added return in the `pop_child` method of the Element
+
 ## [0.9.92] - 2025-05-29
 ---
 ### Bug Fixes

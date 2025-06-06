@@ -23,6 +23,7 @@ class CreatApp:
         self.__server_port = os.environ.get('PYWEBER_SERVER_PORT') or kwargs.get('port', None) or config.get('server', 'port')
         self.__server_ws_port = os.environ.get('PYWEBER_WS_PORT') or kwargs.get('ws_port', None) or config.get('websocket', 'port')
         self.__server_route = os.environ.get('PYWEBER_SERVER_ROUTE') or kwargs.get('route', None) or config.get('server', 'route')
+        self.__disable_ws = os.environ.get('PYWEBER_DISABLE_WS') or kwargs.get('disable_ws', None) or config.get('websocket', 'disable_ws')
         self.http_server = HttpServer(update_handler=self.update)
         self.ws_server = WsServer(
             host=self.__server_host,
@@ -52,7 +53,8 @@ class CreatApp:
     
     def run(self):
         self.load_target()
-        Thread(target=asyncio.run, args=(self.ws_server.ws_start(),), daemon=True).start()
+        if self.__disable_ws not in ['True', True, '1', 1]:
+            Thread(target=asyncio.run, args=(self.ws_server.ws_start(),), daemon=True).start()
 
         if self.__reload_mode in [True, 'True', 1, '1']:
             Thread(target=self.reload_server.start, daemon=True).start()
