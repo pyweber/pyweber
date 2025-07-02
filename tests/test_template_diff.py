@@ -11,7 +11,7 @@ class FakeElement(Element):
         self.value = value or ''
         self.attrs = attrs or {}
         self.style = style or {}
-        self.events = events or type("Events", (), {})()  # Empty class
+        self.events = events
         self.classes = classes or []
         self.parent = parent
         self.childs = childs or []
