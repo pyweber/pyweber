@@ -94,9 +94,11 @@ class TextArea(Element):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        onselect: Callable = None
+        onselect: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__(tag='textarea')
+        self.sanitize = sanitize
         self.content = content
         self.name = name
         self.id = id

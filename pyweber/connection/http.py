@@ -7,7 +7,7 @@ import shutil
 import asyncio
 from threading import Thread
 from pyweber.pyweber.pyweber import Pyweber
-from pyweber.models.request import Request
+from pyweber.models.request import Request, ClientInfo
 from pyweber.utils.utils import PrintLine, Colors
 from typing import TYPE_CHECKING, Callable
 
@@ -42,7 +42,7 @@ class HttpServer:
             self.ssl_context.load_cert_chain(certfile=cert_file, keyfile=key_file)
             PrintLine(text=f"{Colors.GREEN}SSL configuration successful{Colors.RESET}")
         except Exception as e:
-            PrintLine(text=f"{Colors.RED}SSL configuration failed: {e}{Colors.RESET}")
+            PrintLine(text=f"{Colors.RED}SSL configuration failed: {e}{Colors.RESET}", level='ERROR')
             self.ssl_context = None
     
     async def process_request(self, client: socket.socket) -> tuple[bytes, bytes]:
@@ -77,17 +77,19 @@ class HttpServer:
         return header_bytes, body
 
     async def handle_response(self, client: socket.socket | ssl.SSLSocket):
-        from pyweber.models.request import request
-        
         try:
             request_tuple = await self.process_request(client=client)
+            client_info = client.getpeername()
 
             if request_tuple:
-                requests=Request(
+                request=Request(
                     headers=request_tuple[0].decode('iso-8859-1'),
-                    body=request_tuple[-1]
+                    body=request_tuple[-1],
+                    client_info=ClientInfo(
+                        host=client_info[0],
+                        port=client_info[-1]
+                    )
                 )
-                request = requests
 
                 if request.path:
                     if self.started:
@@ -104,13 +106,27 @@ class HttpServer:
             pass
 
         except UnicodeDecodeError:
-            PrintLine(f'Error [Server]: Protocol http incompatible, please use same http protocol for response and request')
+            PrintLine(
+                text=f'Error [Server]: Protocol http incompatible, please use same http protocol for response and request',
+                level='ERROR'
+            )
         
         finally:
             if client in self.connections:
                 self.connections.remove(client)
 
             client.close()
+    
+    def get_local_ip(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        try:
+            s.connect(('8.8.8.8', 80))
+            local_ip = s.getsockname()[0]
+        finally:
+            s.close()
+        
+        return local_ip
     
     def create_server(self, restart: bool = False):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_server:
@@ -122,8 +138,11 @@ class HttpServer:
                 protocol = 'https' if self.ssl_context else 'http'
 
                 if not restart:
-                    url = f"{protocol}://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}"
-                    PrintLine(text=f'Server online in {Colors.GREEN}{url}{Colors.RESET}')
+                    public_url = f"{protocol}://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}"
+                    local_url = f"{protocol}://{self.get_local_ip()}:{self.port}{self.route}"
+                    PrintLine(
+                        text=f"Server online in {Colors.GREEN}{public_url}{Colors.RESET} or {Colors.GREEN}{local_url}{Colors.RESET}"
+                    )
 
                 while True:
                     try:
@@ -136,7 +155,6 @@ class HttpServer:
                             for server in rlist:
                                 if server is client_server:
                                     client_socket, _ = client_server.accept()
-
                                     if self.ssl_context:
                                         try:
                                             client_socket = self.ssl_context.wrap_socket(
@@ -144,7 +162,7 @@ class HttpServer:
                                                 server_side=True
                                             )
                                         except Exception as e:
-                                            PrintLine(text=f"SSL Error: {e}")
+                                            PrintLine(text=f"SSL Error: {e}", level='ERROR')
                                             client_socket.close()
                                             continue
 
@@ -162,11 +180,12 @@ class HttpServer:
                         break
         
             except OSError as e:
-                PrintLine(text=f'Error to running server: ')
-                return
+                PrintLine(text=f'Error to running server: {e}', level='ERROR')
+                raise e
             
             except Exception as e:
-                PrintLine(text=f'Error [server] 1: {e}')
+                PrintLine(text=f'Error [server] 1: {e}', level='ERROR')
+                raise e
             
     def run(self, route: str, port: int, host: str, cert_file: str, key_file: str):
         self.route, self.port, self.host = route, port, host

@@ -5,7 +5,7 @@ from uuid import uuid4
 from threading import Timer
 from typing import Callable, Union
 from pyweber.core.events import WindowEvents
-from pyweber.connection.websocket import WsServer, WsServerAsgi
+from pyweber.connection.websocket import WebSocket
 from pyweber.utils.types import WindowEventType, OrientationType, BaseStorage
 
 class Orientation:
@@ -65,7 +65,7 @@ class Location:
 
 class LocalStorage(BaseStorage):
     """Localstorage"""
-    def __init__(self, data: dict[str, (int, float)], session_id: str, ws: Union[WsServer, WsServerAsgi]):
+    def __init__(self, data: dict[str, (int, float)], session_id: str, ws: 'WebSocket'):
         super().__init__(data=data)
         self.__ws = ws
         self.sesssion_id = session_id
@@ -92,19 +92,19 @@ class LocalStorage(BaseStorage):
     def __send__(self):
         try:
             asyncio.get_running_loop()
-            asyncio.create_task(self.__ws.async_send_message(
+            asyncio.create_task(self.__ws.send_message(
                 data={'localstorage': self.data},
                 session_id=self.__ws
             ))
         except RuntimeError:
-            asyncio.run(self.__ws.async_send_message(
+            asyncio.run(self.__ws.send_message(
                 data={'localstorage': self.data},
                 session_id=self.__ws
             ))
 
 class SessionStorage(BaseStorage):
     """SessionStorage"""
-    def __init__(self, data: dict[str, (int, float)], session_id: str, ws: Union[WsServer, WsServerAsgi]):
+    def __init__(self, data: dict[str, (int, float)], session_id: str, ws: 'WebSocket'):
         super().__init__(data=data)
         self.__ws = ws
         self.sesssion_id = session_id
@@ -127,12 +127,12 @@ class SessionStorage(BaseStorage):
     def __send__(self):
         try:
             asyncio.get_running_loop()
-            asyncio.create_task(self.__ws.async_send_message(
+            asyncio.create_task(self.__ws.send_message(
                 data={'sessionstorage': self.data},
                 session_id=self.sesssion_id
             ))
         except RuntimeError:
-            asyncio.run(self.__ws.async_send_message(
+            asyncio.run(self.__ws.send_message(
                 data={'sessionstorage': self.data},
                 session_id=self.sesssion_id
             ))
@@ -161,7 +161,7 @@ class Window:
         self.inner_width: float = 0.0
         self.inner_height: float = 0.0
         self.session_id: str = None
-        self.__ws: Union[WsServer, WsServerAsgi] = None
+        self.__ws: 'WebSocket' = None
         self.scroll_x: float = 0.0
         self.scroll_y: float = 0.0
         self.screen: Screen = None
@@ -189,8 +189,8 @@ class Window:
         self.__events_dict.clear()
         for event, call in self.events.__dict__.items():
             if call is not None:
-                key = f'{event}_{id(call)}'
-                self.__events_dict[key] = call
+                # key = f'_{event}_{id(call)}'
+                self.__events_dict[event.removeprefix('on')] = call
 
     def __repr__(self):
         """Representação legível da janela."""
@@ -213,7 +213,7 @@ class Window:
         self.__set_event_id()
     
     def add_event(self, event_type: WindowEventType, event: Callable):
-        if not isinstance(event_type, event):
+        if not isinstance(event_type, WindowEventType):
             raise TypeError('Event_type must be an EventType instance')
         
         if not callable(event):
@@ -236,7 +236,7 @@ class Window:
 
     async def confirm(self, message: str, timeout: int = 300) -> Confirm:
         """Exibe uma caixa de confirmação."""
-        self.__ws.send_message(
+        await self.__ws.send_message(
             data={'confirm': message, 'confirm_id': str(str(uuid4()))},
             session_id=self.session_id
         )
@@ -250,7 +250,7 @@ class Window:
 
     async def prompt(self, message: str, default: str = "", timeout: int = 300) -> Prompt:
         """Exibe uma caixa de prompt para entrada do usuário."""
-        self.__ws.send_message(
+        await self.__ws.send_message(
             data={'prompt': {'message': message, 'default': default}, 'prompt_id': str(uuid4())},
             session_id=self.session_id
         )
@@ -315,12 +315,12 @@ class Window:
     def __send__(self, data: dict[str, (int, float)]):
         try:
             asyncio.get_running_loop()
-            asyncio.create_task(self.__ws.async_send_message(
+            asyncio.create_task(self.__ws.send_message(
                 data=data,
                 session_id=self.session_id
             ))
         except RuntimeError:
-            asyncio.run(self.__ws.async_send_message(
+            asyncio.run(self.__ws.send_message(
                 data=data,
                 session_id=self.session_id
             ))

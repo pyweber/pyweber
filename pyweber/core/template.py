@@ -9,12 +9,13 @@ from pyweber.config.config import config
 from pyweber.utils.types import HTTPStatusCode
 
 class Template:
-    def __init__(self, template: str, status_code: int = 200, **kwargs):
+    def __init__(self, template: str, status_code: int = 200, title: str = None, **kwargs):
         self.__template = self.__read_file(file_path=template)
         self.kwargs = kwargs
         self.data = None
         self.__status_code = status_code
         self.__icon: str = self.get_icon()
+        self.title = title
         self.__root = self.parse_html()
     
     @property
@@ -47,6 +48,19 @@ class Template:
     def events(self):
         from pyweber.core.events import EventBook
         return EventBook
+    
+    @property
+    def title(self): return self.__title
+
+    @title.setter
+    def title(self, value: str):
+        self.__title = value
+
+        if hasattr(self, 'root'):
+            title = self.root.getElement(by='tag', value='title')
+
+            if title:
+                title.content = value if value else title.content
 
     def get_icon(self):
         return str(config['app'].get('icon'))
@@ -232,7 +246,7 @@ class Template:
                 if new_content:
                     if isinstance(new_content, Element):
                         new_content = self.build_html(element=new_content)
-                    content = content.replace(content[begin:end+2], new_content)
+                    content = content.replace(content[begin:end+2], str(new_content))
         
         return content
 
@@ -251,7 +265,7 @@ class Template:
         return Element(*args, **kwargs)
     
     def __inject_default_elements(self, root: Element):
-        has_websocket_script, has_icon, has_description, has_css, has_keywords = False, False, False, False, False
+        has_websocket_script, has_icon, has_description, has_css, has_keywords, has_title = False, False, False, False, False, False
         for child in root.childs[0].childs:
             if child.tag == 'script' and child.get_attr('src', '').startswith('/_pyweber/static/') and child.get_attr('src', '').endswith('/.js'):
                 has_websocket_script = True
@@ -270,7 +284,10 @@ class Template:
                 elif 'keywords' in list(child.attrs.values()):
                     has_keywords = True
             
-            if has_websocket_script and has_icon and has_css and has_description and has_keywords:
+            elif child.tag == 'title':
+                has_title = child
+            
+            if has_websocket_script and has_icon and has_css and has_description and has_keywords and has_title:
                 break
         
         if not has_websocket_script:
@@ -328,13 +345,24 @@ class Template:
                 )
             )
         
+        if isinstance(has_title, Element):
+            has_title.content = self.title if self.title else has_title.content
+            
+        else:
+            root.childs[0].childs.append(
+                self.__create_default_element(
+                    tag='title',
+                    content=self.title if self.title else config.get('app', 'name')
+                )
+            )
+
         return root
     
-    @property
     def clone(self):
         tpl = Template(
             template=self.template,
             status_code=self.status_code,
+            title=self.title,
             **self.kwargs
         )
         tpl.data = self.data

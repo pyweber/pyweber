@@ -1,24 +1,25 @@
 from uuid import uuid4
 from typing import Union, Any
 from pyweber.utils.types import HTMLTag, GetBy
-from pyweber.models.element import ElementConstrutor
+from pyweber.models.element import ElementConstrutor, TemplateEvents
 
 class Element(ElementConstrutor):
     def __init__(
         self,
-        tag,
-        id = None,
-        content = None,
-        value = None,
-        classes = None,
-        style = None,
-        attrs = None,
+        tag: HTMLTag,
+        id: str = None,
+        content: Any = None,
+        value: Any = None,
+        classes: list[str] = None,
+        style: dict[str, str] = None,
+        attrs: dict[str, str] = None,
         childs: list['Element'] = None,
-        events = None,
+        events: TemplateEvents = None,
         data: Any = None,
-        **kwargs
+        sanitize: bool = False,
+        **kwargs: str
     ):
-        super().__init__(tag, id, content, value, classes, style, attrs, childs, events, **kwargs)
+        super().__init__(tag, id, content, value, classes, style, attrs, childs, events, sanitize, **kwargs)
         self.uuid = getattr(self, 'uuid', None) or str(uuid4())
         self.data = data
     

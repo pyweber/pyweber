@@ -1,8 +1,8 @@
-from typing import TYPE_CHECKING, Callable, Union
+from typing import TYPE_CHECKING, Callable, Union, Any
 import asyncio
 
 if TYPE_CHECKING:
-    from pyweber.connection.websocket import WsServer, WsServerAsgi
+    from pyweber.connection.websocket import WebSocket
     from pyweber.connection.session import Session
     from pyweber.pyweber.pyweber import Pyweber
     from pyweber.core.template import Template, Element
@@ -32,7 +32,7 @@ class EventHandler:
         event_data: EventData,
         app: 'Pyweber',
         session: 'Session',
-        ws: Union['WsServer', 'WsServerAsgi'],
+        ws: 'WebSocket',
     ):
         self.event_type = event_type
         self.route = route
@@ -44,26 +44,34 @@ class EventHandler:
         self.session = session
         self.__ws = ws
     
+    def update_all(self):
+        self.__send__(data=self.__data_to_send__(), session_id=None)
+    
     def update(self):
-        data = {
-                'template': self.__ws.get_template_diff(
-                        old_template=self.__ws.old_template,
-                        new_template=self.session.template
-                    ),
-                'window': self.session.window.get_all_event_ids
-            }
-        try:
-            asyncio.get_running_loop()
-            asyncio.create_task(self.__ws.async_send_message(data=data, session_id=self.session.session_id))
-        except RuntimeError:
-            asyncio.run(self.__ws.async_send_message(data=data, session_id=self.session.session_id))
+        self.__send__(data=self.__data_to_send__(), session_id=self.session.session_id)
 
     def reload(self):
+        self.__send__(data={'reload': True}, session_id=self.session.session_id)
+    
+    def reload_all(self):
+        self.__send__(data={'reload': True}, session_id=None)
+    
+    def window_data(self):
+        return self.__ws.window_response
+    
+    def __data_to_send__(self):
+        return {'template': self.session.template, 'window': self.session.window.get_all_event_ids}
+    
+    def __send__(self, data: dict[str, Any], session_id: str):
         try:
             asyncio.get_running_loop()
-            asyncio.create_task(self.__ws.async_send_message(data={'reload': True}, session_id=self.session.session_id))
-        except:
-            asyncio.run(self.__ws.async_send_message(data={'reload': True}, session_id=self.session.session_id))
+            asyncio.create_task(
+                self.__ws.send_message(data=data, session_id=session_id, route=self.route)
+            )
+        except RuntimeError:
+            asyncio.run(
+                self.__ws.send_message(data=data, session_id=session_id, route=self.route)
+            )
 
     def __repr__(self):
         return f'EventHandler(event_type: {self.event_type}, route: {self.route})'
@@ -73,7 +81,7 @@ class EventConstrutor:
         self,
         target_id: str,
         app: 'Pyweber',
-        ws: Union['WsServer', 'WsServerAsgi'],
+        ws: 'WebSocket',
         session: 'Session',
         route: str,
         event_data: dict[str, str],
@@ -101,7 +109,6 @@ class EventConstrutor:
             element_uuid=self.__target_id
         )
     
-    @property
     def build_event(self):
         return EventHandler(
             event_type=self.event_type,
@@ -337,6 +344,18 @@ class WindowEvents:
 
         # Eventos de Segurança
         onsecuritypolicyviolation: Callable = None,
+
+        # Eventos de clique e Mouse
+        onpointerover: Callable = None,
+        onpointerenter: Callable = None,
+        onpointerdown: Callable = None,
+        onpointermove: Callable = None,
+        onpointerup: Callable = None,
+        onpointercancel: Callable = None,
+        onpointerout: Callable = None,
+        onpointerleave: Callable = None,
+        ongotpointercapture: Callable = None,
+        onlostpointercapture: Callable = None,
     ):
         # Eventos de Janela e Navegação
         self.onafterprint = onafterprint
@@ -429,6 +448,18 @@ class WindowEvents:
 
         # Eventos de Segurança
         self.onsecuritypolicyviolation = onsecuritypolicyviolation
+
+        # Eventos de clique ou mouse
+        self.onpointerover = onpointerover
+        self.onpointerenter = onpointerenter
+        self.onpointerdown = onpointerdown
+        self.onpointermove = onpointermove
+        self.onpointerup = onpointerup
+        self.onpointercancel = onpointercancel
+        self.onpointerout = onpointerout
+        self.onpointerleave = onpointerleave
+        self.ongotpointercapture = ongotpointercapture
+        self.onlostpointercapture = onlostpointercapture
 
     def __repr__(self):
         """Representação legível dos eventos."""

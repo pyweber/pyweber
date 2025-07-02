@@ -1,5 +1,24 @@
 # PyWeber Changelog
 
+## [0.9.94] - 2025-07-02
+---
+### New features
+- Added `request` method in `Pyweber` to acess all request's methods in all program.
+- Added `get_group_and_route` method in `Pyweber` to acess group and route on full route
+- Added `sanitize` attribute an `sanitize_values` method to prevent XSS atack.
+- Added `title` attribute in `Route` instances to define title in html templates if not exists.
+- Added `raw_body` properity in Request instances for get brute bodies received from client-side
+- Renamed `raw_request` to `raw_headers` to get headers received from client request
+- Added `process_response` in Route instance to allow create or no the Template for all routes responses.
+- Added the possibility to create a log file using Printline
+- Improved terminal logs status now categorized into `INFO`, `ERROR` and `WARNING`
+
+### Bug Fixes
+- Fixed get correct selected value in `Select` Element
+- Fixes get values checked in CheckBox and Radio Elements
+- Fixed `TypeError` when try to replace variables in html
+- Fixed `TypeError` when try to set attribute without value
+
 ## [0.9.93] - 2025-06-06
 ---
 ### Bug Fixes

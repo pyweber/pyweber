@@ -123,7 +123,17 @@ class Response:
         bold_white_color = Colors.BOLD_WHITE
         bold_red_color = Colors.BOLD_RED
         bold_green_color = Colors.GREEN
-        status_color = bold_red_color if self.code in [404, 500, 503] else bold_green_color
+        bold_yellow_color = Colors.BOLD_YELLOW
+        bold_blue_color = Colors.BOLD_BLUE
+
+        if self.code >= 400:
+            status_color = bold_red_color
+        elif self.code >= 300:
+            status_color = bold_yellow_color
+        elif self.code >= 200:
+            status_color = bold_green_color
+        else:
+            status_color = bold_blue_color
 
         for key, value in self.headers.items():
             if key == 'Set-Cookie':
@@ -137,7 +147,8 @@ class Response:
                 response += f'{key}: {value}\r\n'
         
         response += '\r\n'
-
-        to_replace = r'\r\n'
-        PrintLine(text=f"{bold_white_color}{self.request.first_line} {status_color}{self.status_code.replace(to_replace, ' ')}{reset_color}")
+        
+        to_replace = '\r\n'
+        clear_status_code = self.status_code.replace(to_replace, ' ')
+        PrintLine(text=f"{bold_white_color}{self.request.first_line} {status_color}{clear_status_code}{reset_color}")
         return response.encode() + self.response_content

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Callable
 from pyweber.models.create_app import CreatApp
-from pyweber.models.request import Request
-from pyweber.connection.websocket import WsServerAsgi
+from pyweber.models.request import Request, ClientInfo
+from pyweber.connection.websocket import WebSocket
 import os
 
 if TYPE_CHECKING:
@@ -48,7 +48,6 @@ def run(target: Callable = None, **kwargs):
     CreatApp(target=target, **kwargs).run()
 
 async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None):
-    from pyweber.models.request import request
     global WS_RUNNING
 
     body = b""
@@ -58,11 +57,18 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
             message = await receive()
             body += message.get("body", b"")
             more_body = message.get("more_body", False)
-
-    requests = Request(headers=scope, body=body)
-    request = requests
     
-    ws_server = WsServerAsgi(app=app)
+    client_info = scope.get('client', (None, 0))
+    request = Request(
+        headers=scope,
+        body=body,
+        client_info=ClientInfo(
+            host=client_info[0],
+            port=client_info[-1]
+        )
+    )
+    
+    ws_server = WebSocket(app=app, protocol='uvicorn')
 
     if not WS_RUNNING:
         WS_RUNNING = True

@@ -441,6 +441,18 @@ class WindowEventType(Enum):
     # Eventos de Segurança
     SECURITY_POLICY_VIOLATION = "onsecuritypolicyviolation"
 
+    # Eventos do pointer e mouse
+    POINTEROVER = "onpointerover"
+    POINTERENTER = "onpointerenter"
+    POINTERDOWN = "onpointerdown"
+    POINTERMOVE = "onpointermove"
+    POINTERUP = "onpointerup"
+    POINTERCANCEL = "onpointercancel"
+    POINTEROUT = "onpointerout"
+    POINTERLEAVE = "onpointerleave"
+    GOTPOINTERCAPTURE = "ongotpointercapture"
+    LOSTPOINTERCAPTURE = "onlostpointercapture"
+
 class HTMLTag(Enum):
     # Tags Semânticas e de Estruturação
     html = "html"

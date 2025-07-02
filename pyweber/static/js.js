@@ -1,5 +1,7 @@
 let socket;
 let socketReady = false;
+let window_event_received = false;
+const earyEventsBuffer = [];
 
 const EventRef = new Proxy(
     {DOCUMENT: 'document', WINDOW: 'window'},
@@ -38,6 +40,28 @@ function connectWebSocket() {
 
     socket.onmessage = function(event) {
         const data = JSON.parse(event.data);
+
+        if (data.window) {
+            Object.keys(sessionStorage).forEach(item => {
+                if (item !== '_pyweber_sessionId') {
+                    sessionStorage.removeItem(item)
+                };
+            });
+
+            for (let i=0; i<data.window.length; i++) {
+                palavra = data.window[i].replace(/^_on/, "");
+                evt = palavra.split("_")[0];
+                sessionStorage.setItem(evt, data.window[i]);
+            };
+
+            if (!window_event_received) {
+                window_event_received = true;
+                earyEventsBuffer.forEach(item => {
+                    sendEvent(item);
+                });
+                earyEventsBuffer.length = 0;
+            }
+        };
 
         if (data.template) {
             applyDifferences(data.template);
@@ -290,12 +314,24 @@ function setSessionId(sessionId) {
 }
 
 function sendEvent({type, event, event_ref, window_response}) {
+
+    if (event_ref === EventRef.WINDOW && !window_event_received) {
+        earyEventsBuffer.push({type, event, event_ref, window_response});
+        return;
+    };
+
     const target = event.target instanceof HTMLElement ? event.target : null;
     const eventData = getEventData({type, event, event_ref, window_response});
 
     if (socket.readyState === WebSocket.OPEN) {
         if (target) {
             if (target.getAttribute(`_on${type}`)) {
+                socket.send(JSON.stringify(eventData));
+            };
+        };
+
+        if (event_ref === 'window') {
+            if (sessionStorage.getItem(type)) {
                 socket.send(JSON.stringify(eventData));
             };
         };
@@ -339,6 +375,7 @@ function getEventData({type=null, event=null, event_ref=null, window_response=nu
         },
         window_data: JSON.stringify(getWindowData()),
         window_response: window_response ? window_response : {},
+        window_event: event_ref === EventRef.WINDOW ? sessionStorage.getItem(type): null,
         sessionId: getsessionId()
     };
 
@@ -395,14 +432,21 @@ function getFormValues() {
     inputs.forEach(input => {
         const id = input.getAttribute('uuid');
         if (id) {
-            if (input.type === 'checkbox' || input.type === 'radio') {
-                values[id] = input.value;
-
+            if (input.type === 'radio') {
                 if (input.checked) {
                     input.setAttribute('checked', '');
+                    values[id] = input.value;
                 } else {
                     input.removeAttribute('checked');
                 }
+            } else if (input.type === 'checkbox') {
+                if (input.checked) {
+                    values[id] = input.value;
+                    input.setAttribute('checked', '');
+                } else {
+                    input.removeAttribute('checked');
+                };
+                
             } else if (input.tagName === 'SELECT') {
                 values[id] = input.value;
 
@@ -410,10 +454,10 @@ function getFormValues() {
                 options.forEach(option => {
                     if (option.value === input.value) {
                         option.setAttribute('selected', '');
+                        values[id] = option.value;
                     } else {
                         option.removeAttribute('selected');
                     }
-                    values[id] = option.value;
                 });
             } else {
                 values[id] = input.value;

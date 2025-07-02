@@ -263,8 +263,18 @@ class FieldStorage:
     def __repr__(self):
         return f'FileStorage(files={self.__len__()})'
 
+@dataclass
+class ClientInfo:
+    host: str
+    port: int
+
 class Request:
-    def __init__(self, headers: Union[str, dict[str, Union[tuple[str, str], str]]], body: Union[bytes] = None):
+    def __init__(
+        self,
+        headers: Union[str, dict[str, Union[tuple[str, str], str]]],
+        body: Union[bytes] = None,
+        client_info: ClientInfo = None
+    ):
         if isinstance(headers, Headers):
             headers = headers.text
 
@@ -283,6 +293,7 @@ class Request:
         else:
             raise TypeError('Request type does not valid')
         
+        self.client_info = client_info
         self.__additions_headers()
     
     @property
@@ -295,13 +306,27 @@ class Request:
             raise TypeError('Request mode does not valid')
         
         self.__request_mode = value
+    
+    @property
+    def client_info(self): return self.__client_info
+
+    @client_info.setter
+    def client_info(self, value: ClientInfo):
+        if value and not isinstance(value, ClientInfo):
+            raise TypeError('client_info must be a ClientInfo instances')
+        
+        self.__client_info = value or ClientInfo(host=None, port=0)
         
     @property
-    def raw_request(self):
+    def raw_headers(self):
         if self.request_mode.value == 'asgi':
             return self.__raw_request_asgi
         
         return self.__raw_request_wsgi
+    
+    @property
+    def raw_body(self):
+        return self.__raw_body
     
     @property
     def host(self):
@@ -366,7 +391,7 @@ class Request:
         elif ContentTypes.form_data.value in self.content_type:
             return self.__parse_form_data()
         else:
-            return self.__raw_body
+            return {}
     
     @property
     def first_line(self):
@@ -397,20 +422,21 @@ class Request:
                 
         return body
     
-    
     def __additions_headers(self):
         if self.request_mode.value == 'asgi':
-            self.method: str = self.raw_request.get('method')
-            self.scheme: str = f"{self.raw_request.get('scheme')}/{self.raw_request.get('http_version')}".lower()
-            self.path: str = self.raw_request.get('raw_path', b'').decode()
-            self.query_params = {key: ';'.join(val) for key, val in parse_qs(self.raw_request.get('query_string', b'').decode()).items() if val}
+            self.method: str = self.raw_headers.get('method')
+            self.scheme: str = f"{self.raw_headers.get('scheme')}/{self.raw_headers.get('http_version')}".lower()
+            self.path: str = self.raw_headers.get('raw_path', b'').decode()
+            self.query_params = {key: ';'.join(val) for key, val in parse_qs(self.raw_headers.get('query_string', b'').decode()).items() if val}
 
         else:
-            line_info = self.raw_request.split(self.__line_splitter, 1)[0].split()
+            line_info = self.raw_headers.split(self.__line_splitter, 1)[0].split()
             self.method = line_info[0] if len(line_info) > 0 else None
             self.path = line_info[1].split('?', 1)[0] if len(line_info) >= 2 else None
             self.scheme = line_info[2] if len(line_info) >= 3 else None
-            self.query_params = {key: ';'.join(val) for key, val in parse_qs(line_info[1].split('?', 1)[-1]).items() if val} if len(line_info) >= 2 else {}
+            self.query_params = {
+                key: ';'.join(val) for key, val in parse_qs(line_info[1].split('?', 1)[-1]).items() if val
+            } if len(line_info) >= 2 else {}
         
     def __parse_headers_wsgi(self) -> dict[str, str]:
         return {header.split(':', 1)[0].strip().lower(): header.split(':', 1)[-1].strip() for header in self.__raw_headers.split(self.__line_splitter)[1::]}

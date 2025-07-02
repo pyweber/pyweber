@@ -34,6 +34,7 @@ class Pyweber:
         self.__add_framework_routes()
         self.data = None
         self.__visited__ = set()
+        self.__request: Request = None
     
     # Error pages
 
@@ -82,11 +83,19 @@ class Pyweber:
     def get_after_request_middleware(self):
         return self.__middleware_manager.get_after_request_middlewares
     
-    def before_request(self, status_code: int = 200, order: int=-1):
-        return self.__middleware_manager.before_request(status_code=status_code, order=order)
+    def before_request(self, status_code: int = 200, process_response: bool = True, order: int=-1):
+        return self.__middleware_manager.before_request(
+            status_code=status_code,
+            process_response=process_response,
+            order=order
+        )
     
-    def after_request(self, status_code: int = None, order: int=-1):
-        return self.__middleware_manager.after_request(status_code=status_code, order=order)
+    def after_request(self, status_code: int = None, process_response: bool = True, order: int=-1):
+        return self.__middleware_manager.after_request(
+            status_code=status_code,
+            process_response=process_response,
+            order=order
+        )
     
     def clear_before_request_middleware(self):
         return self.__middleware_manager.clear_before_request_middleware()
@@ -117,6 +126,7 @@ class Pyweber:
     def remove_group(self, group: str): return self.__route_manager.remove_group(group=group)
     def get_group_routes(self, group: str = None): return self.__route_manager.get_group_routes(group=group)
     def get_group_by_route(self, route: str): return self.__route_manager.get_group_by_route(route=route)
+    def get_group_and_route(self, route: str): return self.__route_manager.get_group_and_route(route=route)
 
     def get_route_by_path(self, route: str, follow_redirect: bool = True): return self.__route_manager.get_route_by_path(route=route, follow_redirect=follow_redirect)
     def get_route_by_name(self, name: str): return self.__route_manager.get_route_by_name(name=name)
@@ -133,7 +143,9 @@ class Pyweber:
         name: str = None,
         middlewares: list[str] = None,
         status_code: int = None,
-        content_type: ContentTypes = None
+        content_type: ContentTypes = None,
+        title: str = None,
+        process_response: bool = True
     ):
         return self.__route_manager.route(
             route=route,
@@ -142,7 +154,9 @@ class Pyweber:
             name=name,
             middlewares=middlewares,
             status_code=status_code,
-            content_type=content_type
+            content_type=content_type,
+            title=title,
+            process_response=process_response
         )
     
     def add_route(
@@ -154,7 +168,9 @@ class Pyweber:
         name: str = None,
         middlewares: list[Callable] = None,
         status_code: int = None,
-        content_type: ContentTypes = None
+        content_type: ContentTypes = None,
+        title: str = None,
+        process_response: bool = True
     ):
         return self.__route_manager.add_route(
             route=route,
@@ -164,7 +180,9 @@ class Pyweber:
             name=name,
             middlewares=middlewares,
             status_code=status_code,
-            content_type=content_type
+            content_type=content_type,
+            title=title,
+            process_response=process_response
         )
     
     def update_route(self, route: str, group: str=None, **kwargs):
@@ -178,33 +196,45 @@ class Pyweber:
     
     def inspect_function(self, callback: Callable):
         return self.__route_manager.inspect_function(callback=callback)
+    
+    # Request
+    @property
+    def request(self): return self.__request
 
     # Response
     async def get_response(self, request: Request):
         if not isinstance(request, Request):
             raise TypeError(f'request must be a Request instances, but got {type(request).__name__}')
         
-        # process before request middlewares
-        before_request_response = await self.process_middleware(resp=request, middlewares=self.get_before_request_middleware)
+        _route, _ = self.resolve_path(route=request.path)
+        title = None
 
-        if before_request_response:
-            status_code, response = before_request_response
-            content_type, content = self.template_to_bytes(template=response)
-            return Response(
-                request=request,
-                response_content=content,
-                code=status_code,
-                cookies=self.cookies,
-                response_type=content_type,
-                route=request.path
-            )
+        if _route in self.list_routes:
+            title = self.get_route_by_path(route=_route).title
+            self.__request = request
         
-        status_code, content_type, redirect_path, template = await self.get_template(
-            route=request.path,
-            method=request.method
+        # process before request middlewares
+        before_request_response = await self.process_middleware(
+            resp=request,
+            middlewares=self.get_before_request_middleware
         )
 
-        content_type, content = self.template_to_bytes(template=template, content_type=content_type)
+        if before_request_response:
+            status_code, process_response, response = before_request_response
+            status_code, content_type, redirect_path, process_response, template = await self.process_templates(template=response)
+        
+        else:
+            status_code, content_type, redirect_path, process_response, template = await self.get_template(
+                route=request.path,
+                method=request.method
+            )
+
+        content_type, content = self.template_to_bytes(
+            template=template,
+            content_type=content_type,
+            title=title,
+            process_response=process_response
+        )
         
         response = Response(
             request=request,
@@ -216,10 +246,13 @@ class Pyweber:
         )
         
         # process after request middlewares
-        after_request_response = await self.process_middleware(resp=response, middlewares=self.get_after_request_middleware)
+        after_request_response = await self.process_middleware(
+            resp=response,
+            middlewares=self.get_after_request_middleware
+        )
 
         if after_request_response:
-            _, response = after_request_response
+            _, _, response = after_request_response
 
             if not isinstance(response, Response):
                 raise TypeError(f'All after request middleware need return Response instances, but got {type(response).__name__}')
@@ -227,32 +260,55 @@ class Pyweber:
         return response
     
     # Utils
-    def template_to_bytes(self, template: Union[Template, Element, dict, str, bytes], content_type: ContentTypes = ContentTypes.html) -> tuple[ContentTypes, bytes]:
+    def template_to_bytes(
+        self,
+        template: Union[Template, Element, dict, str, bytes],
+        content_type: ContentTypes = ContentTypes.html,
+        title: str = None,
+        process_response: bool = False
+    ) -> tuple[ContentTypes, bytes]:
         template_str = None
         template_bytes = b''
 
         if not isinstance(content_type, ContentTypes):
-            PrintLine(template)
-            raise TypeError(f'content_type does not NoneType')
+            raise TypeError(f'content_type must be ContentTypes instances, but got {type(content_type).__name__}')
 
         if isinstance(template, Template):
+            template.title = title
             template_str = template.build_html()
+        
         elif isinstance(template, Element):
-            template_str = template.to_html()
-        elif isinstance(template, dict):
+            if process_response:
+                template_str = Template(
+                    template=template.to_html(),
+                    title=title
+                ).build_html()
+            else:
+                template_str = template.to_html()
+        
+        elif isinstance(template, (dict, set, list)):
             template_str = json.dumps(template)
             content_type = ContentTypes.json
+
         elif isinstance(template, bytes):
             template_bytes = template
             content_type = content_type or ContentTypes.unkown
+
         elif isinstance(template, str):
             if content_type.value in ['text/html', 'text/plain']:
-                template_str = Template(template=template).build_html()
-                content_type = ContentTypes.html
+                if process_response:
+                    template_str = Template(template=template, title=title).build_html()
+                    content_type = ContentTypes.html
+                else:
+                    template_str = template
+                    content_type = ContentTypes.txt
             else:
                 template_str = template
         else:
-            template_str = Template(template=str(template)).build_html()
+            if process_response:
+                template_str = Template(template=str(template), title=title).build_html()
+            else:
+                template_str = str(template)
         
         template_bytes = template_str.encode() if isinstance(template_str, str) else template_bytes
         
@@ -269,7 +325,8 @@ class Pyweber:
 
     async def get_template(self, route: str, method: str = 'GET'):
         path, kwargs = self.resolve_path(route=route)
-        status_code, content_type, redirect_path, template = 404, ContentTypes.html, route, path
+        status_code, content_type, redirect_path, template, _template, process_response = 404, ContentTypes.html, route, path, None, None
+
         if self.exists(route=path):
             status_code, _kwargs = 200, {}
 
@@ -289,44 +346,42 @@ class Pyweber:
                 kwargs = _kwargs or kwargs
                 status_code = status_code or _route.status_code
                 content_type = _route.content_type
+                process_response = _route.process_response
 
                 if _route.middlewares:
                     self.__visited__.add(route)
-                    _status_code, _template = await self.process_route_middleware(
+                    _status_code, _, _template = await self.process_route_middleware(
                         resp=route,
                         middlewares=_route.middlewares,
                         status_code=status_code
                     )
-
-                    if _template:
-                        return await self.final_response(
-                            template=_template,
-                            status_code=_status_code,
-                            redirect_path=redirect_path,
-                            content_type=content_type,
-                            **kwargs
-                        )
-                
-        if template == path:
-            if self.is_static_file(route=path):
-                status_code, content_type, template = 200, self.get_content_type(route=path), self.load_static_files(path=path)
-            else:
-                status_code, content_type, template =  404, ContentTypes.html, self.error_pages.page_not_found
+        
+        if not _template:
+            if template == path:
+                if self.is_static_file(route=path):
+                    status_code, content_type, template = 200, self.get_content_type(route=path), self.load_static_files(path=path)
+                else:
+                    status_code, content_type, template =  404, ContentTypes.html, self.error_pages.page_not_found
+        else:
+            template = _template
+            status_code = _status_code
 
         return await self.final_response(
             template=template,
             status_code=status_code,
             redirect_path=redirect_path,
             content_type=content_type,
+            process_response=process_response,
             **kwargs
         )
 
-    async def final_response(self, template, status_code, content_type, redirect_path, **kwargs):
-        _status_code, _content_type, _redirect_path, template = await self.process_templates(template=template, **kwargs)
+    async def final_response(self, template, status_code, content_type, redirect_path, process_response, **kwargs):
+        _status_code, _content_type, _redirect_path, _process_response, template = await self.process_templates(template=template, **kwargs)
 
         status_code = _status_code or status_code
         redirect_path = _redirect_path or redirect_path
         content_type = _content_type or content_type
+        process_response = _process_response or process_response
 
         if isinstance(template, str) and (self.is_static_file(route=template) or self.is_file_requested(route=template)):
             content_type = self.get_content_type(route=self.normaize_path(route=template))
@@ -336,18 +391,14 @@ class Pyweber:
 
             else:
                 status_code, template = status_code, b'Not found'
-        
-        if isinstance(template, str):
-            if content_type.value in ['text/html', 'text/plain']:
-                template = Template(template=template)
-                content_type = ContentTypes.html
 
-        return status_code, content_type, redirect_path, template     
+        return status_code, content_type, redirect_path, process_response, template     
 
-    async def process_templates(self, template: Union[Callable, Template, Element, dict, str], **kwargs):
+    async def process_templates(self, template: Union[Callable, RedirectRoute, Template, Element, dict, str], **kwargs):
         status_code: int = None
         content_type: ContentTypes = None
         redirect_path = None
+        process_response = False
 
         while callable(template) or isinstance(template, RedirectRoute):
             if callable(template):
@@ -363,11 +414,12 @@ class Pyweber:
                 kwargs = template.kwargs or kwargs
                 status_code = status_code or template.status_code
                 content_type = template.route.content_type
+                process_response = template.route.process_response
                 redirect_path = builded_route
                 kwargs = template.kwargs or kwargs
 
                 if template.route.middlewares:
-                    status_code, template = await self.process_route_middleware(
+                    status_code, process_response, template = await self.process_route_middleware(
                         resp=builded_route,
                         middlewares=template.route.middlewares,
                         status_code=status_code
@@ -379,35 +431,31 @@ class Pyweber:
                             status_code=status_code,
                             content_type=content_type,
                             redirect_path=redirect_path,
+                            process_response=process_response,
                             **kwargs
                         )
                 
                 template = template.route.template
-
-        if isinstance(template, Element):
-            response = Template(template=template.to_html())
         
-        else:
-            response = template
-        
-        return status_code, content_type, redirect_path, response
+        return status_code, content_type, redirect_path, process_response, template
     
     async def process_route_middleware(self, resp: str, middlewares: list[Callable], status_code: int):
-        status_code, response = status_code, None
+        status_code, process_response, response = status_code, False, None
         if isinstance(middlewares, list):
             midd_resp = await self.process_middleware(
                 resp=resp,
                 middlewares=[{
                     'status_code': status_code,
                     'middleware': middleware,
+                    'process_middleware': process_response,
                     'order': None
                 } for middleware in middlewares]
             )
 
             if midd_resp:
-                status_code, response = midd_resp[0], midd_resp[-1]
+                status_code, process_response, response = midd_resp
         
-        return status_code, response
+        return status_code, process_response, response
     
     def is_file_requested(self, route: str):
         return re.match(r".*(\.[a-zA-Z0-9]+)+$", route.split('?')[0].split('/')[-1]) is not None
@@ -457,9 +505,12 @@ class Pyweber:
         )
     
     async def clone_template(self, route: str):
-        _, _, _, last_template = await self.get_template(route=route)
+        _, _, _, _, last_template = await self.get_template(route=route)
+
+        if not isinstance(last_template, Template):
+            last_template = Template(template=str(last_template))
         
-        return last_template.clone
+        return last_template.clone()
 
     def update(self):
         return self.__update_handler() if self.__update_handler else None

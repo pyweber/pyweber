@@ -1,20 +1,28 @@
 from pyweber.core.element import Element
-from typing import Literal
+from pyweber.core.template import Template
+from typing import Literal, Union
 
 class TemplateDiff:
-    def __init__(self, new_element: Element, old_element: Element):
-        self.new_element = new_element
-        self.old_element = old_element
-        self.differences: dict[str, dict[str, str]] = {}
-        self.checked_elements: list[Element] = []
-        self.track_differences()
+    def __init__(self):
+        self.__differences: dict[str, dict[str, str]] = {}
+        self.__checked_elements: list[Element] = []
     
-    def track_differences(self, new_element: Element = None, old_element: Element = None):
-        if not new_element:
-            new_element = self.new_element
+    @property
+    def differences(self): return self.__differences
+    
+    def __raise_typr_error(self, *elements: Element):
+        for element in elements:
+            if not isinstance(element, Element):
+                raise TypeError(f'all elements must be Element instances, but got {type(element).__name__}')
+
+    def track_differences(self, new_element: Union[Element, Template], old_element: Union[Element, Template]):
+        if isinstance(old_element, Template):
+            old_element = old_element.root
         
-        if not old_element:
-            old_element = self.old_element
+        if isinstance(new_element, Template):
+            new_element = new_element.root
+
+        self.__raise_typr_error(old_element, new_element)
         
         status = None
         
@@ -52,14 +60,14 @@ class TemplateDiff:
             if status == 'Added':
                 self.add_element_on_diff(element=old_element, status='Removed')
 
-            self.checked_elements.append(new_element.uuid)
+            self.__checked_elements.append(new_element.uuid)
         
         new_element_childs_map = {child.uuid: child for child in new_element.childs}
         old_element_childs_map = {child.uuid: child for child in old_element.childs}
         
         for uuid, old_child in old_element_childs_map.items():
             if uuid in new_element_childs_map:
-                if old_child.parent and old_child.parent.uuid not in self.checked_elements:
+                if old_child.parent and old_child.parent.uuid not in self.__checked_elements:
                     self.track_differences(new_element_childs_map[uuid], old_child)
             
             else:
@@ -70,7 +78,7 @@ class TemplateDiff:
                 self.add_element_on_diff(element=new_child, status='Added')
     
     def add_element_on_diff(self, element: Element, status: Literal['Added', 'Changed', 'Removed']):
-        self.differences[str(len(self.differences))] = {
+        self.differences[element.uuid] = {
             'parent': element.parent.uuid if element.parent else None,
             'element': element.to_html() if status in ['Added', 'Changed'] else element.uuid,
             'status': status

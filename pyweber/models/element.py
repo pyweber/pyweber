@@ -1,5 +1,5 @@
 from uuid import uuid4
-from typing import TYPE_CHECKING, Callable, Union
+from typing import TYPE_CHECKING, Callable, Union, Any
 from pyweber.core.events import TemplateEvents
 from pyweber.utils.types import EventType, HTMLTag, NonSelfClosingHTMLTags
 
@@ -10,16 +10,18 @@ class ElementConstrutor:
     def __init__(
         self,
         tag: HTMLTag,
-        id: str,
-        content: str,
-        value: str,
+        id: Any,
+        content: Any,
+        value: Any,
         classes: list[str],
         style: dict[str, str],
         attrs: dict[str, str],
         childs: list['ElementConstrutor'],
-        events: 'TemplateEvents',
-        **kwargs
+        events: TemplateEvents,
+        sanitize: bool = False,
+        **kwargs: str
     ):
+        self.sanitize = sanitize
         self.kwargs = kwargs
         self.tag = tag
         self.id = id
@@ -32,6 +34,16 @@ class ElementConstrutor:
         self.events = events or TemplateEvents()
         self.parent = None
         self.data = None
+    
+    @property
+    def sanitize(self): return self.__sanitize
+
+    @sanitize.setter
+    def sanitize(self, value: bool):
+        if not isinstance(value, bool):
+            raise TypeError(f'sanitize value must be a boolean value, but got {type(value).__name__}')
+        
+        self.__sanitize = value
     
     @property
     def template(self):
@@ -176,7 +188,7 @@ class ElementConstrutor:
         self.__attrs = value
     
     def set_attr(self, key: str, value: str):
-        if not key or not value:
+        if not key:
             raise ValueError('key and value cannot be empty or null')
         
         if not isinstance(key, str) or not isinstance(value, str):
@@ -201,7 +213,7 @@ class ElementConstrutor:
             self.__content = None
         else:
             try:
-                self.__content = str(value)
+                self.__content = str(value) if not self.sanitize else self.sanitize_values(str(value))
             except Exception as e:
                 raise ValueError(f"Could not convert value to string: {e}")
     
@@ -215,7 +227,7 @@ class ElementConstrutor:
             self.__value = value
         else:
             try:
-                self.__value = str(value)
+                self.__value = str(value) if not self.sanitize else self.sanitize_values(str(value))
             except Exception as e:
                 raise ValueError(f"Could not convert value to string: {e}")
     
@@ -344,6 +356,16 @@ class ElementConstrutor:
                 return event_id
 
         raise ValueError(f'Event {event.__name__} is an invalid callable ou event_id')
+    
+    def sanitize_values(self, text: str):
+        for key, value in self.__character_to_replace__().items():
+            if key in text:
+                text = text.replace(key, value)
+        
+        return text
+    
+    def __character_to_replace__(self):
+        return {"<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#x27;", "/": "&#x2F;", "&": "&amp;"}
     
     def __repr__(self):
         return (

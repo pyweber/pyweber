@@ -9,8 +9,8 @@ from pyweber.models.routes import RouteManager
 
 class MiddlewareManager:
     def __init__(self):
-        self.__before_request: list[dict[str, Union[int, Callable]]] = []
-        self.__after_request: list[dict[str, Union[int, Callable]]] = []
+        self.__before_request: list[dict[str, Union[int, Callable, bool]]] = []
+        self.__after_request: list[dict[str, Union[int, Callable, bool]]] = []
     
     @property
     def get_before_request_middlewares(self):
@@ -20,15 +20,27 @@ class MiddlewareManager:
     def get_after_request_middlewares(self):
         return self.__after_request
     
-    def before_request(self, status_code: int = 200, order: int = -1):
+    def before_request(self, status_code: int = 200, process_response: bool = True, order: int = -1):
         def wrapper(middleware: Callable[..., Template | Element | str | None]):
-            self.__before_request.insert(order, self.set_middleware(status_code=status_code, middleware=middleware, order=order))
+            self.__before_request.insert(order, self.set_middleware(
+                    status_code=status_code,
+                    middleware=middleware,
+                    order=order,
+                    process_response=process_response
+                )
+            )
             return middleware
         return wrapper
     
-    def after_request(self, status_code: int = None, order: int = -1):
+    def after_request(self, status_code: int = None, process_response: bool = True, order: int = -1):
         def wrapper(middleware: Callable[..., Response | None]):
-            self.__after_request.insert(order, self.set_middleware(status_code=status_code, middleware=middleware, order=order))
+            self.__after_request.insert(order, self.set_middleware(
+                    status_code=status_code,
+                    middleware=middleware,
+                    order=order,
+                    process_response=process_response
+                )
+            )
             return middleware
         return wrapper
     
@@ -38,9 +50,13 @@ class MiddlewareManager:
     def clear_after_request_middleware(self):
         self.__after_request.clear()
     
-    async def process_middleware(self, resp: Union[Request, Response, str], middlewares: list[dict[str, Union[int, Callable]]]) -> None | tuple[int, Response | Template | Element | str | dict]:
+    async def process_middleware(
+        self,
+        resp: Union[Request, Response, str],
+        middlewares: list[dict[str, Union[int, Callable, bool]]]
+    ) -> None | tuple[int, bool, Response | Template | Element | str | dict]:
         for middle_dict in middlewares:
-            status_code, middle, _ = middle_dict.values()
+            status_code, middle, _, process_response = middle_dict.values()
 
             variables = RouteManager.inspect_function(callback=middle)
             var = []
@@ -58,9 +74,9 @@ class MiddlewareManager:
                 response = middle(**kwargs)
 
             if response:
-                return status_code, response
+                return status_code, process_response, response
     
-    def set_middleware(self, status_code: int, middleware: Callable, order: int = -1):
+    def set_middleware(self, status_code: int, middleware: Callable, process_response: bool = True, order: int = -1):
         if not isinstance(order, int):
             raise ValueError(f'middleware order must be an integer instances, but got {type(order).__name__}')
         
@@ -77,9 +93,9 @@ class MiddlewareManager:
             raise TypeError(f"The {middleware.__name__}'s middleware must be receive one parameter only")
         
         if params and not all(param.annotation in [Request, Response] for param in params if param):
-            raise TypeError(f"All parameters of {middleware.__name__}'s middleware must be a Request or Response instances, but got ")
+            raise TypeError(f"All parameters of {middleware.__name__}'s middleware must be a Request or Response instances")
         
-        return {'status_code': status_code, 'middleware': middleware, 'order': order}
+        return {'status_code': status_code, 'middleware': middleware, 'order': order, 'process_response': process_response}
     
     def __repr__(self):
         return (

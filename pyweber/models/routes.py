@@ -74,6 +74,8 @@ class Route:
         middlewares: list[Callable] = None,
         status_code: int = None,
         content_type: ContentTypes = None,
+        title: str = '',
+        process_response: bool = True,
         **kwargs
     ):
         self.group = group
@@ -84,6 +86,8 @@ class Route:
         self.middlewares = middlewares or []
         self.status_code = status_code
         self.content_type = content_type or ContentTypes.html
+        self.title = title
+        self.process_response = process_response
         self.kwargs = kwargs
     
     @property
@@ -270,7 +274,9 @@ class RouteManager:
         name: str = None,
         middlewares: list[str] = None,
         status_code: int = None,
-        content_type: ContentTypes = None
+        content_type: ContentTypes = None,
+        title: str = None,
+        process_response: bool = True
     ):
         def decorator(handler: Callable):
             async def wrapper(**kwargs):
@@ -293,7 +299,9 @@ class RouteManager:
                 name=name,
                 middlewares=middlewares,
                 status_code=status_code,
-                content_type=content_type
+                content_type=content_type,
+                title=title,
+                process_response=process_response
             )
             return wrapper
         return decorator
@@ -307,7 +315,9 @@ class RouteManager:
         name: str = None,
         middlewares: list[Callable] = None,
         status_code: int = None,
-        content_type: ContentTypes = None
+        content_type: ContentTypes = None,
+        title: str = None,
+        process_response: bool = True
     ):
         group = self.get_group(group=group)
         if self.full_route(route=route, group=group) in self.__routes:
@@ -324,7 +334,9 @@ class RouteManager:
             name=name,
             middlewares=middlewares,
             status_code=status_code,
-            content_type=content_type
+            content_type=content_type,
+            title=title,
+            process_response=process_response
         )
 
         self.__routes[_route.full_route] = _route
@@ -411,6 +423,11 @@ class RouteManager:
     
     def get_group(self, group: str):
         return Route.get_group(group=group)
+    
+    def get_group_and_route(self, route: str):
+        group = self.get_group_by_route(route=route)
+        net_route = route.removeprefix(f'/{group}')
+        return group, net_route
     
     def exists(self, route: str) -> bool:
         path, _ = self.resolve_path(route=route)

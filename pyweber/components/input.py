@@ -120,8 +120,10 @@ class InputColor(Input):
         onchange = None,
         oninput = None,
         onclick = None,
+        sanitize: bool = False
     ):
         super().__init__('color', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
 
 class InputText(Input):
@@ -149,8 +151,10 @@ class InputText(Input):
         onchange = None,
         oninput = None,
         onclick = None,
+        sanitize: bool = False
     ):
         super().__init__('text', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
         self.placeholder = placeholder
         self.size = size
@@ -196,8 +200,10 @@ class InputPassword(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__('password', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
         self.placeholder = placeholder
         self.size = size
@@ -253,8 +259,10 @@ class InputEmail(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__('email', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
         self.placeholder = placeholder
         self.size = size
@@ -299,8 +307,10 @@ class InputNumber(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__('number', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
         self.placeholder = placeholder
         self.min = min
@@ -326,7 +336,7 @@ class InputFile(Input):
         id: str = None,
         accept: str = None,
         multiple: bool = False,
-        capture: str = None,  # camera, microphone
+        capture: Literal['camera', 'microphone'] = None,  # camera, microphone
         form = None,
         tabindex = None,
         classes = None,
@@ -361,7 +371,7 @@ class InputCheckbox(Input):
         self,
         name: str = None,
         id: str = None,
-        value: str = "on",
+        value: Literal['on', 'off'] = "on",
         checked: bool = False,
         form = None,
         tabindex = None,
@@ -571,8 +581,10 @@ class InputSearch(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__('search', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
         self.placeholder = placeholder
         self.size = size
@@ -618,8 +630,10 @@ class InputTel(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__('tel', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
         self.placeholder = placeholder
         self.size = size
@@ -665,8 +679,10 @@ class InputUrl(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__('url', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
         self.placeholder = placeholder
         self.size = size
@@ -701,8 +717,10 @@ class InputHidden(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__('hidden', name, id, form, None, classes, style, False, False, False, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
 
 
@@ -727,8 +745,10 @@ class InputSubmit(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__('submit', name, id, form, tabindex, classes, style, disabled, autofocus, False, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
         self.formaction = formaction
         self.formmethod = formmethod
@@ -763,8 +783,10 @@ class InputButton(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__('button', name, id, form, tabindex, classes, style, disabled, autofocus, False, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value
 
 
@@ -785,6 +807,8 @@ class InputReset(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
+        sanitize: bool = False
     ):
         super().__init__('reset', name, id, form, tabindex, classes, style, disabled, autofocus, False, onfocus, onblur, onchange, oninput, onclick,)
+        self.sanitize = sanitize
         self.value = value

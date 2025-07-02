@@ -1,28 +1,29 @@
 import json
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 from pyweber.connection.session import sessions
 from pyweber.core.element import Element
 
 if TYPE_CHECKING:
     from pyweber.pyweber.pyweber import Pyweber
-    from pyweber.connection.websocket import WsServer, WsServerAsgi
+    from pyweber.connection.websocket import WebSocket
 
 class wsMessage:
-    def __init__(self, raw_message: dict[str, (str, float)], app, ws: Union['WsServer', 'WsServerAsgi']):
+    def __init__(self, raw_message: dict[str, (str, float)], app, ws: 'WebSocket'):
+        self.ws = ws
+        self.__app = app
         self.__raw_message = raw_message
         self.__raw_window: dict[str, (int, str, float)] = self.get_raw_window()
         self.__values = self.get_form_values()
-        self.__app = app
-        self.ws = ws
         self.route: str = self.get_value(key='route')
         self.type: str = self.get_value(key='type')
         self.event_ref: str = self.get_value(key='event_ref')
         self.target_uuid: str = self.get_value(key='target_uuid')
-        self.event_data: dict[str, int] = self.get_value(key='event_data')
+        self.event_data: dict[str, int] = self.get_value(key='event_data') or {}
         self.session_id: str = self.get_value(key='sessionId')
+        self.window_event: str = self.get_value(key='window_event')
         self.template = self.get_template()
         self.window = self.get_window()
-    
+        
     @property
     def window_response(self) -> dict[str, (str, int)]:
         return self.__raw_message.get('window_response', {})
@@ -49,12 +50,12 @@ class wsMessage:
 
         window._Window__ws = self.ws
         window.session_id = self.session_id
-        window.width = self.get_window_values(key='width')
-        window.height = self.get_window_values(key='height')
-        window.inner_width = self.get_window_values(key='innerWidth')
-        window.inner_height = self.get_window_values(key='innerHeight')
-        window.scroll_x = self.get_window_values(key='scrollX')
-        window.scroll_y = self.get_window_values(key='scrollY')
+        window.width = self.get_window_values(key='width') or 0
+        window.height = self.get_window_values(key='height') or 0
+        window.inner_width = self.get_window_values(key='innerWidth') or 0
+        window.inner_height = self.get_window_values(key='innerHeight') or 0
+        window.scroll_x = self.get_window_values(key='scrollX') or 0
+        window.scroll_y = self.get_window_values(key='scrollY') or 0
         window.screen = Screen(
             width=self.get_window_values(key='screen').get('width', None),
             height=self.get_window_values(key='screen').get('height', None),
@@ -63,9 +64,9 @@ class wsMessage:
             screenX=self.get_window_values(key='screen').get('screenX', None),
             screenY=self.get_window_values(key='screen').get('screenY', None),
             orientation=Orientation(
-                angle=self.get_window_values(key='screen').get('orientation', None).get('angle', None),
-                type=self.get_window_values(key='screen').get('orientation', None).get('type', None),
-                on_change=self.get_window_values(key='screen').get('orientation', None).get('on_change', None),
+                angle=self.get_window_values(key='screen').get('orientation', {}).get('angle', None),
+                type=self.get_window_values(key='screen').get('orientation', {}).get('type', None),
+                on_change=self.get_window_values(key='screen').get('orientation', {}).get('on_change', None),
             )
         )
         window.location = Location(
@@ -76,12 +77,12 @@ class wsMessage:
             origin=self.get_window_values(key='location').get('origin', None),
         )
         window.session_storage = SessionStorage(
-            data=json.loads(self.get_window_values(key='sessionStorage')),
+            data=json.loads(self.get_window_values(key='sessionStorage') or "{}"),
             session_id=self.session_id,
             ws=self.ws
         )
         window.local_storage = LocalStorage(
-            data=json.loads(self.get_window_values(key='localStorage')),
+            data=json.loads(self.get_window_values(key='localStorage') or "{}"),
             session_id=self.session_id,
             ws=self.ws
         )
@@ -89,10 +90,10 @@ class wsMessage:
         return window
     
     def get_form_values(self) -> dict[str, (str, int, float)]:
-        return json.loads(self.get_value(key='values')) or {}
+        return json.loads(self.get_value(key='values') or "{}") or {}
     
     def get_raw_window(self):
-        return json.loads(self.get_value(key='window_data'))
+        return json.loads(self.get_value(key='window_data') or "{}")
 
     def get_window_values(self, key: str):
         return self.__raw_window.get(key, {})

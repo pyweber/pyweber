@@ -7,7 +7,7 @@ import sys
 
 from pyweber.pyweber.pyweber import Pyweber
 from pyweber.connection.http import HttpServer
-from pyweber.connection.websocket import WsServer
+from pyweber.connection.websocket import WebSocket
 from pyweber.connection.reload import ReloadServer
 from pyweber.config.config import config
 
@@ -25,13 +25,8 @@ class CreatApp:
         self.__server_route = os.environ.get('PYWEBER_SERVER_ROUTE') or kwargs.get('route', None) or config.get('server', 'route')
         self.__disable_ws = os.environ.get('PYWEBER_DISABLE_WS') or kwargs.get('disable_ws', None) or config.get('websocket', 'disable_ws')
         self.http_server = HttpServer(update_handler=self.update)
-        self.ws_server = WsServer(
-            host=self.__server_host,
-            port=int(self.__server_ws_port),
-            cert_file=self.__cert_file,
-            key_file=self.__key_file
-        )
-        self.reload_server = ReloadServer(ws_reload=self.ws_server.async_send_message, http_reload=self.update)
+        self.ws_server = WebSocket(app=self.app, protocol='pyweber')
+        self.reload_server = ReloadServer(ws_reload=self.ws_server.send_message, http_reload=self.update)
     
     @property
     def target(self):
@@ -54,7 +49,13 @@ class CreatApp:
     def run(self):
         self.load_target()
         if self.__disable_ws not in ['True', True, '1', 1]:
-            Thread(target=asyncio.run, args=(self.ws_server.ws_start(),), daemon=True).start()
+            Thread(target=asyncio.run, args=(self.ws_server.ws_start(
+                    host=self.__server_host,
+                    port=self.__server_ws_port,
+                    cert_file=self.__cert_file,
+                    key_file=self.__key_file
+                ),), daemon=True
+            ).start()
 
         if self.__reload_mode in [True, 'True', 1, '1']:
             Thread(target=self.reload_server.start, daemon=True).start()
@@ -80,7 +81,7 @@ class CreatApp:
             if isinstance(obj, Pyweber):
                 obj._Pyweber__update_handler = self.update
                 return obj
-        
+
         return Pyweber(update_handler=self.update)
     
     def load_target(self):
