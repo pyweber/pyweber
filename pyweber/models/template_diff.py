@@ -21,7 +21,7 @@ class TemplateDiff:
         
         if isinstance(new_element, Template):
             new_element = new_element.root
-
+        
         self.__raise_typr_error(old_element, new_element)
         
         status = None

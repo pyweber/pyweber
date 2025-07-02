@@ -1,8 +1,10 @@
 import pytest
 from pyweber.models.template_diff import TemplateDiff
+from pyweber.core.element import Element
 
-class FakeElement:
+class FakeElement(Element):
     def __init__(self, uuid, id=None, content=None, value=None, tag=None, attrs=None, style=None, events=None, classes=None, parent=None, childs=None):
+        super().__init__(tag=tag)
         self.uuid = uuid
         self.id = id or ''
         self.content = content or ''
