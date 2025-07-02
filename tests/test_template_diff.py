@@ -9,7 +9,6 @@ class FakeElement(Element):
         self.id = id or ''
         self.content = content or ''
         self.value = value or ''
-        self.tag = tag or ''
         self.attrs = attrs or {}
         self.style = style or {}
         self.events = events or type("Events", (), {})()  # Empty class
