@@ -11,7 +11,6 @@ class FakeElement(Element):
         self.value = value or ''
         self.attrs = attrs or {}
         self.style = style or {}
-        self.events = events
         self.classes = classes or []
         self.parent = parent
         self.childs = childs or []
@@ -120,10 +119,11 @@ class Events:
         self.onclick = onclick
 
 def test_element_differs_by_events():
+    from pyweber.core.events import TemplateEvents
     e1 = FakeElement(uuid="1")
     e2 = FakeElement(uuid="1")
-    e1.events = Events(onclick="handler1")
-    e2.events = Events(onclick="handler2")
+    e1.events = TemplateEvents(onclick=lambda e: print(e.element))
+    e2.events = TemplateEvents(onchange=lambda e: print(e.element))
     diff = TemplateDiff()
 
     diff.track_differences(e1, e2)
