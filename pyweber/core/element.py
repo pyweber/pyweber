@@ -1,25 +1,29 @@
 from uuid import uuid4
 from typing import Union, Any
 from pyweber.utils.types import HTMLTag, GetBy
-from pyweber.models.element import ElementConstrutor, TemplateEvents
+from pyweber.models.element import (
+    ElementConstrutor,
+    TemplateEvents,
+    ChildElements
+)
 
 class Element(ElementConstrutor):
     def __init__(
         self,
         tag: HTMLTag,
+        childs: ChildElements = None,
         id: str = None,
         content: Any = None,
         value: Any = None,
         classes: list[str] = None,
         style: dict[str, str] = None,
         attrs: dict[str, str] = None,
-        childs: list['Element'] = None,
         events: TemplateEvents = None,
         data: Any = None,
         sanitize: bool = False,
         **kwargs: str
     ):
-        super().__init__(tag, id, content, value, classes, style, attrs, childs, events, sanitize, **kwargs)
+        super().__init__(tag, childs, id, content, value, classes, style, attrs, events, sanitize, **kwargs)
         self.uuid = getattr(self, 'uuid', None) or str(uuid4())
         self.data = data
     
@@ -43,10 +47,13 @@ class Element(ElementConstrutor):
         return self.__childs
     
     @childs.setter
-    def childs(self, value: list['Element']):
-        if not isinstance(value, list):
-            raise TypeError("Children must be a list")
+    def childs(self, value: ChildElements):
+        if not isinstance(value, (list, ChildElements)):
+            raise TypeError(f"Children must be a ChildElements instances, but got {type(value).__name__}")
         
+        if isinstance(value, list):
+            value = ChildElements(self).extend(value)
+
         value = self.__render_dynamic_elements(childs=value)
         
         for child in value:
@@ -72,11 +79,7 @@ class Element(ElementConstrutor):
         if not isinstance(index, int):
             raise TypeError(f'Index must be a integer, but you got {type(index).__name__}')
 
-        try:
-            return self.__childs.pop(index)
-        
-        except IndexError as e:
-            raise IndexError(str(e))
+        return self.__childs.pop(index)
     
     def getElement(self, by: GetBy, value: str, element: 'Element' = None) -> 'Element':
         results = self.getElements(by=by, value=value, element=element)
@@ -151,8 +154,8 @@ class Element(ElementConstrutor):
 
         return list(dict.fromkeys(results))
     
-    def __render_dynamic_elements(self, childs: list[Union['ElementConstrutor', str]]):
-        new_childs: list['ElementConstrutor'] = []
+    def __render_dynamic_elements(self, childs: ChildElements):
+        new_childs: ChildElements = ChildElements(self)
         if childs:
             for child in childs:
                 if isinstance(child, str):

@@ -1,4 +1,5 @@
 from typing import Callable, Union
+from dataclasses import dataclass
 import inspect
 from pyweber.models.request import Request
 from pyweber.models.response import Response
@@ -6,6 +7,12 @@ from pyweber.core.element import Element
 from pyweber.core.template import Template
 from pyweber.utils.types import HTTPStatusCode
 from pyweber.models.routes import RouteManager
+
+@dataclass
+class MiddlewareResult:
+    status_code: int
+    process_response: bool
+    content: Union[Template, Element, Response, dict, str]
 
 class MiddlewareManager:
     def __init__(self):
@@ -47,6 +54,12 @@ class MiddlewareManager:
     def clear_before_request_middleware(self):
         self.__before_request.clear()
     
+    def remove_before_middleware(self, index: int = -1):
+        return self.__before_request.pop(index)
+    
+    def remove_after_middleware(self, index: int = -1):
+        return self.__after_request.pop(index)
+    
     def clear_after_request_middleware(self):
         self.__after_request.clear()
     
@@ -54,7 +67,9 @@ class MiddlewareManager:
         self,
         resp: Union[Request, Response, str],
         middlewares: list[dict[str, Union[int, Callable, bool]]]
-    ) -> None | tuple[int, bool, Response | Template | Element | str | dict]:
+    ):
+        response, status_code, process_response = None, None, None
+
         for middle_dict in middlewares:
             status_code, middle, _, process_response = middle_dict.values()
 
@@ -72,9 +87,26 @@ class MiddlewareManager:
                 response = await middle(**kwargs)
             else:
                 response = middle(**kwargs)
-
+            
             if response:
-                return status_code, process_response, response
+                break
+
+        if not isinstance(resp, Response) and response:
+            return MiddlewareResult(
+                status_code=status_code,
+                process_response=process_response,
+                content=response
+            )
+        
+        if isinstance(resp, Response):
+            if middlewares and not isinstance(response, Response):
+                raise TypeError(f'All after request middleware need return Response instances, but got {type(response).__name__}')
+            
+            return MiddlewareResult(
+                content=response or resp,
+                status_code=resp.status_code,
+                process_response=None
+            )
     
     def set_middleware(self, status_code: int, middleware: Callable, process_response: bool = True, order: int = -1):
         if not isinstance(order, int):

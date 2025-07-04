@@ -12,10 +12,10 @@ def test_cookies(app):
     assert len(app.cookies) == 0
 
 def test_get_before_middlewares(app):
-    assert len(app.get_before_request_middleware) == 0
+    assert len(app.get_before_request_middlewares) == 0
 
 def test_get_after_middlewares(app):
-    assert len(app.get_after_request_middleware) == 0
+    assert len(app.get_after_request_middlewares) == 0
 
 def test_list_routes(app):
     assert '/admin' in app.list_routes
@@ -27,8 +27,8 @@ def test_exists(app):
     assert app.exists('/admin')
 
 def test_template_to_bytes(app):
-    assert isinstance(app.template_to_bytes(template='Hello world')[-1], bytes)
-    assert isinstance(app.template_to_bytes(template=Template(template='Hello world'))[-1], bytes)
-    assert isinstance(app.template_to_bytes(template={'message': 'Hello world'})[-1], bytes)
-    assert isinstance(app.template_to_bytes(template=Element(tag='p', content='Hello world'))[-1], bytes)
-    assert isinstance(app.template_to_bytes(template=b'Hello world')[-1], bytes)
+    assert isinstance(app.template_to_bytes(template='Hello world').content, bytes)
+    assert isinstance(app.template_to_bytes(template=Template(template='Hello world')).content, bytes)
+    assert isinstance(app.template_to_bytes(template={'message': 'Hello world'}).content, bytes)
+    assert isinstance(app.template_to_bytes(template=Element(tag='p', content='Hello world')).content, bytes)
+    assert isinstance(app.template_to_bytes(template=b'Hello world').content, bytes)

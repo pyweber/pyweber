@@ -115,12 +115,12 @@ function connectWebSocket() {
         };
 
         if (data.scroll_to) {
-            window.scrollTo(data.scroll_to.x, data.scroll_to.y);
+            window.scrollTo({left: data.scroll_to.x, top: data.scroll_to.y, behavior: data.scroll_to.behavior});
             return;
         };
 
         if (data.scroll_by) {
-            window.scrollBy(data.scroll_by.x, data.scroll_by.y);
+            window.scrollBy({left: data.scroll_by.x, top: data.scroll_by.y, behavior: data.scroll_by.behavior});
             return;
         };
 
@@ -324,13 +324,13 @@ function sendEvent({type, event, event_ref, window_response}) {
     const eventData = getEventData({type, event, event_ref, window_response});
 
     if (socket.readyState === WebSocket.OPEN) {
-        if (target) {
+        if (target && event_ref == EventRef.DOCUMENT) {
             if (target.getAttribute(`_on${type}`)) {
                 socket.send(JSON.stringify(eventData));
             };
         };
 
-        if (event_ref === 'window') {
+        if (event_ref === EventRef.WINDOW) {
             if (sessionStorage.getItem(type)) {
                 socket.send(JSON.stringify(eventData));
             };

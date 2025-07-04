@@ -5,18 +5,53 @@ from pyweber.utils.types import EventType, HTMLTag, NonSelfClosingHTMLTags
 
 if TYPE_CHECKING:
     from pyweber.core.template import Template
+    from pyweber.core.element import Element
+
+class ChildElements(list['Element']):
+    def __init__(self, parent: 'Element'):
+        super().__init__()
+        self.parent = parent
+    
+    def append(self, element: 'Element'):
+        super().append(element)
+        element.parent = self.parent
+
+        return self
+    
+    def remove(self, element: 'Element'):
+        super().remove(element)
+
+        return self
+    
+    def pop(self, index: int = -1):
+        return super().pop(index)
+    
+    def insert(self, index: int, element: 'Element'):
+        super().insert(index, element)
+        element.parent = self.parent
+
+        return self
+    
+    def extend(self, elements):
+        for element in elements:
+            if not isinstance(element, ElementConstrutor):
+                raise TypeError(f'element must be Element istances, but got {type(element).__name__}')
+            
+            self.append(element=element)
+        
+        return self
 
 class ElementConstrutor:
     def __init__(
         self,
         tag: HTMLTag,
+        childs: ChildElements,
         id: Any,
         content: Any,
         value: Any,
         classes: list[str],
         style: dict[str, str],
         attrs: dict[str, str],
-        childs: list['ElementConstrutor'],
         events: TemplateEvents,
         sanitize: bool = False,
         **kwargs: str
@@ -30,10 +65,10 @@ class ElementConstrutor:
         self.classes = classes or []
         self.style = style or {}
         self.attrs = attrs or {}
-        self.childs = childs or []
-        self.events = events or TemplateEvents()
         self.parent = None
         self.data = None
+        self.events = events or TemplateEvents()
+        self.childs = childs or ChildElements(self)
     
     @property
     def sanitize(self): return self.__sanitize

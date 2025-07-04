@@ -3,7 +3,7 @@ import base64
 import json
 from uuid import uuid4
 from threading import Timer
-from typing import Callable, Union
+from typing import Callable, Union, Literal
 from pyweber.core.events import WindowEvents
 from pyweber.connection.websocket import WebSocket
 from pyweber.utils.types import WindowEventType, OrientationType, BaseStorage
@@ -270,15 +270,15 @@ class Window:
         """Close the current window if it was openned with script."""
         self.__send__(data={'close': True})
 
-    def scroll_to(self, x: float = None, y: float = None):
+    def scroll_to(self, x: float = None, y: float = None, behavior: Literal['auto', 'smooth', 'instant'] = 'instant'):
         """Rola a janela para a posição (x, y)."""
         self.scroll_x, self.scroll_y = x, y
-        self.__send__(data={'scroll_to': {'x': x or self.scroll_x, 'y': y or self.scroll_y}})
+        self.__send__(data={'scroll_to': {'x': x or self.scroll_x, 'y': y or self.scroll_y, 'behavior': behavior}})
 
-    def scroll_by(self, x: float = 0, y: float = 0):
+    def scroll_by(self, x: float = 0, y: float = 0, behavior: Literal['auto', 'smooth', 'instant'] = 'instant'):
         """Rola a janela por um deslocamento (x, y)."""
         self.scroll_x, self.scroll_y = self.scroll_x + x, self.scroll_y + y
-        self.__send__(data={'scroll_to': {'x': self.scroll_x, 'y': self.scroll_y}})
+        self.__send__(data={'scroll_to': {'x': self.scroll_x, 'y': self.scroll_y, 'behavior': behavior}})
     
     def atob(self, encoded_string: str) -> str:
         """Decodifica uma string codificada em Base64."""

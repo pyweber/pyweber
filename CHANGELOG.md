@@ -1,5 +1,17 @@
 # PyWeber Changelog
 
+## [0.9.95] - 2025-07-04
+---
+### New features
+- Allowed `ValueError` when create route with empty template value 
+- Added `remove_before_middleware` and `remove_after_middleware` methods in MiddlewareManager instance do allow remove specific middleware.
+- Added `behavior` parameter in scroll window methods. Now, you can choose one of options: `auto`, `smooth` or `instant`
+- Changed return type from tuple to `MiddlewareResult` for process_middleware method in MiddlewareManager.
+- Changed `childs` type for Element to `ChildElements` instances. Now you can use list methods e.g: `append`, `remove`, `extend`, `pop`, to manipulate childs without problem.
+
+### Bug Fixes
+- Fixed duplicate send events allways that target has document and window events. Now, window events only will be sent if it was created before.
+
 ## [0.9.94] - 2025-07-02
 ---
 ### New features

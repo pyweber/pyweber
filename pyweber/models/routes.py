@@ -94,16 +94,6 @@ class Route:
     def full_route(self): return f"/{self.group.removeprefix('__')}{self.route}" if self.group != self.default_group() else self.route
     
     @property
-    def template(self): return self.__template
-
-    @template.setter
-    def template(self, value: Union[RedirectRoute, Template, Element, Callable, dict, str]):
-        if not value:
-            raise ValueError('Template does not be an empty value')
-        
-        self.__template = value
-    
-    @property
     def middlewares(self): return self.__middlewares
 
     @middlewares.setter

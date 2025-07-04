@@ -3,15 +3,14 @@ import json
 import os
 import re
 import webbrowser
-from datetime import datetime
-from typing import Union, Callable, Literal
+from typing import Union, Callable, Any
+from dataclasses import dataclass
 from pyweber.core.element import Element
 from pyweber.core.template import Template
 from pyweber.models.request import Request
 from pyweber.models.response import Response
 from pyweber.utils.types import ContentTypes, StaticFilePath
 from pyweber.utils.loads import LoadStaticFiles
-from pyweber.utils.utils import PrintLine
 from pyweber.core.window import window
 
 from pyweber.models.middleware import MiddlewareManager
@@ -23,186 +22,76 @@ from pyweber.models.routes import (
     RouteManager
 )
 
+@dataclass
+class StateResult:
+    template: Any
+    status_code: int
+    content_type: ContentTypes
+    redirect_path: str
+    process_response: bool
+    kwargs: dict[str, Any]
 
-class Pyweber:
+    def update(
+        self,
+        template = None,
+        status_code = None,
+        content_type = None,
+        redirect_path = None,
+        process_response = None,
+        kwargs = {}
+    ):
+        self.template = template if template else self.template
+        self.status_code = status_code if status_code else self.status_code
+        self.content_type = content_type if content_type else self.content_type
+        self.redirect_path = redirect_path if redirect_path else self.redirect_path
+        self.process_response = process_response if process_response is not None else self.process_response
+        self.kwargs = kwargs if kwargs else self.kwargs
+
+        return self
+
+@dataclass
+class TemplateResult:
+    status_code: int
+    content_type: ContentTypes
+    redirect_path: str
+    process_response: bool
+    template: Union[Template, Element, dict, list, str]
+
+@dataclass
+class ContentResult:
+    content: bytes
+    content_type: ContentTypes
+
+    def __post__init__(self):
+        if not isinstance(self.content_type, ContentTypes):
+            raise TypeError(f"content_type must be ContentTypes, got {type(self.content_type).__name__}")
+        
+        if not isinstance(self.content, bytes):
+            raise TypeError(f"content must be bytes, got {type(self.content).__name__}")
+
+class Pyweber(
+    ErrorPages,
+    CookieManager,
+    MiddlewareManager,
+    RouteManager
+):
     def __init__(self, **kwargs):
+        MiddlewareManager.__init__(self)
+        RouteManager.__init__(self)
+        CookieManager.__init__(self)
+        ErrorPages.__init__(self)
         self.__update_handler: Callable = kwargs.get('update_handler', None)
-        self.__middleware_manager = MiddlewareManager()
-        self.__route_manager = RouteManager()
-        self.__cookie_manager = CookieManager()
-        self.error_pages = ErrorPages()
         self.__add_framework_routes()
         self.data = None
         self.__visited__ = set()
         self.__request: Request = None
-    
-    # Error pages
-
-    @property
-    def error_pages(self):
-        return self.__error_pages
-    
-    @error_pages.setter
-    def error_pages(self, error_pages: ErrorPages):
-        if not isinstance(error_pages, ErrorPages):
-            raise TypeError(f'Error Page must be an Error Pages instances, but got {type(error_pages).__name__}')
-        
-        self.__error_pages = error_pages
-    
-    # Cokkie Manager
-    @property
-    def cookies(self): return self.__cookie_manager.cookies
-
-    def set_cookie(
-        self,
-        cookie_name: str,
-        cookie_value: str,
-        path: str = '/',
-        samesite: Literal['Strict', 'Lax', None] = 'Strict',
-        httponly: bool = True,
-        secure: bool= True,
-        expires: datetime = None
-    ):
-        return self.__cookie_manager.set_cookie(
-            cookie_name=cookie_name,
-            cookie_value=cookie_value,
-            path=path,
-            samesite=samesite,
-            httponly=httponly,
-            secure=secure,
-            expires=expires
-        )
-    
-    # Middlewares
-
-    @property
-    def get_before_request_middleware(self):
-        return self.__middleware_manager.get_before_request_middlewares
-    
-    @property
-    def get_after_request_middleware(self):
-        return self.__middleware_manager.get_after_request_middlewares
-    
-    def before_request(self, status_code: int = 200, process_response: bool = True, order: int=-1):
-        return self.__middleware_manager.before_request(
-            status_code=status_code,
-            process_response=process_response,
-            order=order
-        )
-    
-    def after_request(self, status_code: int = None, process_response: bool = True, order: int=-1):
-        return self.__middleware_manager.after_request(
-            status_code=status_code,
-            process_response=process_response,
-            order=order
-        )
-    
-    def clear_before_request_middleware(self):
-        return self.__middleware_manager.clear_before_request_middleware()
-    
-    def clear_after_request_middleware(self):
-        return self.__middleware_manager.clear_after_request_middleware()
-    
-    async def process_middleware(self, resp: Request | Response, middlewares: list[dict[str, int | Callable]]):
-        return await self.__middleware_manager.process_middleware(resp=resp, middlewares=middlewares)
-
-    # Router
-    
-    @property
-    def list_routes(self): return self.__route_manager.list_routes
-    @property
-    def list_redirected_routes(self): return self.__route_manager.list_redirected_routes
-
-    def exists(self, route: str): return self.__route_manager.exists(route=route)
-    def is_redirected(self, route: str): return self.__route_manager.is_redirected(route=route)
-    def route_info(self, target: str): return self.__route_manager.route_info(target=target)
-    def full_route(self, route: str, group: str=None): return self.__route_manager.full_route(route=route, group=group)
-
-    def clear_routes(self): return self.__route_manager.clear_routes()
-    def remove_route(self, route: str, group: str=None): return self.__route_manager.remove_route(route=route, group=group)
-    def remove_redirected_route(self, route: str): return self.__route_manager.remove_redirected_route(route=route)
-
-    def add_group_routes(self, routes: list[str], group: str = None): return self.__route_manager.add_group_routes(routes=routes, group=group)
-    def remove_group(self, group: str): return self.__route_manager.remove_group(group=group)
-    def get_group_routes(self, group: str = None): return self.__route_manager.get_group_routes(group=group)
-    def get_group_by_route(self, route: str): return self.__route_manager.get_group_by_route(route=route)
-    def get_group_and_route(self, route: str): return self.__route_manager.get_group_and_route(route=route)
-
-    def get_route_by_path(self, route: str, follow_redirect: bool = True): return self.__route_manager.get_route_by_path(route=route, follow_redirect=follow_redirect)
-    def get_route_by_name(self, name: str): return self.__route_manager.get_route_by_name(name=name)
-    def get_redirected_route(self, route: str): return self.__route_manager.get_redirected_route(route=route)
-
-    def resolve_path(self, route: str): return self.__route_manager.resolve_path(route=route)
-    def build_route(self, route: str, **kwargs): return self.__route_manager.build_route(route=route, **kwargs)
-
-    def route(
-        self,
-        route: str,
-        methods: list[str] = None,
-        group: str = None,
-        name: str = None,
-        middlewares: list[str] = None,
-        status_code: int = None,
-        content_type: ContentTypes = None,
-        title: str = None,
-        process_response: bool = True
-    ):
-        return self.__route_manager.route(
-            route=route,
-            methods=methods,
-            group=group,
-            name=name,
-            middlewares=middlewares,
-            status_code=status_code,
-            content_type=content_type,
-            title=title,
-            process_response=process_response
-        )
-    
-    def add_route(
-        self,
-        route: str,
-        template: Union[Callable, Template, Element, str, dict],
-        methods: list[str] = None,
-        group: str = None,
-        name: str = None,
-        middlewares: list[Callable] = None,
-        status_code: int = None,
-        content_type: ContentTypes = None,
-        title: str = None,
-        process_response: bool = True
-    ):
-        return self.__route_manager.add_route(
-            route=route,
-            template=template,
-            methods=methods,
-            group=group,
-            name=name,
-            middlewares=middlewares,
-            status_code=status_code,
-            content_type=content_type,
-            title=title,
-            process_response=process_response
-        )
-    
-    def update_route(self, route: str, group: str=None, **kwargs):
-        return self.__route_manager.update_route(route=route, group=group, **kwargs)
-    
-    def redirect(self, from_route: str, target: str, status_code: int = 302, **kwargs):
-        return self.__route_manager.redirect(from_route=from_route, target=target, status_code=status_code, **kwargs)
-    
-    def to_route(self, target: str, status_code=302, **kwargs):
-        return self.__route_manager.to_route(target=target, status_code=status_code, **kwargs)
-    
-    def inspect_function(self, callback: Callable):
-        return self.__route_manager.inspect_function(callback=callback)
     
     # Request
     @property
     def request(self): return self.__request
 
     # Response
-    async def get_response(self, request: Request):
+    async def get_response(self, request: Request) -> Response:
         if not isinstance(request, Request):
             raise TypeError(f'request must be a Request instances, but got {type(request).__name__}')
         
@@ -216,103 +105,123 @@ class Pyweber:
         # process before request middlewares
         before_request_response = await self.process_middleware(
             resp=request,
-            middlewares=self.get_before_request_middleware
+            middlewares=self.get_before_request_middlewares
         )
 
         if before_request_response:
-            status_code, process_response, response = before_request_response
-            status_code, content_type, redirect_path, process_response, template = await self.process_templates(template=response)
+            template_result = await self._process_templates(
+                state_result=StateResult(
+                    template=before_request_response.content,
+                    status_code=before_request_response.status_code,
+                    process_response=before_request_response.process_response,
+                    content_type=ContentTypes.html,
+                    redirect_path=request.path,
+                    kwargs={}
+                )
+            )
         
         else:
-            status_code, content_type, redirect_path, process_response, template = await self.get_template(
+            template_result = await self.get_template(
                 route=request.path,
                 method=request.method
             )
 
-        content_type, content = self.template_to_bytes(
-            template=template,
-            content_type=content_type,
+        content_result = self.template_to_bytes(
+            template=template_result.template,
+            content_type=template_result.content_type,
             title=title,
-            process_response=process_response
-        )
-        
-        response = Response(
-            request=request,
-            response_content=content,
-            code=status_code,
-            cookies=self.cookies,
-            response_type=content_type,
-            route=redirect_path
+            process_response=template_result.process_response
         )
         
         # process after request middlewares
         after_request_response = await self.process_middleware(
-            resp=response,
-            middlewares=self.get_after_request_middleware
+            resp=Response(
+                request=request,
+                response_content=content_result.content,
+                response_type=content_result.content_type,
+                code=template_result.status_code,
+                cookies=self.cookies,
+                route=template_result.redirect_path
+            ),
+            middlewares=self.get_after_request_middlewares
         )
 
-        if after_request_response:
-            _, _, response = after_request_response
-
-            if not isinstance(response, Response):
-                raise TypeError(f'All after request middleware need return Response instances, but got {type(response).__name__}')
-
-        return response
+        return after_request_response.content
     
     # Utils
     def template_to_bytes(
         self,
-        template: Union[Template, Element, dict, str, bytes],
+        template: Union[Template, Element, dict, list, set, str, bytes],
         content_type: ContentTypes = ContentTypes.html,
         title: str = None,
         process_response: bool = False
-    ) -> tuple[ContentTypes, bytes]:
-        template_str = None
-        template_bytes = b''
-
-        if not isinstance(content_type, ContentTypes):
-            raise TypeError(f'content_type must be ContentTypes instances, but got {type(content_type).__name__}')
-
+    ):
         if isinstance(template, Template):
-            template.title = title
-            template_str = template.build_html()
+            return self._process_template_object(template=template, content_type=content_type)
         
         elif isinstance(template, Element):
-            if process_response:
-                template_str = Template(
-                    template=template.to_html(),
-                    title=title
-                ).build_html()
-            else:
-                template_str = template.to_html()
+            return self._process_element_object(
+                element=template,
+                title=title,
+                content_type=content_type,
+                process_template=process_response
+            )
         
         elif isinstance(template, (dict, set, list)):
-            template_str = json.dumps(template)
-            content_type = ContentTypes.json
+            return self._process_json_object(template=template)
 
         elif isinstance(template, bytes):
-            template_bytes = template
-            content_type = content_type or ContentTypes.unkown
-
-        elif isinstance(template, str):
-            if content_type.value in ['text/html', 'text/plain']:
-                if process_response:
-                    template_str = Template(template=template, title=title).build_html()
-                    content_type = ContentTypes.html
-                else:
-                    template_str = template
-                    content_type = ContentTypes.txt
-            else:
-                template_str = template
+            return self._process_byte_object(data=template, content_type=content_type)
+        
         else:
-            if process_response:
-                template_str = Template(template=str(template), title=title).build_html()
-            else:
-                template_str = str(template)
+            return self._process_string_object(
+                data=template,
+                title=title,
+                content_type=content_type,
+                process_response=process_response
+            )
+    
+    def _process_byte_object(self, data: bytes, content_type: ContentTypes):
+        return ContentResult(content=data, content_type=content_type)
+    
+    def _process_json_object(self, template: Union[dict, list, set]):
+        return ContentResult(content=json.dumps(template).encode(), content_type=ContentTypes.json)
+    
+    def _process_template_object(self, template: Template, content_type: ContentTypes):
+        return ContentResult(content=template.build_html().encode(), content_type=content_type)
+    
+    def _process_element_object(
+        self,
+        element: Element,
+        title: str,
+        content_type: ContentTypes,
+        process_template: bool
+    ):        
+        if process_template:
+            return ContentResult(
+                content=Template(template=element.to_html(), title=title).build_html().encode(),
+                content_type=content_type
+            )
         
-        template_bytes = template_str.encode() if isinstance(template_str, str) else template_bytes
+        return ContentResult(content=element.to_html().encode(), content_type=content_type)
+    
+    def _process_string_object(
+        self,
+        data: str,
+        title: str,
+        content_type: ContentTypes,
+        process_response: bool
+    ):
+        if not isinstance(data, str):
+            data = str(data)
         
-        return content_type, template_bytes
+        if process_response and content_type == ContentTypes.html:
+            return ContentResult(
+                content=Template(template=data, title=title).build_html().encode(),
+                content_type=content_type
+            )
+        
+        return ContentResult(content=data.encode(), content_type=content_type)
 
     def get_content_type(self, route: str) -> ContentTypes:
         if self.is_file_requested(route=route):
@@ -325,137 +234,157 @@ class Pyweber:
 
     async def get_template(self, route: str, method: str = 'GET'):
         path, kwargs = self.resolve_path(route=route)
-        status_code, content_type, redirect_path, template, _template, process_response = 404, ContentTypes.html, route, path, None, None
 
-        if self.exists(route=path):
-            status_code, _kwargs = 200, {}
-
-            if self.is_redirected(route=path):
-                redirected_route = self.get_redirected_route(route=path)
-                _kwargs = redirected_route.kwargs
-                status_code = redirected_route.status_code
-                _route = redirected_route.route
-                kwargs = redirected_route.kwargs or kwargs
-                redirect_path = self.build_route(_route.full_route, **kwargs)
-            else:
-                _route = self.get_route_by_path(route=route, follow_redirect=False)
-            
-            if str(method).upper() in _route.methods:
-                template = _route.template
-                
-                kwargs = _kwargs or kwargs
-                status_code = status_code or _route.status_code
-                content_type = _route.content_type
-                process_response = _route.process_response
-
-                if _route.middlewares:
-                    self.__visited__.add(route)
-                    _status_code, _, _template = await self.process_route_middleware(
-                        resp=route,
-                        middlewares=_route.middlewares,
-                        status_code=status_code
-                    )
-        
-        if not _template:
-            if template == path:
-                if self.is_static_file(route=path):
-                    status_code, content_type, template = 200, self.get_content_type(route=path), self.load_static_files(path=path)
-                else:
-                    status_code, content_type, template =  404, ContentTypes.html, self.error_pages.page_not_found
-        else:
-            template = _template
-            status_code = _status_code
-
-        return await self.final_response(
-            template=template,
-            status_code=status_code,
-            redirect_path=redirect_path,
-            content_type=content_type,
-            process_response=process_response,
-            **kwargs
+        state_result = StateResult(
+            template=None,
+            status_code=404,
+            content_type=ContentTypes.html,
+            process_response=True,
+            kwargs=kwargs,
+            redirect_path=path
         )
 
-    async def final_response(self, template, status_code, content_type, redirect_path, process_response, **kwargs):
-        _status_code, _content_type, _redirect_path, _process_response, template = await self.process_templates(template=template, **kwargs)
+        if self.exists(route=path):
+            _route = self.get_route_by_path(route=path)
 
-        status_code = _status_code or status_code
-        redirect_path = _redirect_path or redirect_path
-        content_type = _content_type or content_type
-        process_response = _process_response or process_response
+            if method in _route.methods:
+                if self.is_redirected(route=path):
+                    redirect_route = self.get_redirected_route(route=path)
+                    kwargs = redirect_route.kwargs or redirect_route.route.kwargs
 
-        if isinstance(template, str) and (self.is_static_file(route=template) or self.is_file_requested(route=template)):
-            content_type = self.get_content_type(route=self.normaize_path(route=template))
-            if self.is_static_file(route=template):
-                status_code = 200 if status_code == 404 else status_code
-                template = self.load_static_files(path=template)
+                    state_result.update(
+                        kwargs=kwargs,
+                        status_code=redirect_route.status_code,
+                        redirect_path=self.build_route(_route.full_route, **kwargs),
+                        template=_route.template,
+                        process_response=_route.process_response,
+                        content_type=_route.content_type
+                    )
+                else:
+                    state_result.update(
+                        template=_route.template,
+                        process_response=_route.process_response,
+                        status_code=_route.status_code,
+                        content_type=_route.content_type,
+                        kwargs=kwargs
+                    )
+                
+                if _route.middlewares:
+                    middleware_result = await self.process_route_middleware(
+                        resp=self.request,
+                        middlewares=_route.middlewares,
+                        status_code=_route.status_code
+                    )
 
+                    if middleware_result:
+                        state_result.update(
+                            template=middleware_result.content,
+                            status_code=middleware_result.status_code,
+                            process_response=middleware_result.process_response
+                        )
+    
+        if not state_result.template or isinstance(state_result.template, str):
+            path = state_result.template or path
+
+            if self.is_static_file(route=path) or self.is_file_requested(route=path):
+                content_type = self.get_content_type(route=self.normaize_path(route=path))
+                if self.is_static_file(route=path):
+                    state_result.update(
+                        template=self.load_static_files(path=path),
+                        content_type=content_type,
+                        status_code=200
+                    )
+                else:
+                    state_result.update(
+                        template=b'File not found',
+                        status_code=404,
+                        content_type=content_type
+                    )
             else:
-                status_code, template = status_code, b'Not found'
+                content_type = self.get_content_type(route=path)
 
-        return status_code, content_type, redirect_path, process_response, template     
+                state_result.update(
+                    template=self.page_not_found,
+                    content_type=self.get_content_type(route=route),
+                    process_response=False if content_type.value != ContentTypes.html.value else True
+                )
+        
+        return await self._process_templates(state_result=state_result)   
 
-    async def process_templates(self, template: Union[Callable, RedirectRoute, Template, Element, dict, str], **kwargs):
-        status_code: int = None
-        content_type: ContentTypes = None
-        redirect_path = None
-        process_response = False
+    def _check_recursion(self, route: str):
+        if route in self.__visited__:
+            raise RecursionError(f'Recursion detected for route {route}')
+        self.__visited__.add(route)
+    
+    async def _process_redirect_route(
+        self,
+        state: StateResult,
+        redirect_route: RedirectRoute,
+        redirect_path: str,
+        kwargs
+    ):
+        if redirect_route.route.middlewares:
+            middleware_result = await self.process_route_middleware(
+                resp=self.request,
+                middlewares=redirect_route.route.middlewares,
+                status_code=redirect_route.status_code
+            )
+
+            return state.update(
+                status_code=middleware_result.status_code,
+                process_response=middleware_result.process_response,
+                template=middleware_result.content
+            )
+        
+        return state.update(
+            template=redirect_route.route.template,
+            status_code=redirect_route.status_code,
+            content_type=redirect_route.route.content_type,
+            redirect_path=redirect_path,
+            process_response=redirect_route.route.process_response,
+            kwargs=redirect_route.kwargs or kwargs
+        )
+
+    async def _process_templates(self, state_result: StateResult):
+        template = state_result.template
 
         while callable(template) or isinstance(template, RedirectRoute):
             if callable(template):
-                template = await template(**kwargs) if inspect.iscoroutinefunction(template) else template(**kwargs)
+                template = await template(**state_result.kwargs) if inspect.iscoroutinefunction(template) else template(**state_result.kwargs)
             
             if isinstance(template, RedirectRoute):
-                builded_route = self.build_route(route=template.route.full_route, **kwargs)
+                redirect_path = self.build_route(route=template.route.full_route, **state_result.kwargs)
 
-                if builded_route in self.__visited__:
-                    raise RecursionError(f'Recursion detected for route {builded_route}')
-                self.__visited__.add(builded_route)
+                self._check_recursion(route=redirect_path)
+                state_result = await self._process_redirect_route(
+                    state=state_result,
+                    redirect_route=template,
+                    redirect_path=redirect_path,
+                    kwargs=state_result.kwargs
+                )
 
-                kwargs = template.kwargs or kwargs
-                status_code = status_code or template.status_code
-                content_type = template.route.content_type
-                process_response = template.route.process_response
-                redirect_path = builded_route
-                kwargs = template.kwargs or kwargs
-
-                if template.route.middlewares:
-                    status_code, process_response, template = await self.process_route_middleware(
-                        resp=builded_route,
-                        middlewares=template.route.middlewares,
-                        status_code=status_code
-                    )
-
-                    if not callable(template) or not isinstance(template, RedirectRoute):
-                        return await self.final_response(
-                            template=template,
-                            status_code=status_code,
-                            content_type=content_type,
-                            redirect_path=redirect_path,
-                            process_response=process_response,
-                            **kwargs
-                        )
-                
-                template = template.route.template
+                template = state_result.template
         
-        return status_code, content_type, redirect_path, process_response, template
+        return TemplateResult(
+            status_code=state_result.status_code,
+            content_type=state_result.content_type,
+            redirect_path=state_result.redirect_path,
+            process_response=state_result.process_response,
+            template=template
+        )
     
     async def process_route_middleware(self, resp: str, middlewares: list[Callable], status_code: int):
-        status_code, process_response, response = status_code, False, None
-        if isinstance(middlewares, list):
-            midd_resp = await self.process_middleware(
-                resp=resp,
-                middlewares=[{
+        return await self.process_middleware(
+            resp=resp,
+            middlewares=[
+                {
                     'status_code': status_code,
                     'middleware': middleware,
-                    'process_middleware': process_response,
+                    'process_middleware': False,
                     'order': None
-                } for middleware in middlewares]
-            )
-
-            if midd_resp:
-                status_code, process_response, response = midd_resp
-        
-        return status_code, process_response, response
+                } for middleware in middlewares
+            ]
+        )
     
     def is_file_requested(self, route: str):
         return re.match(r".*(\.[a-zA-Z0-9]+)+$", route.split('?')[0].split('/')[-1]) is not None
@@ -505,12 +434,12 @@ class Pyweber:
         )
     
     async def clone_template(self, route: str):
-        _, _, _, _, last_template = await self.get_template(route=route)
+        template_result = await self.get_template(route=route)
 
-        if not isinstance(last_template, Template):
-            last_template = Template(template=str(last_template))
+        if not isinstance(template_result.template, Template):
+            template_result.template = Template(template=str(template_result.template))
         
-        return last_template.clone()
+        return template_result.template.clone()
 
     def update(self):
         return self.__update_handler() if self.__update_handler else None
