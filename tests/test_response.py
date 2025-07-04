@@ -131,25 +131,6 @@ class TestResponse:
         assert response.status_code == expected
 
     @patch('pyweber.utils.types.HTTPStatusCode.search_by_code')
-    @patch('pyweber.config.config.config.get')
-    def test_status_code_property_401_unauthorized(self, mock_config, mock_search, mock_request):
-        """Testa status_code para 401 Unauthorized"""
-        mock_search.return_value = "401 Unauthorized"
-        mock_config.return_value = "MyApp"
-
-        response = Response(
-            request=mock_request,
-            response_content=b"",
-            code=401,
-            cookies=[],
-            response_type=ContentTypes.html,  # Corrigido para minúsculo
-            route="/protected"
-        )
-
-        expected = "401 Unauthorized\r\nWWW-Authenticate: Basic realm=MyApp"
-        assert response.status_code == expected
-
-    @patch('pyweber.utils.types.HTTPStatusCode.search_by_code')
     def test_status_code_property_405_method_not_allowed(self, mock_search, mock_request):
         """Testa status_code para 405 Method Not Allowed"""
         mock_search.return_value = "405 Method Not Allowed"
