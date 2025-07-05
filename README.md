@@ -1,6 +1,6 @@
 # PyWeber Framework
 
-<img src="https://pyweber.readthedocs.io/en/latest/images/pyweber.png" alt="PyWeber Logo">
+<img src="https://pyweber.dev/en/latest/images/pyweber.png" alt="PyWeber Logo">
 
 [![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master) [![License](https://img.shields.io/pypi/l/pyweber.svg)](https://github.com/pyweber/pyweber/blob/master/LICENSE)
 

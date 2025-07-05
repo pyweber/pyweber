@@ -22,11 +22,12 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://pyweber.readthedocs.io/en/latest"
+Documentation = "https://pyweber.dev/"
 Source = "https://github.com/pyweber/pyweber"
 Tracker = "https://github.com/pyweber/pyweber/issues"
 PyPI = "https://pypi.org/project/pyweber/"
 YouTube = "https://youtube.com/@devpythonMZ"
+Examples = "https://github.com/pyweber-examples"
 
 [project.scripts]
 pyweber = "pyweber.cli.commands:app"
