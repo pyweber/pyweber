@@ -428,7 +428,7 @@ function getWindowData() {
 
 function getFormValues() {
     const values = {};
-    const inputs = document.querySelectorAll('input, textarea, select');
+    const inputs = document.querySelectorAll('input, textarea, select, option');
     inputs.forEach(input => {
         const id = input.getAttribute('uuid');
         if (id) {
@@ -446,7 +446,6 @@ function getFormValues() {
                 } else {
                     input.removeAttribute('checked');
                 };
-                
             } else if (input.tagName === 'SELECT') {
                 values[id] = input.value;
 

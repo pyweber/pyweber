@@ -1,5 +1,33 @@
 # PyWeber Changelog
 
+## [0.9.96] - 2025-07-05
+---
+### Improvements
+
+- Enhanced `<select>` and `<option>` support:
+  - Fixed issue where `<option>` values were lost during server-client sync.
+  - Options now preserve their `value` and `selected` states automatically without requiring manual `.value` assignment.
+  - Defining `.value` on a `<select>` automatically sets the corresponding `<option>` as selected and removes `selected` from others.
+  - `.value` getter on `<select>` returns the `value` of the selected `<option>`, or the first available one if none are explicitly selected.
+  - Aligned with native HTML select behavior, reducing need for manual loops.
+
+- Standardized `<textarea>` handling:
+  - `.value` can now be used to both get and set values in `<textarea>`, while `.content` still works for initialization.
+  - Calling `.value = "..."` on `<textarea>` also sets `.content`, ensuring two-way consistency.
+  - `.value` getter returns `.content` for `<textarea>` elements.
+
+- Cleaner task editing logic:
+  - Editing forms now use direct `.value` assignments for `<select>`, `<textarea>`, and other fields — no longer requires iterating manually over options to apply `selected`.
+
+- Backend-frontend synchronization improved:
+  - Data reflection in inputs is now more consistent during updates and form submissions, especially when dynamically modifying templates.
+
+### New features
+- Added `Element.has_attr(name)`:
+  - Utility method to check if a DOM element has a specific attribute.
+  - Example usage: `if element.has_attr("selected")`.
+  - Improves readability and encapsulates attribute logic more cleanly.
+
 ## [0.9.95] - 2025-07-04
 ---
 ### New features

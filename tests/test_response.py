@@ -5,7 +5,6 @@ from pyweber.models.response import Response
 from pyweber.models.request import Request
 from pyweber.utils.types import ContentTypes, HTTPStatusCode
 
-
 class TestResponse:
     """Testes para a classe Response"""
 

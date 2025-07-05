@@ -60,11 +60,11 @@ class ElementConstrutor:
         self.kwargs = kwargs
         self.tag = tag
         self.id = id
+        self.attrs = attrs or {}
+        self.style = style or {}
         self.content = content
         self.value = value
         self.classes = classes or []
-        self.style = style or {}
-        self.attrs = attrs or {}
         self.parent = None
         self.data = None
         self.events = events or TemplateEvents()
@@ -234,6 +234,9 @@ class ElementConstrutor:
     def get_attr(self, key: str, default=None) -> str | None:        
         return self.__attrs.get(key, default)
     
+    def has_attr(self, attribute: str, /):
+        return attribute in self.__attrs.keys()
+    
     def remove_attr(self, key: str):
         if key in self.__attrs:
             del self.__attrs[key]
@@ -249,22 +252,49 @@ class ElementConstrutor:
         else:
             try:
                 self.__content = str(value) if not self.sanitize else self.sanitize_values(str(value))
+
             except Exception as e:
                 raise ValueError(f"Could not convert value to string: {e}")
     
     @property
     def value(self):
+        if self.tag == 'select':
+            index = -1
+
+            if hasattr(self, 'childs') and self.childs:
+                for i, child in enumerate(self.childs):
+                    if child.tag == 'option':
+                        index = i if index < 0 else index
+
+                        if child.has_attr('selected'):
+                            return child.value
+             
+            return self.childs[index].value if index >= 0 else None
+            
         return self.__value
     
     @value.setter
     def value(self, value: str):
-        if value is None:
-            self.__value = value
-        else:
+        if value is not None:
             try:
-                self.__value = str(value) if not self.sanitize else self.sanitize_values(str(value))
+                value = str(value) if not self.sanitize else self.sanitize_values(str(value))
             except Exception as e:
                 raise ValueError(f"Could not convert value to string: {e}")
+        
+        self.__value = value
+
+        if self.tag == 'textarea':
+            self.content = value
+        
+        if self.tag == 'select':
+            self.__value = None
+            if hasattr(self, 'childs') and self.childs:
+                for child in self.childs:
+                    if child.tag == 'option':
+                        if child.value == value:
+                            child.set_attr('selected', '')
+                        else:
+                            child.remove_attr('selected')
     
     @property
     def events(self):

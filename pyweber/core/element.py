@@ -56,9 +56,6 @@ class Element(ElementConstrutor):
 
         value = self.__render_dynamic_elements(childs=value)
         
-        for child in value:
-            child.parent = self
-        
         self.__childs = value
     
     def add_child(self, child: 'Element'):
