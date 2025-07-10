@@ -1,6 +1,6 @@
 # PyWeber Framework
 
-<img src="https://pyweber.dev/en/latest/images/pyweber.png" alt="PyWeber Logo">
+<img src="https://pyweber.readthedocs.io/en/latest/images/pyweber.png" alt="PyWeber Logo">
 
 [![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master) [![License](https://img.shields.io/pypi/l/pyweber.svg)](https://github.com/pyweber/pyweber/blob/master/LICENSE)
 
@@ -44,7 +44,8 @@ class Counter(pw.Template):
                 <p>Count: <span id="count">0</span></p>
                 <button id="increment">Increment</button>
             </div>
-        """)
+        """,
+        title='Hello pyweber')
 
         self.button = self.querySelector("#increment")
         self.button.events.onclick = self.increment
@@ -196,5 +197,13 @@ pyweber add-section --section-name database
 # Update framework
 pyweber --update
 ```
+
+## Next Steps
+
+- [Installation Guide](installation.md) - Detailed setup instructions
+- [Templates](template.md) - Creating dynamic UI components
+- [Elements](element.md) - DOM manipulation
+- [Events](events.md) - Handling user interactions
+- [CLI](cli.md) - Command-line tools
 
 Visit [Pyweber Docs](https://pyweber.readthedocs.io/) for complete documentation.
