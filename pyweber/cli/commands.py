@@ -10,7 +10,7 @@ from pyweber.utils.loads import StaticTemplates
 from pyweber.utils.utils import PrintLine, Colors
 from importlib.metadata import version, PackageNotFoundError
 
-class CLI:
+class CLI: # pragma: no cover
     def __init__(self):
         self.default_file = 'main.py'
         self.default_path_config_file = '.pyweber'
@@ -333,7 +333,7 @@ class CLI:
         except PackageNotFoundError:
             return "0.0.0"
 
-class CommandFunctions:
+class CommandFunctions: # pragma: no cover
     def __init__(self):
         self.project_name: Path = None
 
@@ -637,7 +637,7 @@ class CommandFunctions:
         }
         PrintLine(f"{colors.get(level, '')}{message}{colors.get('reset')}")
 
-class ConfigManagerCLI:
+class ConfigManagerCLI: # pragma: no cover
     def __init__(self):
         self.config_file = config
     

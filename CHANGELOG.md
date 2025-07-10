@@ -1,5 +1,24 @@
 # PyWeber Changelog
 
+## [0.9.97] - 2025-07-10
+---
+### New features
+- **OpenAPI/Swagger Integration**: Full automatic OpenAPI 3.0 documentation generation with Swagger UI interface accessible at `/docs` endpoint
+- **Multi-Type Model Support**: Automatic detection and processing of Pydantic models, dataclasses, and vanilla Python classes in route parameters
+- **Smart Parameter Resolution**: Intelligent separation between path parameters and request body fields with automatic type inference
+- **Dynamic Schema Generation**: Real-time OpenAPI schema creation based on function signatures and type annotations
+- **Automatic Documentation**: Zero-configuration API documentation with interactive Swagger UI, including examples and validation schemas
+- Added `files` attribute in `Element` instances. It is available only on `Input Elements` with type `file`
+- Now you can get all files content loaded in real-time using event-handlers. Now, is not necessary post-request to get files
+- Added `search_name_by_code` in HttpStatusCode instance. Now, you can get the http status_code description
+
+### Technical Improvements
+- **OpenApiProcessor Class**: New dedicated class for handling OpenAPI specification generation and type mapping
+- **Enhanced Type System**: Comprehensive mapping between Python types and OpenAPI/JSON Schema types with format support
+- **UUID-based Cache Busting**: Dynamic UUID generation for OpenAPI endpoint URLs to prevent caching issues
+- **Flexible Model Instantiation**: Automatic object instantiation from request data regardless of model type (Pydantic, dataclass, or vanilla class)
+
+
 ## [0.9.96] - 2025-07-05
 ---
 ### Improvements

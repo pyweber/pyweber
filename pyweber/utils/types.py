@@ -4,6 +4,21 @@ from enum import Enum
 from typing import Dict, Any, Union
 from importlib.resources import files
 
+class DateFormat: pass
+class DateTimeFormat: pass
+class PasswordFormat: pass
+class ByteFormat: pass
+class EmailFormat: pass
+class UuidFormat: pass
+class UrlFormat: pass
+class HostnameFormat: pass
+class Ipv4Format: pass
+class Ipv6Format: pass
+class Int32Format: pass
+class Int64Format: pass
+class FloatFormat: pass
+class DoubleFormnat: pass
+
 class BaseStorage:
     def __init__(self, data: dict[str, (str, int)]):
         self.data = data or {}
@@ -174,6 +189,7 @@ class StaticFilePath(Enum):
     admin_page = files(framework).joinpath(os.path.join('admin', 'index.html'))
     admin_css_file = files(framework).joinpath(os.path.join('admin', 'src', 'style.css'))
     admin_js_file = files(framework).joinpath(os.path.join('admin', 'src', 'script.js'))
+    pyweber_docs = files(framework).joinpath(os.path.join('static', 'docs.html'))
 
     @classmethod
     def all_static_files(cls):
@@ -286,7 +302,15 @@ class HTTPStatusCode(Enum):
             if str(code) in value.value:
                 return value.value
         
-        return cls.NOT_FOUND.value
+        raise Warning(f'{code} is not an httpstatus code')
+    
+    @classmethod
+    def search_name_by_code(cls, code: int):
+        for value in cls:
+            if str(code) in value.value:
+                return value.name
+        
+        raise Warning(f'{code} is not an httpstatus code')
 
 class EventType(Enum):
     # Mouse Events

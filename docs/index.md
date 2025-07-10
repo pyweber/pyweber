@@ -44,7 +44,8 @@ class Counter(pw.Template):
                 <p>Count: <span id="count">0</span></p>
                 <button id="increment">Increment</button>
             </div>
-        """)
+        """,
+        title='Hello pyweber')
 
         self.button = self.querySelector("#increment")
         self.button.events.onclick = self.increment

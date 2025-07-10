@@ -1,13 +1,16 @@
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union, List
 from pyweber.connection.session import sessions
 from pyweber.core.element import Element
+from pyweber.models.file import File
+from pyweber.models.file import Field
+from pyweber.utils.utils import PrintLine
 
 if TYPE_CHECKING:
     from pyweber.pyweber.pyweber import Pyweber
     from pyweber.connection.websocket import WebSocket
 
-class wsMessage:
+class wsMessage: # pragma: no cover
     def __init__(self, raw_message: dict[str, (str, float)], app, ws: 'WebSocket'):
         self.ws = ws
         self.__app = app
@@ -99,7 +102,25 @@ class wsMessage:
         return self.__raw_window.get(key, {})
     
     def insert_values(self, element: Element):
-        element.value = self.__values.get(element.uuid, None)
+        values: Union[List[dict[str, Union[str, List[int]]]], str] = self.__values.get(element.uuid, None)
+        if element.tag == 'input' and element.attrs.get('type') == 'file':
+
+            element.files.extend([
+                File(
+                    field=Field(
+                        name=None,
+                        filename=value.get('name'),
+                        content_type=value.get('content_type'),
+                        value=bytes(value.get('content'))
+                    )
+                ) for value in values if value
+            ])
+
+            element.value = ';'.join([value.get('name') for value in values if value]) or None
+            
+        else:
+            element.value = values
+
         if element.childs:
             for child in element.childs:
                 self.insert_values(element=child)

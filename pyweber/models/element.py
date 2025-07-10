@@ -1,7 +1,19 @@
 from uuid import uuid4
-from typing import TYPE_CHECKING, Callable, Union, Any
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Union,
+    Any
+)
+
 from pyweber.core.events import TemplateEvents
-from pyweber.utils.types import EventType, HTMLTag, NonSelfClosingHTMLTags
+from pyweber.utils.types import (
+    EventType,
+    HTMLTag,
+    NonSelfClosingHTMLTags
+)
+
+from pyweber.models.file import File
 
 if TYPE_CHECKING:
     from pyweber.core.template import Template
@@ -53,7 +65,8 @@ class ElementConstrutor:
         style: dict[str, str],
         attrs: dict[str, str],
         events: TemplateEvents,
-        sanitize: bool = False,
+        sanitize: bool,
+        files: list[File],
         **kwargs: str
     ):
         self.sanitize = sanitize
@@ -67,6 +80,7 @@ class ElementConstrutor:
         self.classes = classes or []
         self.parent = None
         self.data = None
+        self.files = files or []
         self.events = events or TemplateEvents()
         self.childs = childs or ChildElements(self)
     
@@ -87,6 +101,30 @@ class ElementConstrutor:
     @template.setter
     def template(self, value: 'Template'):
         self.__template = value
+    
+    @property
+    def files(self):
+        if self.tag == 'input' and self.attrs.get('type', None) == 'file': 
+            return self.__files
+        
+        return None
+
+    @files.setter
+    def files(self, files: list[File]):
+        if self.tag == 'input' and self.attrs.get('type', None) == 'file':
+            if not files:
+                self.__files = []
+            
+            if not isinstance(files, (list, set, tuple)):
+                raise TypeError(f'file must be an interable intances, but got {type(files).__name__}')
+            
+            if not all(isinstance(file, File) for file in files):
+                raise TypeError(f'all file elements must be a File instances')
+            
+            self.__files = files
+
+        else:
+            self.__files = None
     
     @property
     def uuid(self):
@@ -217,7 +255,7 @@ class ElementConstrutor:
         if not isinstance(value, dict):
             raise TypeError('attrs value must be a dict of strings')
         
-        if not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
+        if not all(isinstance(key, str) for key in value.keys()):
             raise TypeError('All keys and values must be a string')
         
         self.__attrs = value
@@ -226,7 +264,7 @@ class ElementConstrutor:
         if not key:
             raise ValueError('key and value cannot be empty or null')
         
-        if not isinstance(key, str) or not isinstance(value, str):
+        if not isinstance(key, str):
             raise TypeError('Key or value must be a string')
         
         self.__attrs[key] = value
@@ -268,7 +306,7 @@ class ElementConstrutor:
 
                         if child.has_attr('selected'):
                             return child.value
-             
+
             return self.childs[index].value if index >= 0 else None
             
         return self.__value

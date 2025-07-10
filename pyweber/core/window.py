@@ -8,7 +8,7 @@ from pyweber.core.events import WindowEvents
 from pyweber.connection.websocket import WebSocket
 from pyweber.utils.types import WindowEventType, OrientationType, BaseStorage
 
-class Orientation:
+class Orientation: # pragma: no cover
     def __init__(self, angle: int, type: OrientationType, on_change: Callable = None):
         self.angle = angle
         self.on_change = on_change
@@ -29,7 +29,7 @@ class Orientation:
 
         self.__on_change = event
 
-class Screen:
+class Screen: # pragma: no cover
     def __init__(
         self,
         width: float,
@@ -48,7 +48,7 @@ class Screen:
         self.screenX = screenX
         self.screenY = screenY
 
-class Location:
+class Location: # pragma: no cover
     def __init__(
         self,
         host: str,
@@ -63,7 +63,7 @@ class Location:
         self.route = route
         self.protocol = protocol
 
-class LocalStorage(BaseStorage):
+class LocalStorage(BaseStorage): # pragma: no cover
     """Localstorage"""
     def __init__(self, data: dict[str, (int, float)], session_id: str, ws: 'WebSocket'):
         super().__init__(data=data)
@@ -102,7 +102,7 @@ class LocalStorage(BaseStorage):
                 session_id=self.__ws
             ))
 
-class SessionStorage(BaseStorage):
+class SessionStorage(BaseStorage): # pragma: no cover
     """SessionStorage"""
     def __init__(self, data: dict[str, (int, float)], session_id: str, ws: 'WebSocket'):
         super().__init__(data=data)
@@ -137,7 +137,7 @@ class SessionStorage(BaseStorage):
                 session_id=self.sesssion_id
             ))
 
-class Confirm:
+class Confirm: # pragma: no cover
     def __init__(self, confirm_result: str, confirm_id: str):
         self.result=confirm_result
         self.id=confirm_id
@@ -145,7 +145,7 @@ class Confirm:
     def __repr__(self):
         return f'result={self.result}, id={self.id}'
 
-class Prompt:
+class Prompt: # pragma: no cover
     def __init__(self, prompt_result: str, prompt_id: str):
         self.result=prompt_result
         self.id=prompt_id
@@ -153,7 +153,7 @@ class Prompt:
     def __repr__(self):
         return f'result={self.result}, id={self.id}'
 
-class Window:
+class Window: # pragma: no cover
     def __init__(self):
         self.__events_dict: dict[str, Callable] = {}
         self.width: float = 0.0

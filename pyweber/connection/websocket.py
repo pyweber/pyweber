@@ -320,7 +320,7 @@ class WebSocket(BaseWebsockets):
             protocol = 'wss' if ssl_context else 'ws'
             PrintLine(text=f"Server [ws] is running in {protocol}://{host}:{port}")
 
-            async with async_serve(self.ws_handler_wsgi, host=host, port=port, ssl=ssl_context) as server:
+            async with async_serve(self.ws_handler_wsgi, host=host, port=port, ssl=ssl_context, max_size=2**48, write_limit=2**48) as server:
                 await server.serve_forever()
 
         except Exception as e:

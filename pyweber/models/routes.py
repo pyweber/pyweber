@@ -1,17 +1,17 @@
+import re
+import inspect
+from string import punctuation
+from typing import Callable, Union, Any
+
 from pyweber.core.template import Template
 from pyweber.core.element import Element
 from pyweber.utils.types import HTTPStatusCode, ContentTypes
-
-import inspect
-from string import punctuation
 from pyweber.utils.exceptions import (
     InvalidRouteFormatError,
     RouteAlreadyExistError,
     RouteNotFoundError,
     RouteNameAlreadyExistError
 )
-
-from typing import Callable, Union
 
 class RedirectRoute:
     def __init__(
@@ -76,6 +76,7 @@ class Route:
         content_type: ContentTypes = None,
         title: str = '',
         process_response: bool = True,
+        callback: Callable[..., Any] = None,
         **kwargs
     ):
         self.group = group
@@ -88,7 +89,18 @@ class Route:
         self.content_type = content_type or ContentTypes.html
         self.title = title
         self.process_response = process_response
+        self.callback = callback
         self.kwargs = kwargs
+    
+    @property
+    def callback(self): return self.__callback
+
+    @callback.setter
+    def callback(self, callback: Callable[..., Any]):
+        if callback:
+            assert callable(callback)
+        
+        self.__callback = callback or self.template if callable(self.template) else lambda **kwargs: self.template
     
     @property
     def full_route(self): return f"/{self.group.removeprefix('__')}{self.route}" if self.group != self.default_group() else self.route
@@ -168,6 +180,88 @@ class Route:
             raise InvalidRouteFormatError()
         
         self.__route = value
+    
+    @staticmethod
+    def paramaters_types():
+        return {'int': 'integer', 'str': 'string', 'float': 'number'}
+    
+    @staticmethod
+    def argument_types():
+        return {
+            **Route.paramaters_types(),
+            'list': 'array',
+            'dict': 'object',
+            'set': 'array',
+            'tuple': 'array'
+        }
+    
+    @classmethod
+    def get_callback_parameters(cls, callback: Callable[..., Any]):
+        sign = inspect.signature(obj=callback)
+        params = sign.parameters
+
+        return {param.name: {
+                    "default": param.default,
+                    "types": param.annotation,
+                } for _, param in params.items()}
+    
+    @classmethod
+    def get_query_parameters(cls, route: str, callback: Callable):
+        assert isinstance(route, str)
+        pattern = r'{\s*(.*?)\s*}'
+        params_list = re.findall(pattern, route)
+        params: dict[str, dict[str, dict[str, Any]]] = {"parameters": {}, "body": {}}
+
+        callback_parameters = cls.get_callback_parameters(callback)
+
+        for param in params_list:
+            if param in callback_parameters:
+                params['parameters'][param] = {}
+                _types = callback_parameters[param].get('types')
+                default = callback_parameters[param].get('default')
+
+                params['parameters'][param]['type'] = Route.paramaters_types().get(_types.__name__, 'string')
+                params['parameters'][param]['required'] = True if default == inspect._empty else False
+                params['parameters'][param]['default'] = default
+
+            else:
+                params['parameters'][param] = {
+                    'type': 'string',
+                    'default': inspect._empty,
+                    'required': True
+                }
+        
+        if callback.__name__ != '<lambda>':
+            parameters = {key: value for key, value in callback_parameters.items() if key not in params_list}
+
+            if parameters:
+                body = {
+                    "description": "",
+                    "required": True,
+                    "content": {
+                        ContentTypes.json.value: {
+                            "schema": {
+                                "type": 'object',
+                                "required": [param for param, val in parameters.items() if val != inspect._empty],
+                                "properties": {
+                                    param: {
+                                        "default": callback_parameters[param].get(
+                                            'default'
+                                        ) if callback_parameters[param].get('default') != inspect._empty else None,
+                                        'type': Route.argument_types().get(
+                                            callback_parameters[param].get('types').__name__,
+                                            'string'
+                                        )
+                                    } for param, value in parameters.items()
+                                }
+                            }
+                        }
+                    }
+                }
+
+                params['body'] = body
+
+        return params
 
     @staticmethod
     def get_group(group: str):
@@ -291,7 +385,8 @@ class RouteManager:
                 status_code=status_code,
                 content_type=content_type,
                 title=title,
-                process_response=process_response
+                process_response=process_response,
+                callback=handler
             )
             return wrapper
         return decorator
@@ -307,7 +402,8 @@ class RouteManager:
         status_code: int = None,
         content_type: ContentTypes = None,
         title: str = None,
-        process_response: bool = True
+        process_response: bool = True,
+        **kwargs
     ):
         group = self.get_group(group=group)
         if self.full_route(route=route, group=group) in self.__routes:
@@ -315,6 +411,11 @@ class RouteManager:
         
         if self.get_route_by_name(name=name):
             raise RouteNameAlreadyExistError(name=name)
+        
+        if not callable(template):
+            template = lambda **kwargs: template
+        
+        handler = kwargs.get('callback', None) or template
         
         _route = Route(
             route=route,
@@ -326,7 +427,8 @@ class RouteManager:
             status_code=status_code,
             content_type=content_type,
             title=title,
-            process_response=process_response
+            process_response=process_response,
+            callback=handler
         )
 
         self.__routes[_route.full_route] = _route

@@ -19,10 +19,11 @@ function connectWebSocket() {
     let reconnectAttemps = 0
     socket = new WebSocket(`${wsProtocol}//${wsHost}:${wsPort}`);
 
-    socket.onopen = function() {
+    socket.onopen = async function() {
         console.log('Connected to WebSocket!');
         socketReady = true;
-        socket.send(JSON.stringify(getEventData({})));
+        const event_data = await getEventData({})
+        socket.send(JSON.stringify(event_data));
     };
 
     socket.onerror = function(error) {
@@ -38,7 +39,7 @@ function connectWebSocket() {
         };
     };
 
-    socket.onmessage = function(event) {
+    socket.onmessage = async function(event) {
         const data = JSON.parse(event.data);
 
         if (data.window) {
@@ -95,16 +96,19 @@ function connectWebSocket() {
 
         if (data.confirm) {
             const result = window.confirm(data.confirm);
+            const event_data = await getEventData({window_response: { confirm_result: result, confirm_id: data.confirm_id }});
             socket.send(
-                JSON.stringify(getEventData({window_response: { confirm_result: result, confirm_id: data.confirm_id }}))
+                JSON.stringify(event_data)
             );
             return;
         };
 
         if (data.prompt) {
             const result = window.prompt(data.prompt.message, data.prompt.default || "");
+            const event_data = await getEventData({window_response: { prompt_result: result, prompt_id: data.prompt_id }});
+
             socket.send(
-                JSON.stringify(getEventData({window_response: { prompt_result: result, prompt_id: data.prompt_id }}))
+                JSON.stringify(event_data)
             );
             return;
         };
@@ -125,10 +129,11 @@ function connectWebSocket() {
         };
 
         if (data.set_timeout) {
-            const timerId = setTimeout(() => {
+            const timerId = setTimeout(async () => {
                 // Notificar o Python que o timeout foi concluído
+                const event_data = await getEventData({window_response: { timeout_completed: true, timeout_id: data.set_timeout.id }});
                 socket.send(
-                    JSON.stringify(getEventData({window_response: { timeout_completed: true, timeout_id: data.set_timeout.id }}))
+                    JSON.stringify(event_data)
                 );
             }, data.set_timeout.delay);
             
@@ -139,10 +144,12 @@ function connectWebSocket() {
         };
 
         if (data.set_interval) {
-            const intervalId = setInterval(() => {
+            const intervalId = setInterval(async () => {
                 // Notificar o Python que o intervalo foi executado
+                const event_data = await getEventData({window_response: { interval_executed: true, interval_id: data.set_interval.id }});
+
                 socket.send(
-                    JSON.stringify(getEventData({window_response: { interval_executed: true, interval_id: data.set_interval.id }}))
+                    JSON.stringify(event_data)
                 );
             }, data.set_interval.interval);
             
@@ -171,10 +178,16 @@ function connectWebSocket() {
 
         // request_animation_frame
         if (data.request_animation_frame) {
-            const frameId = requestAnimationFrame(() => {
+            const frameId = requestAnimationFrame(async () => {
                 // Notificar o Python que o frame foi processado
+                const event_data = await getEventData({
+                    window_response: {
+                        animation_frame_executed: true,
+                        frame_id: data.request_animation_frame.id
+                    }
+                })
                 socket.send(
-                    JSON.stringify(getEventData({window_response: { animation_frame_executed: true, frame_id: data.request_animation_frame.id }}))
+                    JSON.stringify(event_data)
                 );
             });
             
@@ -313,7 +326,7 @@ function setSessionId(sessionId) {
     }
 }
 
-function sendEvent({type, event, event_ref, window_response}) {
+async function sendEvent({type, event, event_ref, window_response}) {
 
     if (event_ref === EventRef.WINDOW && !window_event_received) {
         earyEventsBuffer.push({type, event, event_ref, window_response});
@@ -321,7 +334,7 @@ function sendEvent({type, event, event_ref, window_response}) {
     };
 
     const target = event.target instanceof HTMLElement ? event.target : null;
-    const eventData = getEventData({type, event, event_ref, window_response});
+    const eventData = await getEventData({type, event, event_ref, window_response});
 
     if (socket.readyState === WebSocket.OPEN) {
         if (target && event_ref == EventRef.DOCUMENT) {
@@ -350,12 +363,14 @@ function fromBase64(base64) {
     return new TextDecoder().decode(Uint8Array.from(atob(base64), c => c.charCodeAt(0)));
 };
 
-function getEventData({type=null, event=null, event_ref=null, window_response=null}) {
+async function getEventData({type=null, event=null, event_ref=null, window_response=null}) {
     let target;
 
     if (event){
         target = event.target instanceof HTMLElement ? event.target : null;
     };
+
+    values = await getFormValues();
 
     const eventData = {
         type: type,
@@ -363,7 +378,7 @@ function getEventData({type=null, event=null, event_ref=null, window_response=nu
         route: window.location.pathname,
         target_uuid: target?.getAttribute("uuid") ?? null,
         template: document.documentElement.outerHTML,
-        values: JSON.stringify(getFormValues()),
+        values: JSON.stringify(values),
         event_data: {
             clientX: event?.clientX ?? null,
             clientY: event?.clientY ?? null,
@@ -426,10 +441,12 @@ function getWindowData() {
     return windowData;
 }
 
-function getFormValues() {
+async function getFormValues() {
     const values = {};
     const inputs = document.querySelectorAll('input, textarea, select, option');
-    inputs.forEach(input => {
+
+    
+    for (const input of inputs) {
         const id = input.getAttribute('uuid');
         if (id) {
             if (input.type === 'radio') {
@@ -446,6 +463,32 @@ function getFormValues() {
                 } else {
                     input.removeAttribute('checked');
                 };
+            } else if (input.type == 'file') {
+
+                if (input.files) {
+                    const files = Array.from(input.files);
+
+                    const arquivos = await Promise.all(files.map(file => {
+                        return new Promise(resolve => {
+                            const reader = new FileReader();
+
+                            reader.onload = function (e) {
+                                const arraybuffer = e.target.result;
+                                const bytes = new Uint8Array(arraybuffer);
+
+                                resolve({
+                                    content: Array.from(bytes),
+                                    size: file.size,
+                                    name: file.name,
+                                    content_type: file.type || "application/octet-stream",
+                                });
+                            };
+                            reader.readAsArrayBuffer(file);
+                        })
+                    }));
+
+                    values[id] = arquivos;
+                }
             } else if (input.tagName === 'SELECT') {
                 values[id] = input.value;
 
@@ -462,7 +505,7 @@ function getFormValues() {
                 values[id] = input.value;
             }
         }
-    });
+    };
 
     return values;
 }
@@ -563,9 +606,9 @@ function trackEvents() {
         "securitypolicyviolation"
     ];
 
-    documentEvents.forEach(eventType => {
+    for (const eventType of documentEvents) {
         document.addEventListener(eventType, (event) => sendEvent({type: eventType, event: event, event_ref: EventRef.DOCUMENT}));
-    });
+    };
 
     windowEvents.forEach(eventType => {
         window.addEventListener(eventType, (event) => sendEvent({type: eventType, event: event, event_ref: EventRef.WINDOW}));

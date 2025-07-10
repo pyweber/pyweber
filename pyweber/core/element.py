@@ -1,6 +1,7 @@
 from uuid import uuid4
 from typing import Union, Any
 from pyweber.utils.types import HTMLTag, GetBy
+from pyweber.models.file import File
 from pyweber.models.element import (
     ElementConstrutor,
     TemplateEvents,
@@ -21,9 +22,23 @@ class Element(ElementConstrutor):
         events: TemplateEvents = None,
         data: Any = None,
         sanitize: bool = False,
+        files: list[File] = None,
         **kwargs: str
     ):
-        super().__init__(tag, childs, id, content, value, classes, style, attrs, events, sanitize, **kwargs)
+        super().__init__(
+            tag=tag,
+            childs=childs,
+            id=id,
+            content=content,
+            value=value,
+            classes=classes,
+            style=style,
+            attrs=attrs,
+            events=events,
+            sanitize=sanitize,
+            files=files,
+            **kwargs
+        )
         self.uuid = getattr(self, 'uuid', None) or str(uuid4())
         self.data = data
     
