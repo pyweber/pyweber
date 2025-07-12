@@ -1,4 +1,4 @@
-site_name: PyWeber Documentation
+site_name: Pyweber Documentation
 theme:
   name: material
   features:

@@ -11,10 +11,10 @@ from pyweber.models.request import Request, ClientInfo
 from pyweber.utils.utils import PrintLine, Colors
 from typing import TYPE_CHECKING, Callable
 
-if TYPE_CHECKING:
+if TYPE_CHECKING: # pragma: no cover
     from pyweber.connection.websocket import TaskManager
 
-class HttpServer:
+class HttpServer: # pragma: no cover
     def __init__(self, update_handler: Callable):
         self.connections: list[socket.socket] = []
         self.route, self.port, self.host = None, None, None

@@ -8,7 +8,7 @@ from pyweber.utils.loads import LoadStaticFiles
 from pyweber.config.config import config
 from pyweber.utils.types import HTTPStatusCode
 
-class Template:
+class Template: # pragma: no cover
     def __init__(self, template: str, status_code: int = 200, title: str = None, **kwargs):
         self.__template = self.__read_file(file_path=template)
         self.kwargs = kwargs

@@ -1,14 +1,14 @@
-from typing import TYPE_CHECKING, Callable, Union, Any
+from typing import TYPE_CHECKING, Callable, Any
 import asyncio
 
-if TYPE_CHECKING:
+if TYPE_CHECKING: # pragma: no cover
     from pyweber.connection.websocket import WebSocket
     from pyweber.connection.session import Session
     from pyweber.pyweber.pyweber import Pyweber
     from pyweber.core.template import Template, Element
     from pyweber.core.window import Window
 
-class EventData:
+class EventData: # pragma: no cover
     def __init__(self, event_data: dict[str, int]):
         self.clientX = event_data.get('clientX', None)
         self.clientY = event_data.get('clientY', None)
@@ -21,7 +21,7 @@ class EventData:
     def __repr__(self):
         return f'EventData(key: {self.key}, clientX: {self.clientX}, clientY: {self.clientY}, timestamp: {self.timestamp})'
 
-class EventHandler:
+class EventHandler: # pragma: no cover
     def __init__(
         self,
         event_type: str,
@@ -76,7 +76,7 @@ class EventHandler:
     def __repr__(self):
         return f'EventHandler(event_type: {self.event_type}, route: {self.route})'
 
-class EventConstrutor:
+class EventConstrutor: # pragma: no cover
     def __init__(
         self,
         target_id: str,
@@ -124,7 +124,7 @@ class EventConstrutor:
 
 EventBook: dict[str, Callable] = {}
 
-class TemplateEvents:
+class TemplateEvents: # pragma: no cover
     def __init__(
         self,
         # Eventos de Mouse

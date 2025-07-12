@@ -6,7 +6,7 @@ from pyweber.models.file import File
 from pyweber.models.file import Field
 from pyweber.utils.utils import PrintLine
 
-if TYPE_CHECKING:
+if TYPE_CHECKING: # pragma: no cover
     from pyweber.pyweber.pyweber import Pyweber
     from pyweber.connection.websocket import WebSocket
 

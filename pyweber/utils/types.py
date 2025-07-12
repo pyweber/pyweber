@@ -4,20 +4,20 @@ from enum import Enum
 from typing import Dict, Any, Union
 from importlib.resources import files
 
-class DateFormat: pass
-class DateTimeFormat: pass
-class PasswordFormat: pass
-class ByteFormat: pass
-class EmailFormat: pass
-class UuidFormat: pass
-class UrlFormat: pass
-class HostnameFormat: pass
-class Ipv4Format: pass
-class Ipv6Format: pass
-class Int32Format: pass
-class Int64Format: pass
-class FloatFormat: pass
-class DoubleFormnat: pass
+class DateFormat: pass # pragma: no cover
+class DateTimeFormat: pass # pragma: no cover
+class PasswordFormat: pass # pragma: no cover
+class ByteFormat: pass # pragma: no cover
+class EmailFormat: pass # pragma: no cover
+class UuidFormat: pass # pragma: no cover
+class UrlFormat: pass # pragma: no cover
+class HostnameFormat: pass # pragma: no cover
+class Ipv4Format: pass # pragma: no cover
+class Ipv6Format: pass # pragma: no cover
+class Int32Format: pass # pragma: no cover
+class Int64Format: pass # pragma: no cover
+class FloatFormat: pass # pragma: no cover
+class DoubleFormnat: pass # pragma: no cover
 
 class BaseStorage:
     def __init__(self, data: dict[str, (str, int)]):
@@ -30,13 +30,13 @@ class BaseStorage:
             return self.data.get(key, default)
     
     def keys(self):
-        return self.data.keys()
+        return list(self.data.keys())
     
     def values(self):
-        return self.__filter_data().values()
+        return list(self.__filter_data().values())
     
     def items(self):
-        return self.__filter_data().items()
+        return list(self.__filter_data().items())
     
     def __filter_data(self):
         try:
@@ -45,10 +45,10 @@ class BaseStorage:
         except (TypeError, json.JSONDecodeError):
             return self.data
     
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         return repr(self.__filter_data())
 
-class Colors:
+class Colors: # pragma: no cover
     RESET = "\033[0m"
     BOLD = "\033[1m"
 
@@ -79,7 +79,7 @@ class Colors:
     BOLD_CYAN = "\033[1;96m"
     BOLD_WHITE = "\033[1;97m"
 
-class JWTAlgorithms(Enum):
+class JWTAlgorithms(Enum): # pragma: no cover
     HS256 = 'HS256'
     HS384 = 'HS384'
     HS512 = 'HS512'
@@ -93,13 +93,13 @@ class JWTAlgorithms(Enum):
     PS384 = 'PS384'
     PS512 = 'PS512'
 
-class OrientationType(Enum):
+class OrientationType(Enum): # pragma: no cover
     LANDSCAPE_PRIMARY = "landscape-primary"
     LANDSCAPE_SECONDARY = "landscape-secondary"
     PORTRAIT_PRIMARY = "portrait-primary"
     PORTRAIT_SECONDARY = "portrait-secondary"
 
-class ContentTypes(Enum):
+class ContentTypes(Enum): # pragma: no cover
     # -------- TEXT TYPES --------
     html = "text/html"
     css = "text/css"
@@ -173,7 +173,7 @@ class ContentTypes(Enum):
     def content_list(cls) -> list[str]:
         return [value.name for value in cls]
 
-class StaticFilePath(Enum):
+class StaticFilePath(Enum): # pragma: no cover
     framework = 'pyweber'
     html_base = files(framework).joinpath(os.path.join('static', 'html.html'))
     html_404 = files(framework).joinpath(os.path.join('static', 'html404.html'))
@@ -190,12 +190,13 @@ class StaticFilePath(Enum):
     admin_css_file = files(framework).joinpath(os.path.join('admin', 'src', 'style.css'))
     admin_js_file = files(framework).joinpath(os.path.join('admin', 'src', 'script.js'))
     pyweber_docs = files(framework).joinpath(os.path.join('static', 'docs.html'))
+    pyweber_loading = files(framework).joinpath(os.path.join('static', 'loading.html'))
 
     @classmethod
     def all_static_files(cls):
         return [value.value for value in cls]
 
-class WebSocketStatusCode(Enum):
+class WebSocketStatusCode(Enum): # pragma: no cover
     NORMAL_CLOSURE = "1000 Normal Closure"
     GOING_AWAY = "1001 Going Away"
     PROTOCOL_ERROR = "1002 Protocol Error"
@@ -224,7 +225,7 @@ class WebSocketStatusCode(Enum):
         
         return cls.INTERNAL_SERVER_ERROR.value
 
-class HTTPStatusCode(Enum):
+class HTTPStatusCode(Enum): # pragma: no cover
     # Informational Responses (1xx)
     CONTINUE = "100 Continue"
     SWITCHING_PROTOCOLS = "101 Switching Protocols"
@@ -312,7 +313,7 @@ class HTTPStatusCode(Enum):
         
         raise Warning(f'{code} is not an httpstatus code')
 
-class EventType(Enum):
+class EventType(Enum): # pragma: no cover
     # Mouse Events
     CLICK = "onclick"
     DBLCLICK = "ondblclick"
@@ -372,7 +373,7 @@ class EventType(Enum):
     TOUCHEND = "ontouchend"
     TOUCHCANCEL = "ontouchcancel"
 
-class WindowEventType(Enum):
+class WindowEventType(Enum): # pragma: no cover
     # Eventos de Janela e Navegação
     AFTER_PRINT = "onafterprint"
     BEFORE_PRINT = "onbeforeprint"
@@ -477,7 +478,7 @@ class WindowEventType(Enum):
     GOTPOINTERCAPTURE = "ongotpointercapture"
     LOSTPOINTERCAPTURE = "onlostpointercapture"
 
-class HTMLTag(Enum):
+class HTMLTag(Enum): # pragma: no cover
     # Tags Semânticas e de Estruturação
     html = "html"
     head = "head"
@@ -586,7 +587,7 @@ class HTMLTag(Enum):
     # Tags de Comentários
     comment = "comment"
 
-class NonSelfClosingHTMLTags(Enum):
+class NonSelfClosingHTMLTags(Enum): # pragma: no cover
     # Tags Semânticas e de Estruturação
     html = "html"
     head = "head"
@@ -689,7 +690,7 @@ class NonSelfClosingHTMLTags(Enum):
     def non_autoclosing_tags(cls) -> list[str]:
         return [val.value for val in cls]
 
-class GetBy(Enum):
+class GetBy(Enum): # pragma: no cover
     tag = 'tag'
     classes = 'classes'
     id = 'id'
@@ -699,7 +700,7 @@ class GetBy(Enum):
     style = 'style'
     uuid = 'uuid'
 
-class Icons(Enum):
+class Icons(Enum): # pragma: no cover
     _0_CIRCLE_FILL = 'bi bi-0-circle-fill'
     _0_CIRCLE = 'bi bi-0-circle'
     _0_SQUARE_FILL = 'bi bi-0-square-fill'

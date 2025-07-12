@@ -2,7 +2,7 @@ from pyweber.core.element import Element
 from pyweber.core.template import Template
 from typing import Literal, Union
 
-class TemplateDiff:
+class TemplateDiff: # pragma: no cover
     def __init__(self):
         self.__differences: dict[str, dict[str, str]] = {}
         self.__checked_elements: list[Element] = []

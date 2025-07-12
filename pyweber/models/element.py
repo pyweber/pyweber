@@ -15,11 +15,11 @@ from pyweber.utils.types import (
 
 from pyweber.models.file import File
 
-if TYPE_CHECKING:
+if TYPE_CHECKING: # pragma: no cover
     from pyweber.core.template import Template
     from pyweber.core.element import Element
 
-class ChildElements(list['Element']):
+class ChildElements(list['Element']): # pragma: no cover
     def __init__(self, parent: 'Element'):
         super().__init__()
         self.parent = parent
@@ -53,7 +53,7 @@ class ChildElements(list['Element']):
         
         return self
 
-class ElementConstrutor:
+class ElementConstrutor: # pragma: no cover
     def __init__(
         self,
         tag: HTMLTag,

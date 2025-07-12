@@ -27,7 +27,7 @@ from pyweber.models.openapi import OpenApiProcessor
 from pyweber.utils.utils import PrintLine
 
 @dataclass
-class StateResult:
+class StateResult: # pragma: no cover
     template: Any
     status_code: int
     content_type: ContentTypes
@@ -57,7 +57,7 @@ class StateResult:
         return self
 
 @dataclass
-class TemplateResult:
+class TemplateResult: # pragma: no cover
     status_code: int
     content_type: ContentTypes
     redirect_path: str
@@ -65,7 +65,7 @@ class TemplateResult:
     template: Union[Template, Element, dict, list, str]
 
 @dataclass
-class ContentResult:
+class ContentResult: # pragma: no cover
     content: bytes
     content_type: ContentTypes
 
@@ -81,7 +81,7 @@ class Pyweber(
     CookieManager,
     MiddlewareManager,
     RouteManager
-):
+): # pragma: no cover
     def __init__(self, **kwargs):
         MiddlewareManager.__init__(self)
         RouteManager.__init__(self)

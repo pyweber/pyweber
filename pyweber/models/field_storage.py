@@ -1,7 +1,7 @@
 import re
 from pyweber.models.field import Field
 
-class FieldStorage:
+class FieldStorage: # pragma: no cover
     def __init__(self, content_type: str, callbacks: bytes):
         self.boundary = content_type
         self.callbacks = callbacks

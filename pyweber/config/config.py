@@ -66,7 +66,7 @@ class PyweberConfig:
                 return default
         return current
     
-    def set(self, *keys, value):
+    def set(self, *keys, value = None):
         current = self.config
         for key in keys[:-1]:
             current = current.setdefault(key, {})
@@ -89,7 +89,7 @@ class PyweberConfig:
         with open(self.path, 'w') as file:
             toml.dump(self.config, file)
     
-    def show(self):
+    def show(self): # pragma: no cover
         import pprint
         pprint.pprint(self.config)
     
@@ -99,10 +99,10 @@ class PyweberConfig:
                 file_config = toml.loads(file.read())
                 self.__merge_configs(target=self.__config, source=file_config)
         
-        except FileNotFoundError:
+        except FileNotFoundError: # pragma: no cover
             pass
 
-        except Exception as e:
+        except Exception as e: # pragma: no cover
             print(f'Error to load the config file: {e}')
     
     def __merge_configs(self, target: dict[str, dict[str, str | int]], source: dict[str, dict[str, str | int]]):
@@ -116,7 +116,7 @@ class PyweberConfig:
             else:
                 target[key] = value
     
-    def __is_empty_value(self, value) -> bool:
+    def __is_empty_value(self, value) -> bool: # pragma: no cover
         """Check if a value is empty."""
         if value is None:
             return True

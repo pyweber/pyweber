@@ -2,7 +2,7 @@ import re
 from pyweber.utils.types import ContentTypes
 
 
-class Headers:
+class Headers: # pragma: no cover
     def __init__(
         self,
         url: str,

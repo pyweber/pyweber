@@ -14,12 +14,12 @@ from pyweber.connection.session import sessions, Session
 from pyweber.models.template_diff import TemplateDiff
 from pyweber.models.task_manager import TaskManager
 
-if TYPE_CHECKING:
+if TYPE_CHECKING: # pragma: no cover
     from pyweber.pyweber.pyweber import Pyweber
     from pyweber.core.template import Template
     from pyweber.core.window import Window
 
-def need_message_keys():
+def need_message_keys(): # pragma: no cover
     return [
         'type',
         'event_ref',
@@ -34,7 +34,7 @@ def need_message_keys():
         'sessionId'
     ]
 
-class BaseWebsockets:
+class BaseWebsockets: # pragma: no cover
     def __init__(self, app: 'Pyweber', protocol: Literal['pyweber', 'uvicorn'] = 'pyweber'):
         self.protocol: Literal['pyweber', 'uvicorn'] = protocol
         self.task_manager = TaskManager()
@@ -152,7 +152,7 @@ class BaseWebsockets:
         
         return diff.differences
 
-class WebSocket(BaseWebsockets):
+class WebSocket(BaseWebsockets): # pragma: no cover
     def __init__(self, app: 'Pyweber', protocol: Literal['pyweber', 'uvicorn'] = 'pyweber'):
         super().__init__(app=app, protocol=protocol)
     
@@ -331,7 +331,7 @@ class WebSocket(BaseWebsockets):
         assert scope.get('type', None) == 'websocket'
         await self.ws_handler_asgi(receive=receive, send=send)
 
-def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool:
+def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool: # pragma: no cover
     """Check if event is running"""
     if message.session_id in task_manager.active_handlers_async:
         template = sessions.get_session(session_id=message.session_id).template

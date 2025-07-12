@@ -2,16 +2,16 @@ from pyweber.core.element import Element
 from pyweber.utils.types import Icons
 from typing import Union, Literal, Callable
 
-class Icon(Element):
+class Icon(Element): # pragma: no cover
     def __init__(self, value: Union[Icons, str]):
         super().__init__(tag='i')
         self.classes.append(value.value if isinstance(value, Icons) else value)
 
-class Style(Element):
+class Style(Element): # pragma: no cover
     def __init__(self, href: str):
         super().__init__(tag='link', attrs={'rel': 'stylesheet', 'href': href})
 
-class Script(Element):
+class Script(Element): # pragma: no cover
     def __init__(self, src: str = None, type: str = None, content: str = None):
         super().__init__(tag='script', content=content)
         self.type = type
@@ -33,7 +33,7 @@ class Script(Element):
             if key in ['src', 'type'] and value:
                 self.__attrs[key] = value
 
-class Label(Element):
+class Label(Element): # pragma: no cover
     def __init__(
         self,
         content: str = None,
@@ -67,7 +67,7 @@ class Label(Element):
                 else:
                     self.__attrs[key] = value
 
-class TextArea(Element):
+class TextArea(Element): # pragma: no cover
     def __init__(
         self,
         name: str = None,

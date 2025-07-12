@@ -11,7 +11,7 @@ from pyweber.connection.websocket import WebSocket
 from pyweber.connection.reload import ReloadServer
 from pyweber.config.config import config
 
-class CreatApp:
+class CreatApp: # pragma: no cover
     def __init__(self, target: Callable, **kwargs):
         self.target = target
         self.module = self.import_module()

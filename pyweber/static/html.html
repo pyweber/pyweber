@@ -3,17 +3,258 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wellcome to PyWeber!</title>
+    <title>Pyweber | Python Web Framework</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../src/style/style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎉 Wellcome to your PyWeber Project!</h1>
-        </header>
-        <section class="content">
-            <p>Now, your finished to create a pyweber project. Let's go to this development journey with style.🚀</p>
-        </section>
-    </div>
+    <!-- Header -->
+    <header class="header">
+        <nav class="container">
+            <div class="nav">
+                <a href="#" class="logo">
+                    <img src="https://cdn.abacus.ai/images/10eeba24-301b-4f7f-a58a-69c423267acf.png" alt="Pyweber">
+                    <span class="logo-text">Pyweber</span>
+                </a>
+                <ul class="nav-links">
+                    <li><a href="https://pyweber.dev">Docs</a></li>
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="https://github.com/pyweber-examples">Examples</a></li>
+                    <li><a href="https://github.com/pyweber/pyweber">GitHub</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Pyweber Framework</h1>
+            <p>
+                A lightweight and reactive Python framework for creating dynamic web applications 
+                with a simple and intuitive API. Combine Python's simplicity with 
+                the reactivity of modern frontend frameworks.
+            </p>
+            <div class="cta-buttons">
+                <a href="#installation" class="btn btn-primary">
+                    <i class="fas fa-download"></i>
+                    Get Started
+                </a>
+                <a href="https://pyweber.dev/" class="btn btn-secondary">
+                    <i class="fas fa-book"></i>
+                    Documentation
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <h2 class="section-title">Key Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-sync-alt"></i>
+                    </div>
+                    <h3 class="feature-title">Reactive Templates</h3>
+                    <p class="feature-description">
+                        Create dynamic interfaces that automatically update 
+                        when data changes, without the need for complex JavaScript.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-cubes"></i>
+                    </div>
+                    <h3 class="feature-title">Component-Based Architecture</h3>
+                    <p class="feature-description">
+                        Build reusable components for consistent interfaces 
+                        and simplified code maintenance.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-fire"></i>
+                    </div>
+                    <h3 class="feature-title">Integrated Hot Reload</h3>
+                    <p class="feature-description">
+                        See changes instantly during development 
+                        without manually reloading the page.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <h3 class="feature-title">Intuitive DOM Manipulation</h3>
+                    <p class="feature-description">
+                        Query and modify elements with familiar selectors, 
+                        all using pure Python.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <h3 class="feature-title">Event-Driven Programming</h3>
+                    <p class="feature-description">
+                        Handle user interactions with Python event handlers 
+                        in a simple and efficient way.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-plug"></i>
+                    </div>
+                    <h3 class="feature-title">WebSocket Integration</h3>
+                    <p class="feature-description">
+                        Real-time communication between client and server 
+                        with native WebSocket support.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Code Example Section -->
+    <section class="code-section">
+        <div class="container">
+            <div class="code-container">
+                <div class="code-info">
+                    <h2>Simple and Powerful</h2>
+                    <p>
+                        With pyweber, you can create reactive web applications 
+                        using only Python. No need for complex JavaScript 
+                        or complicated configurations.
+                    </p>
+                    <ul class="code-features">
+                        <li><i class="fas fa-check"></i> Familiar Python syntax</li>
+                        <li><i class="fas fa-check"></i> Integrated HTML templates</li>
+                        <li><i class="fas fa-check"></i> Asynchronous events</li>
+                        <li><i class="fas fa-check"></i> Automatic routing</li>
+                    </ul>
+                </div>
+                <div class="code-block">
+                    <pre>
+                        <code>
+                            import pyweber as pw
+                            app = pw.Pyweber()
+
+                            class Home(pw.Template):
+                                def __init__(self):
+                                    super().__init__(template='', title='Starting App')
+                                    self.body = self.queryselector('body')
+                                    self.body.childs = [
+                                        pw.Element(
+                                            tag='button',
+                                            content='+',
+                                            events=pw.TemplateEvents(onclick=self.add)
+                                        ),
+                                        pw.Element(
+                                            tag='p',
+                                            content=0,
+                                            style={'width': 'fit-content'}
+                                        ),
+                                        pw.Element(
+                                            tag='button',
+                                            content='-',
+                                            events=pw.TemplateEvents(onclick=self.remove)
+                                        )
+                                    ]
+
+                                    self.body.style = {
+                                        'display': 'flex',
+                                        'justify-content': 'center',
+                                        'align-items': 'center',
+                                        'column-gap': '4px'
+                                    }
+
+                                
+                                    def add(self, e: pw.EventHandler):
+                                        e.parent.childs[1].content = int(e.parent.childs[1].content) + 1
+                                        e.update()
+                                    
+                                    def remove(self, e: pw.EventHandler):
+                                        e.parent.childs[1].content = int(e.parent.childs[1].content) - 1
+                                        e.update()
+
+                            @app.route('/')
+                            def home():
+                                return Home()
+                            
+                            if __name__ == '__main__':
+                                pw.run()
+                        </code>
+                    </pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation Section -->
+    <section class="installation" id="installation">
+        <div class="container">
+            <h2 class="section-title">Quick Installation</h2>
+            <p>Start using pyweber in seconds:</p>
+            <div class="install-command">pip install pyweber</div>
+            <div class="cta-buttons">
+                <a href="https://pyweber.dev/" class="btn btn-primary">
+                    <i class="fas fa-rocket"></i>
+                    Quick Start Guide
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>Documentation</h3>
+                    <ul>
+                        <li><a href="https://pyweber.dev/">Introduction</a></li>
+                        <li><a href="https://pyweber.dev/getting-started/">Getting Started</a></li>
+                        <li><a href="https://pyweber.dev/template/">Templates</a></li>
+                        <li><a href="https://pyweber.dev/element/">Elements</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>Resources</h3>
+                    <ul>
+                        <li><a href="https://pyweber.dev/examples/">Examples</a></li>
+                        <li><a href="https://pyweber.dev/cli/">CLI Tools</a></li>
+                        <li><a href="https://pyweber.dev/router/">Router</a></li>
+                        <li><a href="https://pyweber.dev/event-handlers/">Event Handlers</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>Community</h3>
+                    <ul>
+                        <li><a href="#">GitHub</a></li>
+                        <li><a href="#">Discord</a></li>
+                        <li><a href="#">Stack Overflow</a></li>
+                        <li><a href="#">Twitter</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>pyweber</h3>
+                    <p style="color: #94a3b8; font-size: 0.9rem; line-height: 1.6;">
+                        Python framework for modern and reactive web development. 
+                        Simple, powerful and intuitive.
+                    </p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; {{year}} PyWeber Framework. Made with ❤️ for the Python community.</p>
+            </div>
+        </div>
+    </footer>
 </body>
 </html>

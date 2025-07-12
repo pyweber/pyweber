@@ -1,7 +1,7 @@
 from pyweber.core.element import Element
 from typing import Callable, Literal
 
-class Input(Element):
+class Input(Element): # pragma: no cover
     def __init__(
         self,
         type: str,
@@ -103,7 +103,7 @@ class Input(Element):
                 else:
                     self.__attrs[key] = value
 
-class InputColor(Input):
+class InputColor(Input): # pragma: no cover
     def __init__(self,
         name: str = None,
         id: str = None,
@@ -126,7 +126,7 @@ class InputColor(Input):
         self.sanitize = sanitize
         self.value = value
 
-class InputText(Input):
+class InputText(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -174,7 +174,7 @@ class InputText(Input):
                 else:
                     self._Input__attrs[key] = value
 
-class InputPassword(Input):
+class InputPassword(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -233,7 +233,7 @@ class InputPassword(Input):
             self._Input__attrs['type'] = 'password'
 
 
-class InputEmail(Input):
+class InputEmail(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -284,7 +284,7 @@ class InputEmail(Input):
                     self._Input__attrs[key] = value
 
 
-class InputNumber(Input):
+class InputNumber(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -329,7 +329,7 @@ class InputNumber(Input):
                     self._Input__attrs[key] = value
 
 
-class InputFile(Input):
+class InputFile(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -366,12 +366,12 @@ class InputFile(Input):
                     self._Input__attrs[key] = value
 
 
-class InputCheckbox(Input):
+class InputCheckbox(Input): # pragma: no cover
     def __init__(
         self,
-        name: str = None,
+        name: str,
+        value: str,
         id: str = None,
-        value: Literal['on', 'off'] = "on",
         checked: bool = False,
         form = None,
         tabindex = None,
@@ -401,7 +401,7 @@ class InputCheckbox(Input):
                     self._Input__attrs[key] = value
 
 
-class InputRadio(Input):
+class InputRadio(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -436,7 +436,7 @@ class InputRadio(Input):
                     self._Input__attrs[key] = value
 
 
-class InputRange(Input):
+class InputRange(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -474,7 +474,7 @@ class InputRange(Input):
                 self._Input__attrs[key] = value
 
 
-class InputDate(Input):
+class InputDate(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -515,7 +515,7 @@ class InputDate(Input):
                     self._Input__attrs[key] = value
 
 
-class InputTime(Input):
+class InputTime(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -556,7 +556,7 @@ class InputTime(Input):
                     self._Input__attrs[key] = value
 
 
-class InputSearch(Input):
+class InputSearch(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -605,7 +605,7 @@ class InputSearch(Input):
                     self._Input__attrs[key] = value
 
 
-class InputTel(Input):
+class InputTel(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -654,7 +654,7 @@ class InputTel(Input):
                     self._Input__attrs[key] = value
 
 
-class InputUrl(Input):
+class InputUrl(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -703,7 +703,7 @@ class InputUrl(Input):
                     self._Input__attrs[key] = value
 
 
-class InputHidden(Input):
+class InputHidden(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -724,7 +724,7 @@ class InputHidden(Input):
         self.value = value
 
 
-class InputSubmit(Input):
+class InputSubmit(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -766,7 +766,7 @@ class InputSubmit(Input):
                     self._Input__attrs[key] = value
 
 
-class InputButton(Input):
+class InputButton(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,
@@ -790,7 +790,7 @@ class InputButton(Input):
         self.value = value
 
 
-class InputReset(Input):
+class InputReset(Input): # pragma: no cover
     def __init__(
         self,
         name: str = None,

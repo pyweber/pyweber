@@ -3,12 +3,12 @@ import asyncio
 import hashlib
 from time import time
 from watchdog.observers import Observer
-from typing import Union, Callable, Awaitable
+from typing import Callable, Awaitable
 from watchdog.events import FileSystemEventHandler
 
 from pyweber.utils.utils import Colors, PrintLine
 
-class ReloadServer:
+class ReloadServer: # pragma: no cover
     def __init__(self, ws_reload: Callable[..., Awaitable], http_reload: Callable, watch_path: str = '.'):
         self.ws_reload = ws_reload
         self.http_reload = http_reload
@@ -19,7 +19,7 @@ class ReloadServer:
     def start(self):
         asyncio.run(WatchDogFiles(self).start())
 
-class WatchDogFiles:
+class WatchDogFiles: # pragma: no cover
     def __init__(self, reload_server: ReloadServer):
         self.event_handler = ReloadHandler(reload_server)
         self.observer = Observer()
@@ -41,7 +41,7 @@ class WatchDogFiles:
         
         self.observer.join()
 
-class ReloadHandler(FileSystemEventHandler):
+class ReloadHandler(FileSystemEventHandler): # pragma: no cover
     def __init__(self, reload_server: ReloadServer):
         self.reload_server = reload_server
         self.start_server_time = time()

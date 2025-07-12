@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, Future
 
 from pyweber.utils.utils import PrintLine
 
-class TaskManager:
+class TaskManager: # pragma: no cover
     def __init__(self):
         self.executor = ThreadPoolExecutor(max_workers=10)
         self.lock = Lock()

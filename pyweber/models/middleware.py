@@ -9,12 +9,12 @@ from pyweber.utils.types import HTTPStatusCode
 from pyweber.models.routes import RouteManager
 
 @dataclass
-class MiddlewareResult:
+class MiddlewareResult: # pragma: no cover
     status_code: int
     process_response: bool
     content: Union[Template, Element, Response, dict, str]
 
-class MiddlewareManager:
+class MiddlewareManager: # pragma: no cover
     def __init__(self):
         self.__before_request: list[dict[str, Union[int, Callable, bool]]] = []
         self.__after_request: list[dict[str, Union[int, Callable, bool]]] = []

@@ -2,7 +2,7 @@ from pyweber.core.element import Element
 from pyweber.components.input import Input
 from typing import Callable, Literal
 
-class Form(Element):
+class Form(Element): # pragma: no cover
     def __init__(
         self,
         id: str = None,

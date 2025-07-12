@@ -5,7 +5,7 @@ import dataclasses
 
 from pyweber.utils.types import ContentTypes
 
-class OpenApiProcessor: # pragma: no cover
+class OpenApiProcessor:
     @staticmethod
     def get_format_example(format_type: str):
         examples = {
@@ -31,7 +31,7 @@ class OpenApiProcessor: # pragma: no cover
         return examples.get(format_type, 'pyweber')
     
     @staticmethod
-    def mapping_swegger_types():
+    def mapping_swagger_types():
         return {
             "str": {'type': 'string', 'formats': ['date', 'date-time', 'password', 'byte', 'binary', 'email', 'uuid', 'uri', 'hostname', 'ipv4', 'ipv6']},
             "int": {'type': 'integer', 'formats': ['int32', 'int64']},
@@ -44,14 +44,14 @@ class OpenApiProcessor: # pragma: no cover
         }
     
     @staticmethod
-    def default_format_types(type: str):
+    def default_format_type(type: str):
         return {'string': None, 'integer': 'int32', 'float': 'float', 'boolean': 'boolean'}.get(type, None)
     
     @staticmethod
-    def get_swegger_types(py_type: type, format_type: str = None):
-        mapping_types = OpenApiProcessor.mapping_swegger_types()
-        swegger_type = mapping_types.get(py_type.__name__, mapping_types['str'])
-        return {'type': {'type': swegger_type['type'], 'format': format_type if format_type in swegger_type else None}}
+    def get_swagger_type(py_type: type, format_type: str = None):
+        mapping_types = OpenApiProcessor.mapping_swagger_types()
+        swagger_type = mapping_types.get(py_type.__name__, mapping_types['str'])
+        return {'type': {'type': swagger_type['type'], 'format': format_type if format_type in swagger_type['formats'] else None}}
     
     @staticmethod
     def is_valid_route_param_type(py_type: str):
@@ -76,10 +76,10 @@ class OpenApiProcessor: # pragma: no cover
     @classmethod
     def get_type_parameter(cls, parameter: inspect.Parameter):
         if parameter.annotation == inspect._empty:
-            return cls.get_swegger_types(str)
+            return cls.get_swagger_type(str)
         
-        if parameter.annotation.__name__ in cls.mapping_swegger_types():
-            return cls.get_swegger_types(parameter.annotation)
+        if parameter.annotation.__name__ in cls.mapping_swagger_types():
+            return cls.get_swagger_type(parameter.annotation)
         
     @classmethod
     def get_route_parameters(cls, route: str) -> list[str]:
@@ -110,7 +110,7 @@ class OpenApiProcessor: # pragma: no cover
                         'format': param_type['format']
                     },
                     'example': cls.get_format_example(
-                        param_type['format'] or cls.default_format_types(param_type['type'])
+                        param_type['format'] or cls.default_format_type(param_type['type'])
                     )
                 }
 
@@ -128,9 +128,7 @@ class OpenApiProcessor: # pragma: no cover
                         'type': 'string',
                         'format': None
                     },
-                    'example': cls.get_format_example(
-                        param_type['format'] or cls.default_format_types(param_type['type'])
-                    )
+                    'example': cls.get_format_example('string')
                 }
         
         return route_parameters
@@ -160,7 +158,7 @@ class OpenApiProcessor: # pragma: no cover
                     for p in getattr(annotation, '__dataclass_fields__', {}).values():
                         properities[p.name] = {
                             'title': str(p.name).capitalize(),
-                            'type': cls.get_swegger_types(p.type)['type']['type']
+                            'type': cls.get_swagger_type(p.type)['type']['type']
                         }
 
                         if not isinstance(p.default, dataclasses._MISSING_TYPE):
@@ -171,15 +169,37 @@ class OpenApiProcessor: # pragma: no cover
                     
                     master_props = {**master_props, **properities}
                     master_required.extend(required)
-                
-                else:
-                    if annotation.__name__ not in cls.mapping_swegger_types():
+                elif parameter_solved == 'normal_class':
+                    if annotation.__name__ not in cls.mapping_swagger_types():
                         properities = {}
                         required = []
+
+                        parameters = inspect.signature(annotation.__init__).parameters
+                        for p, t in parameters.items():
+                            if p.lower() not in ['self', 'cls']:
+                                properities[p] = {
+                                    'title': str(p).capitalize(),
+                                    'type': cls.get_swagger_type(t.annotation)['type']['type']
+                                }
+
+                                if t.default != inspect._empty:
+                                    properities[p]['default'] = t.default
+                                    continue
+
+                                required.append(p)
+                        
+                        master_props = {**master_props, **properities}
+                        master_required.extend(required)
+                
+                else:
+                    if annotation.__name__ not in cls.mapping_swagger_types():
+                        properities = {}
+                        required = []
+
                         for p, t in annotation.__dict__.get('__annotations__', {}).items():
                             properities[p] = {
                                 'title': str(p).capitalize(),
-                                'type': cls.get_swegger_types(t)['type']['type']
+                                'type': cls.get_swagger_type(t)['type']['type']
                             }
 
                             if p in annotation.__dict__:
@@ -192,7 +212,7 @@ class OpenApiProcessor: # pragma: no cover
                         master_required.extend(required)
 
                     else:
-                        sw_type = cls.get_swegger_types(parameter.annotation)
+                        sw_type = cls.get_swagger_type(parameter.annotation)
                         properities = {
                             title: {
                                 'title': title.capitalize(),
@@ -239,8 +259,7 @@ class OpenApiProcessor: # pragma: no cover
                 kwd[name] = annotation(**parameters)
 
             else:
-                
-                if annotation.__name__ not in cls.mapping_swegger_types() and annotation != inspect._empty:
+                if annotation.__name__ not in cls.mapping_swagger_types() and annotation != inspect._empty:
                     instance = annotation()
                     for key in instance.__annotations__.keys():
                         setattr(instance, key, kwargs.pop(key))

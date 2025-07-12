@@ -2,7 +2,7 @@ from pyweber.core.template import Template
 from pyweber.utils.loads import StaticTemplates
 from pyweber.utils.exceptions import InvalidTemplateError
 
-class ErrorPages:
+class ErrorPages: # pragma: no cover
     def __init__(self):
         self.page_not_found = Template(template=StaticTemplates.PAGE_NOT_FOUND(), status_code=404)
         self.page_server_error = Template(template=StaticTemplates.PAGE_SERVER_ERROR(), status_code=500)

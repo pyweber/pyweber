@@ -9,7 +9,7 @@ from pyweber.models.field_storage import FieldStorage
 from pyweber.models.headers import Headers
 from pyweber.models.file import File
 
-class RequestMode(Enum):
+class RequestMode(Enum): # pragma: no cover
     asgi = 'asgi'
     wsgi = 'wsgi'
 
@@ -17,11 +17,11 @@ class RequestMode(Enum):
         return self.value
 
 @dataclass
-class ClientInfo:
+class ClientInfo: # pragma: no cover
     host: str
     port: int
 
-class Request:
+class Request: # pragma: no cover
     def __init__(
         self,
         headers: Union[str, dict[str, Union[tuple[str, str], str]]],

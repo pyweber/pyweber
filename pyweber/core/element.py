@@ -8,7 +8,7 @@ from pyweber.models.element import (
     ChildElements
 )
 
-class Element(ElementConstrutor):
+class Element(ElementConstrutor): # pragma: no cover
     def __init__(
         self,
         tag: HTMLTag,

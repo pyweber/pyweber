@@ -9,6 +9,8 @@ htmlcov/
 site/
 templates/
 .vscode/
+.pyweber/
+tests/config
 
 # files ignored
 setup.py

@@ -1,5 +1,14 @@
 # PyWeber Changelog
 
+## [0.9.98] - 2025-07-12
+---
+### New features
+- Created loading screen, acessed adding `spinner` in Element's classes.
+
+### Improvements
+- Changed value type in `InputCheckBox` Element to Literal['on', 'off'] to str. `name` and `value` are now mandatory attribues for this Element.
+- Changed pyweber official ico
+
 ## [0.9.97] - 2025-07-10
 ---
 ### New features

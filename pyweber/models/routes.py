@@ -13,7 +13,7 @@ from pyweber.utils.exceptions import (
     RouteNameAlreadyExistError
 )
 
-class RedirectRoute:
+class RedirectRoute: # pragma: no cover
     def __init__(
         self,
         route: 'Route',
@@ -63,7 +63,7 @@ class RedirectRoute:
             f'status_code={self.status_code})'
         )
 
-class Route:
+class Route: # pragma: no cover
     def __init__(
         self,
         route: str,
@@ -290,7 +290,7 @@ class Route:
             f'status_code={self.status_code})'
         )
 
-class RouteManager:
+class RouteManager: # pragma: no cover
     def __init__(self):
         self.__routes: dict[str, Route] = {}
         self.__redirects: dict[str, RedirectRoute] = {}

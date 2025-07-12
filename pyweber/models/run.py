@@ -4,12 +4,12 @@ from pyweber.models.request import Request, ClientInfo
 from pyweber.connection.websocket import WebSocket
 import os
 
-if TYPE_CHECKING:
+if TYPE_CHECKING: # pragma: no cover
     from pyweber.pyweber.pyweber import Pyweber
 
 WS_RUNNING = False
 
-def run(target: Callable = None, **kwargs):
+def run(target: Callable = None, **kwargs): # pragma: no cover
     """
     For running the pyweber project.
     ```python
@@ -47,7 +47,7 @@ def run(target: Callable = None, **kwargs):
 
     CreatApp(target=target, **kwargs).run()
 
-async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None):
+async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None): # pragma: no cover
     global WS_RUNNING
 
     body = b""

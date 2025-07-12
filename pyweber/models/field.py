@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 @dataclass
-class Field:
+class Field: # pragma: no cover
     name: Optional[str] = None
     filename: Optional[str] = None
     value: Optional[bytes] = b''

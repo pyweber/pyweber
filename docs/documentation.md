@@ -2,29 +2,30 @@
 
 ## Overview
 
-Pyweber provides **zero-configuration** OpenAPI 3.0 documentation with automatic Swagger UI generation. Simply add type hints to your route functions, and the framework automatically generates comprehensive API documentation with interactive testing capabilities.
+PyWeber provides **zero-configuration** OpenAPI 3.0 documentation with automatic Swagger UI generation. By simply adding type hints to your route functions, the framework generates full-featured, interactive API documentation.
 
 ## Key Features
 
-### 🚀 Zero Configuration
-- **No setup required** - just add type hints to your functions
-- **Automatic detection** of all route parameters and types
-- **Instant documentation** available at `/docs` endpoint
+### Zero Configuration
 
-### 🔧 Universal Type Support
-- **Pydantic Models** - Full validation and schema generation
-- **Dataclasses** - Clean, structured data handling
-- **Vanilla Classes** - Simple Python classes with annotations
-- **Primitive Types** - int, str, float, bool with format support
+- **No setup needed** — documentation is generated automatically
+- **Auto-discovery** of all route parameters and data models
+- **Instant Swagger UI** at `/docs` endpoint
 
-### 📚 Intelligent Documentation
-- **Automatic examples** generation for all supported types
-- **Interactive testing** with "Try it out" functionality
-- **Real-time schema** updates based on your code changes
+### Flexible Type Support
+
+- **Pydantic** models for advanced validation
+- **Dataclasses** for clean data handling
+- **Vanilla Python classes** (with `__init__` or annotations)
+- **Primitive types**: `int`, `str`, `float`, `bool`, etc.
+
+### Smart Documentation
+
+- Auto-generated examples and formats
+- Real-time schema reflection on code changes
+- Integrated Swagger UI for "Try it out" functionality
 
 ## Quick Start
-
-### Basic Example
 
 ```python
 import pyweber as pw
@@ -45,280 +46,166 @@ if __name__ == '__main__':
     pw.run()
 ```
 
-**Result**: Automatic OpenAPI documentation with:
-- Path parameter: `user_id` (integer)
-- Request body with mixed fields: `name` (string) + User model properties
-- Interactive Swagger UI at `http://localhost:8800/docs`
+> Access Swagger UI at `http://localhost:8800/docs`
 
 ## Supported Model Types
 
-### 1. Pydantic Models (Recommended)
+### 1. Pydantic Models
 
 ```python
-from pydantic import BaseModel, EmailStr
-from typing import Optional
-
-class UserProfile(BaseModel):
+class Profile(BaseModel):
     username: str
     email: EmailStr
     age: Optional[int] = None
-    is_active: bool = True
-
-@app.route('/profile', methods=['POST'])
-def update_profile(profile: UserProfile):
-    return {"status": "updated"}
 ```
 
-**Benefits:**
-- ✅ Built-in validation
-- ✅ Rich type support (EmailStr, UUID, etc.)
-- ✅ Automatic OpenAPI schema generation
-- ✅ Default values and optional fields
+- Built-in validation
+- Optional/required field detection
+- Rich type support (UUID, EmailStr, etc.)
 
 ### 2. Dataclasses
 
 ```python
-from dataclasses import dataclass
-from typing import Optional
-
 @dataclass
 class Product:
     name: str
     price: float
-    category: str
     in_stock: bool = True
-    description: Optional[str] = None
-
-@app.route('/products', methods=['POST'])
-def create_product(product: Product):
-    return {"product_id": 123}
 ```
 
-**Benefits:**
-- ✅ Clean, readable code
-- ✅ Automatic field detection
-- ✅ Default value support
-- ✅ Type safety
+- Lightweight and readable
+- Type-safe with default value support
 
-### 3. Vanilla Python Classes
+### 3. Vanilla Classes
 
 ```python
 class Settings:
     theme: str
     language: str = 'en'
-    notifications: bool = True
-
-@app.route('/settings', methods=['PUT'])
-def update_settings(user_id: int, settings: Settings):
-    return {"message": "Settings updated"}
 ```
 
-**Benefits:**
-- ✅ Maximum simplicity
-- ✅ No external dependencies
-- ✅ Flexible structure
-- ✅ Automatic instantiation
+- No external dependencies
+- Supports both `__init__` and annotation-based definitions
 
 ## Advanced Features
 
-### Mixed Parameter Types
+### Mixed Parameters Example
 
 ```python
-from enum import Enum
-
-class UserRole(str, Enum):
-    ADMIN = "admin"
-    USER = "user"
-    GUEST = "guest"
-
-class UserData(BaseModel):
-    email: str
-    role: UserRole
-
 @app.route('/users/{user_id}/permissions', methods=['POST'])
 def set_permissions(
-    user_id: int,           # Path parameter
-    force: bool,            # Body parameter (primitive)
-    notify: str = "email",  # Body parameter with default
-    user_data: UserData     # Body parameter (complex object)
+    user_id: int,
+    force: bool,
+    notify: str = "email",
+    user_data: UserData
 ):
-    return {"status": "permissions updated"}
+    return {"status": "ok"}
 ```
 
-**Generated Request Body:**
-```json
-{
-  "force": true,
-  "notify": "email",
-  "email": "user@example.com",
-  "role": "admin"
-}
-```
+Request body schema merges primitives and object models seamlessly.
 
-### Type Formats and Examples
-
-Pyweber automatically generates appropriate examples and formats:
+### Example & Format Detection
 
 ```python
-from datetime import datetime
-from uuid import UUID
-
 class Event(BaseModel):
     id: UUID
     name: str
     start_date: datetime
-    attendee_count: int
-    is_public: bool
-
-@app.route('/events', methods=['POST'])
-def create_event(event: Event):
-    return {"event_created": True}
 ```
 
-**Generated OpenAPI Schema:**
+Auto-generates:
+
 ```json
 {
-  "properties": {
-    "id": {
-      "type": "string",
-      "format": "uuid",
-      "example": "550e8400-e29b-41d4-a716-446655440000"
-    },
-    "start_date": {
-      "type": "string",
-      "format": "date-time",
-      "example": "2023-12-25T14:30:00Z"
-    },
-    "attendee_count": {
-      "type": "integer",
-      "format": "int32",
-      "example": 2147483647
-    }
-  }
+  "id": {"type": "string", "format": "uuid"},
+  "start_date": {"type": "string", "format": "date-time"}
 }
 ```
 
-## Documentation Access
+## Accessing Documentation
 
-### Swagger UI
-Visit `http://localhost:8800/docs` to access the interactive Swagger UI interface.
+- **Swagger UI**: `http://localhost:8800/docs`
+- **Raw JSON**: `http://localhost:8800/_pyweber/{uuid}/openapi.json`
 
-### OpenAPI JSON
-The raw OpenAPI specification is available at `http://localhost:8800/_pyweber/{uuid}/openapi.json`
-
-*Note: UUID is automatically generated for cache-busting purposes.*
+> UUID is used to avoid caching issues.
 
 ## Best Practices
 
-### 1. Use Type Hints Consistently
-```python
-# ✅ Good
-def create_user(name: str, age: int, user: User):
-    pass
+### Use explicit type hints
 
-# ❌ Avoid
-def create_user(name, age, user):
-    pass
+```python
+def create_user(name: str, user: User): ...
 ```
 
-### 2. Provide Default Values
+### Provide default values
+
 ```python
-class UserPreferences(BaseModel):
-    theme: str = "light"
-    language: str = "en"
+class Preferences(BaseModel):
+    theme: str = 'light'
     notifications: bool = True
 ```
 
-### 3. Use Descriptive Route Names
+### Use descriptive routes
+
 ```python
-@app.route('/users/{user_id}', name='get_user_by_id', methods=['GET'])
-def get_user(user_id: int):
-    pass
+@app.route('/users/{id}', name='get_user', methods=['GET'])
 ```
 
-### 4. Avoid *args and **kwargs
-```python
-# ❌ Not supported - will raise ValueError
-def bad_route(*args, **kwargs):
-    pass
+### Avoid dynamic args
 
-# ✅ Use explicit parameters instead
-def good_route(user_id: int, data: UserData):
-    pass
+```python
+def bad_route(*args, **kwargs): ...  # not supported
 ```
 
 ## Error Handling
 
-Pyweber provides clear error messages for unsupported patterns:
+Unsupported patterns (e.g., `**kwargs`) will raise meaningful errors during startup.
 
-```python
-# This will raise a helpful error:
-@app.route('/bad-route')
-def bad_route(**kwargs):
-    pass
+## Performance
 
-# Error: **kwargs parameter 'kwargs' not supported in route functions.
-# Use explicit parameters or typed classes instead for OpenAPI documentation.
-```
+- **Lazy Evaluation**: schema only built on demand
+- **Caching**: route-wise schema caching
+- **Efficient Introspection**: no unnecessary overhead
+- **No Extra Dependencies**: pure Python solution
 
-## Performance Considerations
-
-- **Lazy Loading**: OpenAPI schema is generated only when accessed
-- **Caching**: Schemas are cached per route for optimal performance
-- **Memory Efficient**: Minimal overhead for type introspection
-- **Zero Dependencies**: No additional packages required for basic functionality
-
-## Migration from Other Frameworks
+## Migration Guide
 
 ### From FastAPI
+
 ```python
 # FastAPI
-from fastapi import FastAPI
-from pydantic import BaseModel
+@app.post("/users")
+def create(user: User): ...
 
-app = FastAPI()
-
-@app.post("/users/")
-def create_user(user: User):
-    return user
-
-# Pyweber (almost identical!)
-import pyweber as pw
-from pydantic import BaseModel
-
-app = pw.Pyweber()
-
-@app.route('/users', methods=['POST'])
-def create_user(user: User):
-    return user
+# PyWeber
+@app.route("/users", methods=["POST"])
+def create(user: User): ...
 ```
 
 ### From Flask
+
 ```python
-# Flask (manual work)
-from flask import Flask, request, jsonify
-
-app = Flask(__name__)
-
+# Flask
 @app.route('/users', methods=['POST'])
-def create_user():
-    data = request.get_json()
-    user = User(**data)  # Manual instantiation
-    return jsonify(user.dict())
+def create():
+    user = User(**request.get_json())
 
-# Pyweber (automatic!)
+# PyWeber
 @app.route('/users', methods=['POST'])
-def create_user(user: User):
-    return user  # Automatic instantiation and serialization
+def create(user: User): ...  # auto-instantiated
 ```
 
 ## Conclusion
 
-Pyweber's OpenAPI integration represents a **paradigm shift** in Python web framework design:
+PyWeber redefines how API documentation should work:
 
-- **Developer First**: Focus on writing business logic, not boilerplate
-- **Type Safe**: Leverage Python's type system for better code quality
-- **Universal**: Works with any class structure you prefer
-- **Zero Config**: Documentation that writes itself
+- Instant OpenAPI without boilerplate
+- Full type introspection across all class types
+- Developer-focused with built-in smart defaults
 
-Experience the future of Python web development with Pyweber's intelligent OpenAPI integration
+Now, you can explore more about pyweber:
+- Explore [Templates](template.md) for creating UI components
+- Learn about [Elements](element.md) for DOM manipulation
+- Understand [Events](events.md) for handling user interactions
+- Set up routing with the [PyWeber class](router.md)
+
