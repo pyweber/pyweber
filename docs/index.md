@@ -1,6 +1,6 @@
 # PyWeber Framework
 
-<img src="https://pyweber.readthedocs.io/en/latest/images/pyweber.png" alt="Pyweber Logo">
+<img src="https://pyweber.readthedocs.io/images/pyweber.png" alt="Pyweber Logo">
 
 [![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master) [![License](https://img.shields.io/pypi/l/pyweber.svg)](https://github.com/pyweber/pyweber/blob/master/LICENSE)
 
@@ -85,8 +85,14 @@ pyweber run --reload
 The main application class that handles routing, middleware, and template management:
 ```python
 app = pw.Pyweber()
-app.add_route("/", template=HomePage(app=app))
-app.add_route("/users/{user_id}", template=UserProfile(app=app))
+
+@app.route('/')
+def home():
+    return HomePage()
+
+@app.route('/users/{user_id}')
+def user_profile(user_id: int):
+    return UserProfile(user_id=user_id)
 ```
 
 ### Template
@@ -205,5 +211,3 @@ pyweber --update
 - [Elements](element.md) - DOM manipulation
 - [Events](events.md) - Handling user interactions
 - [CLI](cli.md) - Command-line tools
-
-Visit [Pyweber Docs](https://pyweber.readthedocs.io/) for complete documentation.

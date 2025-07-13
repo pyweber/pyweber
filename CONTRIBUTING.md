@@ -20,7 +20,7 @@ By participating in this project, you agree to abide by our Code of Conduct. Ple
 1. Fork the repository on GitHub
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/your-username/pyweber.git
+   git clone https://github.com/pyweber/pyweber.git
    cd pyweber
    ```
 
