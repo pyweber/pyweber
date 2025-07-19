@@ -876,7 +876,7 @@ def guide_config():
 │ String       │ name str Alex                           │
 │ Integer      │ age int 18                              │
 │ Float        │ price float 19.99                       │
-│ List         │ tags list python flask api              │
+│ List         │ tags list python pyweber api            │
 │ Tuple        │ colors tuple red green blue             │
 │ Dictionary   │ db dict user:str=admin; port:int=5432   │
 ╰──────────────┴─────────────────────────────────────-───╯

@@ -204,8 +204,8 @@ PyWeber redefines how API documentation should work:
 - Developer-focused with built-in smart defaults
 
 Now, you can explore more about pyweber:
+
 - Explore [Templates](template.md) for creating UI components
 - Learn about [Elements](element.md) for DOM manipulation
 - Understand [Events](events.md) for handling user interactions
 - Set up routing with the [PyWeber class](router.md)
-

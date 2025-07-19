@@ -251,13 +251,18 @@ class Template: # pragma: no cover
         return content
 
     def __read_file(self, file_path: str) -> str:
+        from pyweber.models.error_pages import ErrorPages
         if file_path.endswith('.html'):
             path = os.path.join('templates', file_path) if not os.path.isfile(file_path) else file_path
             
-            if os.path.isfile(path=path):
+            try:
                 return LoadStaticFiles(path=path).load
-            else:
-                raise FileNotFoundError('The file not found, please include on templates file')
+            
+            except FileNotFoundError:
+                return ErrorPages().page_server_error.build_html().replace(
+                    "{{error}}",
+                    f'{path} not found, please include on templates file'
+                )
         
         return file_path
     

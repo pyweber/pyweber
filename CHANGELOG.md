@@ -1,5 +1,10 @@
 # PyWeber Changelog
 
+## [1.0.0] - 2025-07-19
+---
+### Improvements
+- Changed return if static template does not exist. Now, if static file not exist will be returned `Error Page Template`
+
 ## [0.9.98] - 2025-07-12
 ---
 ### New features
