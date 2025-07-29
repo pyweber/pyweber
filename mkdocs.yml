@@ -1,35 +1,101 @@
 site_name: Pyweber Documentation
+site_description: Pyweber is a lightweight Python web framework designed to create dynamic, reactive web applications with a simple and intuitive API.
+
 theme:
   name: material
+  palette:
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
   features:
     - navigation.instant
     - navigation.tracking
     - navigation.sections
     - navigation.expand
+    - navigation.top
     - toc.integrate
     - search.suggest
     - search.highlight
     - content.code.copy
-  extra:
-    favicon: images/favicon.ico
+    - content.code.annotate
+  favicon: images/favicon.ico
 
 nav:
-  - Introdution: index.md
-  - Getting started: installation.md
-  - Router: router.md
-  - Template: template.md
-  - Element: element.md
-  - Event Handlers: events.md
-  - CLI: cli.md
-  - Environment Variables: environment.md
-  - Documentation: documentation.md
-  - Examples: examples.md
+  - Home: index.md
+
+  - Getting Started:
+    - Installation: installation.md
+    - Environment Variables: environment.md
+
+  - Core Framework:
+    - PyWeber Application: core/pyweber.md
+    - Request Handling: core/request.md
+    - Response Generation: core/response.md
+    - Headers Management: core/headers.md
+
+  - Routing System:
+    - Routes: routing/route.md
+    - Route Manager: routing/routemanager.md
+    - Redirects: routing/redirectroute.md
+
+  - Templates & UI:
+    - Templates: templates/template.md
+    - Elements: templates/element.md
+    - Template Results: templates/templateresult.md
+    - Content Results: templates/contentresult.md
+    - State Results: templates/stateresult.md
+
+  - Forms & Files:
+    - File Uploads: forms/file.md
+    - Form Fields: forms/field.md
+    - Field Storage: forms/fieldstorage.md
+
+  - Browser Integration:
+    - Window Management: browser/window.md
+    - Screen Information: browser/screen.md
+    - Location Handling: browser/location.md
+    - Orientation: browser/orientation.md
+
+  - Storage:
+    - Local Storage: storage/localstorage.md
+    - Session Storage: storage/sessionstorage.md
+    - Base Storage: storage/basestorage.md
+
+  - User Interaction:
+    - Prompts: interaction/prompt.md
+    - Confirmations: interaction/confirm.md
+    - Event Handlers: interaction/events.md
+
+  - Tools & CLI:
+    - Command Line Interface: cli.md
+
+  - Reference:
+    - Documentation: documentation.md
+    - Examples: examples.md
 
 markdown_extensions:
   - toc:
       permalink: true
-  - pymdownx.highlight
-  - pymdownx.emoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji
   - admonition
   - pymdownx.details
+  - attr_list
+  - tables
+
+plugins:
+  - search

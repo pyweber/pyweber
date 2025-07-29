@@ -85,7 +85,7 @@ def home():
     return Counter()
 
 if __name__ == "__main__":
-    pw.run(route='/admin')
+    pw.run(route='/')
 ```
 
 Run your application:

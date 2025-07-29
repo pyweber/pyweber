@@ -30,7 +30,7 @@ class SessionManager: # pragma: no cover
     
     def add_session(self, session_id: str, session: Session):
         assert isinstance(session, Session)
-        self.sessions[session_id] = Session
+        self.sessions[session_id] = session
     
     def remove_session(self, session_id: str):
         if session_id in self.sessions:
