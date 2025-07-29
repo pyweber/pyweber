@@ -7,7 +7,6 @@ pyweber.egg-info
 .vscode/
 htmlcov/
 site/
-templates/
 .vscode/
 .pyweber/
 tests/config
