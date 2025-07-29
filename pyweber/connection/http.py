@@ -175,7 +175,7 @@ class HttpServer: # pragma: no cover
                                     ).start()
                         
                     except KeyboardInterrupt:
-                        shutil.rmtree('__pycache__', ignore_errors=True)
+                        self.clear_cache(path='.')
                         PrintLine(text='Server offline')
                         break
         
@@ -186,6 +186,11 @@ class HttpServer: # pragma: no cover
             except Exception as e:
                 PrintLine(text=f'Error [server] 1: {e}', level='ERROR')
                 raise e
+    
+    def clear_cache(self, path: str = '.'):
+        for root, folders, files in os.walk(top=path):
+            if any(p in root for p in ['__pycache__', 'tests/config', '.pyweber']):
+                shutil.rmtree(path=root, ignore_errors=True)
             
     def run(self, route: str, port: int, host: str, cert_file: str, key_file: str):
         self.route, self.port, self.host = route, port, host

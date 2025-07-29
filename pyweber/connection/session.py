@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 from time import time
 
-if TYPE_CHECKING:
+if TYPE_CHECKING: # pragma: no cover
     from pyweber.core.template import Template
     from pyweber.core.window import Window
 
@@ -21,14 +21,15 @@ class SessionManager: # pragma: no cover
         return self.__sessions
 
     @property
-    def lenght(self):
+    def length(self):
         return len(self.sessions)
     
     @property
     def all_sessions(self):
         return list(self.sessions.keys())
     
-    def add_session(self, session_id: str, Session: Session):
+    def add_session(self, session_id: str, session: Session):
+        assert isinstance(session, Session)
         self.sessions[session_id] = Session
     
     def remove_session(self, session_id: str):
@@ -37,6 +38,9 @@ class SessionManager: # pragma: no cover
     
     def get_session(self, session_id: str):
         return self.sessions.get(session_id, None)
+    
+    def __len__(self):
+        return len(self.sessions)
     
     def __getitem__(self, session_id: str):
         return self.get_session(session_id=session_id)

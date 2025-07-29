@@ -1,0 +1,42 @@
+{
+  "css": {
+    "selectors": {
+      "focus-within": {
+        "__compat": {
+          "description": "`:focus-within`",
+          "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/:focus-within",
+          "spec_url": "https://drafts.csswg.org/selectors/#the-focus-within-pseudo",
+          "tags": [
+            "web-features:focus-within"
+          ],
+          "support": {
+            "chrome": {
+              "version_added": "60"
+            },
+            "chrome_android": "mirror",
+            "edge": "mirror",
+            "firefox": {
+              "version_added": "52"
+            },
+            "firefox_android": "mirror",
+            "oculus": "mirror",
+            "opera": "mirror",
+            "opera_android": "mirror",
+            "safari": {
+              "version_added": "10.1"
+            },
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": false,
+            "standard_track": true,
+            "deprecated": false
+          }
+        }
+      }
+    }
+  }
+}

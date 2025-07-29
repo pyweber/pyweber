@@ -1,0 +1,86 @@
+{
+  "html": {
+    "elements": {
+      "pre": {
+        "__compat": {
+          "mdn_url": "https://developer.mozilla.org/docs/Web/HTML/Reference/Elements/pre",
+          "spec_url": "https://html.spec.whatwg.org/multipage/grouping-content.html#the-pre-element",
+          "tags": [
+            "web-features:pre"
+          ],
+          "support": {
+            "chrome": {
+              "version_added": "1"
+            },
+            "chrome_android": "mirror",
+            "edge": {
+              "version_added": "12"
+            },
+            "firefox": {
+              "version_added": "1"
+            },
+            "firefox_android": "mirror",
+            "ie": {
+              "version_added": "≤11"
+            },
+            "oculus": "mirror",
+            "opera": "mirror",
+            "opera_android": "mirror",
+            "safari": {
+              "version_added": "≤4"
+            },
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": false,
+            "standard_track": true,
+            "deprecated": false
+          }
+        },
+        "width": {
+          "__compat": {
+            "support": {
+              "chrome": {
+                "version_added": "1",
+                "notes": "Specifying the `width` attribute has no layout effect."
+              },
+              "chrome_android": "mirror",
+              "edge": {
+                "version_added": "12",
+                "notes": "Specifying the `width` attribute has no layout effect."
+              },
+              "firefox": {
+                "version_added": "1",
+                "notes": "Since Firefox 29, specifying the `width` attribute has no layout effect."
+              },
+              "firefox_android": "mirror",
+              "ie": {
+                "version_added": "≤11",
+                "notes": "Specifying the `width` attribute has no layout effect."
+              },
+              "oculus": "mirror",
+              "opera": "mirror",
+              "opera_android": "mirror",
+              "safari": {
+                "version_added": "3",
+                "notes": "Specifying the `width` attribute has no layout effect."
+              },
+              "safari_ios": "mirror",
+              "samsunginternet_android": "mirror",
+              "webview_android": "mirror",
+              "webview_ios": "mirror"
+            },
+            "status": {
+              "experimental": false,
+              "standard_track": false,
+              "deprecated": true
+            }
+          }
+        }
+      }
+    }
+  }
+}

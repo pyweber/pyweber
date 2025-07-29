@@ -4,29 +4,35 @@ from typing import Callable
 import asyncio
 import os
 import sys
+from pathlib import Path
 
 from pyweber.pyweber.pyweber import Pyweber
 from pyweber.connection.http import HttpServer
 from pyweber.connection.websocket import WebSocket
 from pyweber.connection.reload import ReloadServer
+from pyweber.utils.utils import PrintLine
 from pyweber.config.config import config
 
 class CreatApp: # pragma: no cover
     def __init__(self, target: Callable, **kwargs):
         self.target = target
-        self.module = self.import_module()
         self.app = self.get_app_instances()
-        self.__reload_mode = os.environ.get('PYWEBER_RELOAD_MODE') or kwargs.get('reload_mode', None) or config.get('session', 'reload_mode')
-        self.__cert_file = os.environ.get('PYWEBER_CERT_FILE') or kwargs.get('cert_file', None) or config.get('server', 'cert_file')
-        self.__key_file = os.environ.get('PYWEBER_KEY_FILE') or kwargs.get('key_file', None) or config.get('server', 'key_file')
-        self.__server_host = os.environ.get('PYWEBER_SERVER_HOST') or kwargs.get('host', None) or config.get('server', 'host')
-        self.__server_port = os.environ.get('PYWEBER_SERVER_PORT') or kwargs.get('port', None) or config.get('server', 'port')
-        self.__server_ws_port = os.environ.get('PYWEBER_WS_PORT') or kwargs.get('ws_port', None) or config.get('websocket', 'port')
-        self.__server_route = os.environ.get('PYWEBER_SERVER_ROUTE') or kwargs.get('route', None) or config.get('server', 'route')
-        self.__disable_ws = os.environ.get('PYWEBER_DISABLE_WS') or kwargs.get('disable_ws', None) or config.get('websocket', 'disable_ws')
+        self.__reload_mode = kwargs.get('reload_mode', None) or os.environ.get('PYWEBER_RELOAD_MODE') or config.get('session', 'reload_mode')
+        self.__cert_file = kwargs.get('cert_file', None) or os.environ.get('PYWEBER_CERT_FILE') or config.get('server', 'cert_file')
+        self.__key_file = kwargs.get('key_file', None) or os.environ.get('PYWEBER_KEY_FILE') or config.get('server', 'key_file')
+        self.__server_host = kwargs.get('host', None) or os.environ.get('PYWEBER_SERVER_HOST') or config.get('server', 'host')
+        self.__server_port = kwargs.get('port', None) or os.environ.get('PYWEBER_SERVER_PORT') or config.get('server', 'port')
+        self.__server_ws_port = kwargs.get('ws_port', None) or os.environ.get('PYWEBER_WS_PORT') or config.get('websocket', 'port')
+        self.__server_route = kwargs.get('route', None) or os.environ.get('PYWEBER_SERVER_ROUTE') or config.get('server', 'route')
+        self.__disable_ws = kwargs.get('disable_ws', None) or os.environ.get('PYWEBER_DISABLE_WS') or config.get('websocket', 'disable_ws')
         self.http_server = HttpServer(update_handler=self.update)
         self.ws_server = WebSocket(app=self.app, protocol='pyweber')
-        self.reload_server = ReloadServer(ws_reload=self.ws_server.send_message, http_reload=self.update)
+        self.reload_server = ReloadServer(
+            ws_reload=self.ws_server.send_message,
+            http_reload=self.update,
+            ignore_reload_time=kwargs.get('ignore_reload_time', None) or 10,
+            extension_files=kwargs.get('reload_extensions', []) or ['.css', '.html', '.json', '.toml', '.js', '.py']
+        )
     
     @property
     def target(self):
@@ -68,14 +74,43 @@ class CreatApp: # pragma: no cover
             key_file=self.__key_file
         )
     
-    def import_module(self):
+    def get_main_module(self):
+        main_module = os.path.basename(os.path.abspath(sys.argv[0])).split('.')[0]
+        
         try:
-            return reload(import_module(name=os.path.splitext(os.path.basename(sys.argv[0]))[0]))
+            if main_module not in sys.modules:
+                return import_module(main_module)
+            
+            return reload(sys.modules[main_module])
+        except Exception as e:
+            PrintLine(text=f'Error to import {main_module}: {e}', level='ERROR')
+            raise e
+    
+    def path_to_module(self, filepath: str):
+        project_dir = Path(os.path.abspath(sys.argv[0])).parent
+        rel_path = Path(filepath).resolve().relative_to(project_dir)
+        module_path = rel_path.with_suffix('')
+
+        return '.'.join(module_path.parts)
+
+    def reload_modules(self, changed_file: str):
+        try:
+            if changed_file and str(changed_file).endswith('.py'):
+                module_name = self.path_to_module(filepath=changed_file)
+
+                if module_name in sys.modules:
+                    reload(sys.modules[module_name])
+                else:
+                    import_module(module_name)
+            
+            self.load_target()
         
         except Exception as e:
-            raise ImportError(f'Error to import module: {e}')
+            PrintLine(text=f'Error to import module: {e}', level='ERROR')
+            raise e
     
     def get_app_instances(self):
+        self.module = self.get_main_module()
 
         for _, obj in vars(self.module).items():
             if isinstance(obj, Pyweber):
@@ -88,7 +123,6 @@ class CreatApp: # pragma: no cover
         self.app.clear_routes()
         self.app.clear_before_request_middleware()
         self.app.clear_after_request_middleware()
-        self.module = self.import_module()
         self.app = self.get_app_instances()
 
         if self.target:
@@ -98,5 +132,5 @@ class CreatApp: # pragma: no cover
         self.http_server.task_manager = self.ws_server.task_manager
         self.ws_server.app = self.app
 
-    def update(self):
-        self.load_target()
+    def update(self, module: str = None):
+        self.reload_modules(changed_file=module)

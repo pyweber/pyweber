@@ -1,10 +1,10 @@
-# PyWeber Framework
+# Pyweber Framework
 
 <img src="https://pyweber.readthedocs.io/images/pyweber.png" alt="Pyweber Logo">
 
 [![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master) [![License](https://img.shields.io/pypi/l/pyweber.svg)](https://github.com/pyweber/pyweber/blob/master/LICENSE)
 
-PyWeber is a lightweight Python web framework designed to create dynamic, reactive web applications with a simple and intuitive API. It combines the simplicity of Python with the reactivity of modern frontend frameworks.
+Pyweber is a lightweight Python web framework designed to create dynamic, reactive web applications with a simple and intuitive API. It combines the simplicity of Python with the reactivity of modern frontend frameworks.
 
 ## Key Features
 
@@ -36,20 +36,26 @@ cd my_app
 ```python
 import pyweber as pw
 
-class Counter(pw.Template):
-    def __init__(self, app: pw.Pyweber):
-        super().__init__(template="""
-            <div>
-                <h1>PyWeber Counter</h1>
-                <p>Count: <span id="count">0</span></p>
-                <button id="increment">Increment</button>
-            </div>
-        """,
-        title='Hello pyweber')
-
-        self.button = self.querySelector("#increment")
-        self.button.events.onclick = self.increment
-
+class Main(pw.Element):
+    def __init__(self):
+        super().__init__(tag='div', classes=['counter'])
+        self.childs = [
+            pw.Element('h1', content='Pyweber Counter'),
+            pw.Element(
+                tag='p',
+                content='Count:',
+                childs=[
+                    pw.Element('span', id='count', content=0)
+                ]
+            ),
+            pw.Element(
+                'button',
+                id='increment',
+                content='Increment',
+                events=pw.TemplateEvents(onclick=self.increment)
+            )
+        ]
+    
     async def increment(self, e: pw.EventHandler):
         self.count = e.template.querySelector("#count")
         current = int(self.count.content)
@@ -65,11 +71,21 @@ class Counter(pw.Template):
             )
         )
 
-def main(app: pw.Pyweber):
-    app.add_route("/", template=Counter(app=app))
+class Counter(pw.Template):
+    def __init__(self):
+        super().__init__(template='', title='Hello pyweber')
+        self.body.childs = [
+            Main()
+        ]
+
+app = pw.Pyweber()
+
+@app.route('/')
+def home():
+    return Counter()
 
 if __name__ == "__main__":
-    pw.run(target=main)
+    pw.run(route='/admin')
 ```
 
 Run your application:
@@ -115,7 +131,7 @@ button = pw.Element(tag="button", content="Click me", id="my-button")
 
 # Modify properties
 button.content = "Clicked!"
-button.attributes["disabled"] = "true"
+button.attrs["disabled"] = "true"
 button.style["color"] = "red"
 button.add_class("active")
 ```
@@ -127,6 +143,8 @@ Handle user interactions with Python functions:
 # Define event handlers
 async def handle_click(e: pw.EventHandler):
     e.element.content = "Processing..."
+    e.update()
+
     await process_data()
     e.element.content = "Done!"
     e.update()
@@ -204,10 +222,4 @@ pyweber add-section --section-name database
 pyweber --update
 ```
 
-## Next Steps
-
-- [Installation Guide](installation.md) - Detailed setup instructions
-- [Templates](template.md) - Creating dynamic UI components
-- [Elements](element.md) - DOM manipulation
-- [Events](events.md) - Handling user interactions
-- [CLI](cli.md) - Command-line tools
+Visit [Pyweber Docs](https://pyweber.dev/) for complete documentation.

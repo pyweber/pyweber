@@ -1,0 +1,147 @@
+{
+  "css": {
+    "at-rules": {
+      "font-palette-values": {
+        "__compat": {
+          "description": "`@font-palette-values`",
+          "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/@font-palette-values",
+          "spec_url": "https://drafts.csswg.org/css-fonts/#at-ruledef-font-palette-values",
+          "tags": [
+            "web-features:font-palette"
+          ],
+          "support": {
+            "chrome": {
+              "version_added": "101"
+            },
+            "chrome_android": "mirror",
+            "edge": "mirror",
+            "firefox": {
+              "version_added": "107"
+            },
+            "firefox_android": "mirror",
+            "oculus": "mirror",
+            "opera": "mirror",
+            "opera_android": "mirror",
+            "safari": {
+              "version_added": "15.4"
+            },
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": false,
+            "standard_track": true,
+            "deprecated": false
+          }
+        },
+        "base-palette": {
+          "__compat": {
+            "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/@font-palette-values/base-palette",
+            "spec_url": "https://drafts.csswg.org/css-fonts/#base-palette-desc",
+            "tags": [
+              "web-features:font-palette"
+            ],
+            "support": {
+              "chrome": {
+                "version_added": "101"
+              },
+              "chrome_android": "mirror",
+              "edge": "mirror",
+              "firefox": {
+                "version_added": "107"
+              },
+              "firefox_android": "mirror",
+              "oculus": "mirror",
+              "opera": "mirror",
+              "opera_android": "mirror",
+              "safari": {
+                "version_added": "15.4"
+              },
+              "safari_ios": "mirror",
+              "samsunginternet_android": "mirror",
+              "webview_android": "mirror",
+              "webview_ios": "mirror"
+            },
+            "status": {
+              "experimental": false,
+              "standard_track": true,
+              "deprecated": false
+            }
+          }
+        },
+        "font-family": {
+          "__compat": {
+            "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/@font-palette-values/font-family",
+            "spec_url": "https://drafts.csswg.org/css-fonts/#font-family-2-desc",
+            "tags": [
+              "web-features:font-palette"
+            ],
+            "support": {
+              "chrome": {
+                "version_added": "101"
+              },
+              "chrome_android": "mirror",
+              "edge": "mirror",
+              "firefox": {
+                "version_added": "107"
+              },
+              "firefox_android": "mirror",
+              "oculus": "mirror",
+              "opera": "mirror",
+              "opera_android": "mirror",
+              "safari": {
+                "version_added": "15.4"
+              },
+              "safari_ios": "mirror",
+              "samsunginternet_android": "mirror",
+              "webview_android": "mirror",
+              "webview_ios": "mirror"
+            },
+            "status": {
+              "experimental": false,
+              "standard_track": true,
+              "deprecated": false
+            }
+          }
+        },
+        "override-colors": {
+          "__compat": {
+            "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/@font-palette-values/override-colors",
+            "spec_url": "https://drafts.csswg.org/css-fonts/#override-color",
+            "tags": [
+              "web-features:font-palette"
+            ],
+            "support": {
+              "chrome": {
+                "version_added": "101"
+              },
+              "chrome_android": "mirror",
+              "edge": "mirror",
+              "firefox": {
+                "version_added": "107"
+              },
+              "firefox_android": "mirror",
+              "oculus": "mirror",
+              "opera": "mirror",
+              "opera_android": "mirror",
+              "safari": {
+                "version_added": "15.4"
+              },
+              "safari_ios": "mirror",
+              "samsunginternet_android": "mirror",
+              "webview_android": "mirror",
+              "webview_ios": "mirror"
+            },
+            "status": {
+              "experimental": false,
+              "standard_track": true,
+              "deprecated": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -461,7 +461,7 @@ class WindowEvents:
         self.ongotpointercapture = ongotpointercapture
         self.onlostpointercapture = onlostpointercapture
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         """Representação legível dos eventos."""
         events = {k: v for k, v in self.__dict__.items() if v is not None}
         return f"WindowEvents({events})"

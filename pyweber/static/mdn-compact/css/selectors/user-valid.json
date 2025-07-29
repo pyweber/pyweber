@@ -1,0 +1,51 @@
+{
+  "css": {
+    "selectors": {
+      "user-valid": {
+        "__compat": {
+          "description": "`:user-valid`",
+          "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/:user-valid",
+          "spec_url": [
+            "https://html.spec.whatwg.org/multipage/semantics-other.html#selector-user-valid",
+            "https://drafts.csswg.org/selectors/#user-valid-pseudo"
+          ],
+          "tags": [
+            "web-features:user-pseudos"
+          ],
+          "support": {
+            "chrome": {
+              "version_added": "119"
+            },
+            "chrome_android": "mirror",
+            "edge": "mirror",
+            "firefox": [
+              {
+                "version_added": "88"
+              },
+              {
+                "alternative_name": ":-moz-ui-valid",
+                "version_added": "4"
+              }
+            ],
+            "firefox_android": "mirror",
+            "oculus": "mirror",
+            "opera": "mirror",
+            "opera_android": "mirror",
+            "safari": {
+              "version_added": "16.5"
+            },
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": false,
+            "standard_track": true,
+            "deprecated": false
+          }
+        }
+      }
+    }
+  }
+}

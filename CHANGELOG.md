@@ -1,9 +1,15 @@
 # PyWeber Changelog
 
-## [1.0.0] - 2025-07-19
+## [1.0.0] - 2025-07-29
 ---
 ### Improvements
 - Changed return if static template does not exist. Now, if static file not exist will be returned `Error Page Template`
+- Added **hot reload for Python modules**. Now, changes to backend Python code automatically refresh the browser without restarting the server.
+
+### Bug Fixes
+- Solved NoneType Error when the route have no return middleware
+- Solved not show title defined in route if route return Template instances.
+- Solved multiple adding elements if use `e.update()` more than once.
 
 ## [0.9.98] - 2025-07-12
 ---

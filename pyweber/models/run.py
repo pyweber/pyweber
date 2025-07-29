@@ -9,20 +9,33 @@ if TYPE_CHECKING: # pragma: no cover
 
 WS_RUNNING = False
 
-def run(target: Callable = None, **kwargs): # pragma: no cover
+def run(
+        target: Callable = None,
+        reload_mode: bool = False,
+        cert_file: str = None,
+        key_file: str = None,
+        host: str = None,
+        port: int = None,
+        route: str = '/',
+        ws_port: int = None,
+        disable_ws: bool = False,
+        reload_extensions: list[str] = None,
+        ignore_reload_time: int = 10,
+        **kwargs
+    ): # pragma: no cover
     """
     For running the pyweber project.
     ```python
     import pyweber as pw
 
     def main(app: pw.Pyweber):
-    app.add_route(
-        route='/',
-        template=pw.Template(template='Hello, world', status=200)
-    )
+        app.add_route(
+            route='/',
+            template=pw.Template(template='Hello, world', status=200)
+        )
 
     if __name__ == '__main__':
-    pw.run(target=main)
+        pw.run(target=main)
     ```
 
     Or, your can create the project using route decoratores
@@ -39,8 +52,22 @@ def run(target: Callable = None, **kwargs): # pragma: no cover
         pw.run()
     ```
     ---
-    More details: https://pyweber.readthedocs.org
+    More details: https://pyweber.dev
     """
+
+    kwargs = {
+        'reload_mode': reload_mode,
+        'cert_file': cert_file,
+        'key_file': key_file,
+        'host': host,
+        'port': port,
+        'ws_port': ws_port,
+        'route': route,
+        'disable_ws': disable_ws,
+        'reload_extensions': reload_extensions or [],
+        'ignore_reload_time': ignore_reload_time,
+        **kwargs
+    }
 
     if target and not callable(target):
         raise TypeError('The target must be callable function')

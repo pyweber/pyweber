@@ -1,0 +1,45 @@
+{
+  "html": {
+    "elements": {
+      "main": {
+        "__compat": {
+          "mdn_url": "https://developer.mozilla.org/docs/Web/HTML/Reference/Elements/main",
+          "spec_url": "https://html.spec.whatwg.org/multipage/grouping-content.html#the-main-element",
+          "tags": [
+            "web-features:main"
+          ],
+          "support": {
+            "chrome": {
+              "version_added": "26"
+            },
+            "chrome_android": "mirror",
+            "edge": {
+              "version_added": "12"
+            },
+            "firefox": {
+              "version_added": "21"
+            },
+            "firefox_android": "mirror",
+            "oculus": "mirror",
+            "opera": {
+              "version_added": "16"
+            },
+            "opera_android": "mirror",
+            "safari": {
+              "version_added": "7"
+            },
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": false,
+            "standard_track": true,
+            "deprecated": false
+          }
+        }
+      }
+    }
+  }
+}

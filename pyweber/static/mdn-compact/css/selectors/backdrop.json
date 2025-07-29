@@ -1,0 +1,205 @@
+{
+  "css": {
+    "selectors": {
+      "backdrop": {
+        "__compat": {
+          "description": "`::backdrop`",
+          "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/::backdrop",
+          "spec_url": "https://drafts.csswg.org/css-position-4/#backdrop",
+          "tags": [
+            "web-features:backdrop"
+          ],
+          "support": {
+            "chrome": [
+              {
+                "version_added": "37"
+              },
+              {
+                "prefix": "-webkit-",
+                "version_added": "32"
+              }
+            ],
+            "chrome_android": "mirror",
+            "edge": [
+              {
+                "version_added": "79"
+              },
+              {
+                "prefix": "-ms-",
+                "version_added": "12",
+                "version_removed": "79"
+              }
+            ],
+            "firefox": {
+              "version_added": "47"
+            },
+            "firefox_android": "mirror",
+            "ie": {
+              "prefix": "-ms-",
+              "version_added": "11"
+            },
+            "oculus": "mirror",
+            "opera": "mirror",
+            "opera_android": "mirror",
+            "safari": {
+              "version_added": "15.4"
+            },
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": false,
+            "standard_track": true,
+            "deprecated": false
+          }
+        },
+        "dialog": {
+          "__compat": {
+            "description": "Support on `dialog` elements",
+            "tags": [
+              "web-features:backdrop"
+            ],
+            "support": {
+              "chrome": {
+                "version_added": "32"
+              },
+              "chrome_android": "mirror",
+              "edge": "mirror",
+              "firefox": {
+                "version_added": "98"
+              },
+              "firefox_android": "mirror",
+              "oculus": "mirror",
+              "opera": "mirror",
+              "opera_android": "mirror",
+              "safari": {
+                "version_added": "15.4"
+              },
+              "safari_ios": "mirror",
+              "samsunginternet_android": "mirror",
+              "webview_android": "mirror",
+              "webview_ios": "mirror"
+            },
+            "status": {
+              "experimental": false,
+              "standard_track": true,
+              "deprecated": false
+            }
+          }
+        },
+        "fullscreen": {
+          "__compat": {
+            "description": "Fullscreen support",
+            "tags": [
+              "web-features:fullscreen"
+            ],
+            "support": {
+              "chrome": {
+                "version_added": "69"
+              },
+              "chrome_android": "mirror",
+              "edge": {
+                "version_added": "12"
+              },
+              "firefox": {
+                "version_added": "47"
+              },
+              "firefox_android": "mirror",
+              "ie": {
+                "version_added": "11"
+              },
+              "oculus": "mirror",
+              "opera": "mirror",
+              "opera_android": "mirror",
+              "safari": {
+                "version_added": "16.4"
+              },
+              "safari_ios": "mirror",
+              "samsunginternet_android": "mirror",
+              "webview_android": "mirror",
+              "webview_ios": "mirror"
+            },
+            "status": {
+              "experimental": false,
+              "standard_track": true,
+              "deprecated": false
+            }
+          }
+        },
+        "inherit_from_originating_element": {
+          "__compat": {
+            "description": "Backdrop elements inherit their values from its originating element",
+            "tags": [
+              "web-features:backdrop"
+            ],
+            "support": {
+              "chrome": {
+                "version_added": "122",
+                "impl_url": "https://crbug.com/40569411"
+              },
+              "chrome_android": "mirror",
+              "edge": "mirror",
+              "firefox": {
+                "version_added": "120",
+                "impl_url": "https://bugzil.la/1855668"
+              },
+              "firefox_android": "mirror",
+              "oculus": "mirror",
+              "opera": "mirror",
+              "opera_android": "mirror",
+              "safari": {
+                "version_added": "17.4",
+                "impl_url": "https://webkit.org/b/263834"
+              },
+              "safari_ios": "mirror",
+              "samsunginternet_android": "mirror",
+              "webview_android": "mirror",
+              "webview_ios": "mirror"
+            },
+            "status": {
+              "experimental": false,
+              "standard_track": true,
+              "deprecated": false
+            }
+          }
+        },
+        "popover": {
+          "__compat": {
+            "description": "Support on popovers",
+            "tags": [
+              "web-features:popover"
+            ],
+            "support": {
+              "chrome": {
+                "version_added": "114"
+              },
+              "chrome_android": "mirror",
+              "edge": "mirror",
+              "firefox": {
+                "version_added": "125"
+              },
+              "firefox_android": "mirror",
+              "oculus": "mirror",
+              "opera": "mirror",
+              "opera_android": "mirror",
+              "safari": {
+                "version_added": "17"
+              },
+              "safari_ios": "mirror",
+              "samsunginternet_android": "mirror",
+              "webview_android": "mirror",
+              "webview_ios": "mirror"
+            },
+            "status": {
+              "experimental": false,
+              "standard_track": true,
+              "deprecated": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

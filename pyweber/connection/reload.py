@@ -9,12 +9,20 @@ from watchdog.events import FileSystemEventHandler
 from pyweber.utils.utils import Colors, PrintLine
 
 class ReloadServer: # pragma: no cover
-    def __init__(self, ws_reload: Callable[..., Awaitable], http_reload: Callable, watch_path: str = '.'):
+    def __init__(
+            self,
+            ws_reload: Callable[..., Awaitable],
+            http_reload: Callable,
+            watch_path: str = '.',
+            extension_files: list[str] = [],
+            ignore_reload_time: float = 10
+        ):
+        assert callable(ws_reload) and callable(http_reload)
         self.ws_reload = ws_reload
         self.http_reload = http_reload
         self.watch_path = watch_path
-        self.watch_file_extensions: list[str] = ['.css', '.html', '.js', '.py']
-        self.ignore_reload_time = 10
+        self.watch_file_extensions = extension_files
+        self.ignore_reload_time = ignore_reload_time
     
     def start(self):
         asyncio.run(WatchDogFiles(self).start())
@@ -66,10 +74,14 @@ class ReloadHandler(FileSystemEventHandler): # pragma: no cover
 
             if new_hash and new_hash != old_hash:
                 PrintLine(text=f'♻  File {green}{os.path.basename(event.src_path)}{reset} modified. Reloading...')
-                PrintLine(text=f'♻  Restarting the server...')
-                self.reload_server.http_reload()
-                PrintLine(text=f'♻  Server restarted...')
+                self.restart_server(changed_file=event.src_path)
                 PrintLine(text=f'♻  Reloading client...')
 
                 asyncio.run(self.reload_server.ws_reload(data={'reload': True}, session_id=None))
                 self.hash_files[event.src_path] = new_hash
+    
+    def restart_server(self, changed_file: str):
+        if changed_file.endswith('.py'):
+            PrintLine(text=f'♻  Restarting the server...')
+            self.reload_server.http_reload(changed_file)
+            PrintLine(text=f'♻  Server restarted...')

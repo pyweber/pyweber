@@ -1,0 +1,165 @@
+{
+  "css": {
+    "selectors": {
+      "after": {
+        "__compat": {
+          "description": "`::after`",
+          "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/::after",
+          "spec_url": "https://drafts.csswg.org/css-pseudo/#generated-content",
+          "tags": [
+            "web-features:before-after"
+          ],
+          "support": {
+            "chrome": [
+              {
+                "version_added": "1"
+              },
+              {
+                "alternative_name": ":after",
+                "version_added": "1"
+              }
+            ],
+            "chrome_android": "mirror",
+            "edge": [
+              {
+                "version_added": "12"
+              },
+              {
+                "alternative_name": ":after",
+                "version_added": "12"
+              }
+            ],
+            "firefox": [
+              {
+                "version_added": "1.5",
+                "notes": [
+                  "Before Firefox 57, Firefox had a bug where `::after` pseudo-elements were still generated, even if the [`content`](https://developer.mozilla.org/docs/Web/CSS/content) property value were set to `normal` or `none`.",
+                  "Before Firefox 3.5, only the CSS level 2 behavior of `:after` was supported, which disallowed [`position`](https://developer.mozilla.org/docs/Web/CSS/position), [`float`](https://developer.mozilla.org/docs/Web/CSS/float), `list-style-*` and some `display` properties."
+                ]
+              },
+              {
+                "alternative_name": ":after",
+                "version_added": "1"
+              }
+            ],
+            "firefox_android": "mirror",
+            "ie": [
+              {
+                "version_added": "9"
+              },
+              {
+                "alternative_name": ":after",
+                "version_added": "8"
+              }
+            ],
+            "oculus": "mirror",
+            "opera": [
+              {
+                "version_added": "7"
+              },
+              {
+                "alternative_name": ":after",
+                "version_added": "4"
+              }
+            ],
+            "opera_android": [
+              {
+                "version_added": "10.1"
+              },
+              {
+                "alternative_name": ":after",
+                "version_added": "10.1"
+              }
+            ],
+            "safari": [
+              {
+                "version_added": "4"
+              },
+              {
+                "alternative_name": ":after",
+                "version_added": "4"
+              }
+            ],
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": false,
+            "standard_track": true,
+            "deprecated": false
+          }
+        },
+        "animation_and_transition_support": {
+          "__compat": {
+            "description": "Animation and transition support",
+            "tags": [
+              "web-features:before-after"
+            ],
+            "support": {
+              "chrome": {
+                "version_added": "26"
+              },
+              "chrome_android": "mirror",
+              "edge": {
+                "version_added": "12"
+              },
+              "firefox": {
+                "version_added": "4"
+              },
+              "firefox_android": "mirror",
+              "oculus": "mirror",
+              "opera": "mirror",
+              "opera_android": "mirror",
+              "safari": {
+                "version_added": "7"
+              },
+              "safari_ios": "mirror",
+              "samsunginternet_android": "mirror",
+              "webview_android": "mirror",
+              "webview_ios": "mirror"
+            },
+            "status": {
+              "experimental": false,
+              "standard_track": true,
+              "deprecated": false
+            }
+          }
+        },
+        "nested_marker": {
+          "__compat": {
+            "description": "`::after::marker` nested pseudo-elements",
+            "spec_url": "https://drafts.csswg.org/css-pseudo-4/#:~:text=The%20::before::marker%20or%20::after::marker%20selectors",
+            "support": {
+              "chrome": {
+                "version_added": "135"
+              },
+              "chrome_android": "mirror",
+              "edge": "mirror",
+              "firefox": {
+                "version_added": false
+              },
+              "firefox_android": "mirror",
+              "oculus": "mirror",
+              "opera": "mirror",
+              "opera_android": "mirror",
+              "safari": {
+                "version_added": false
+              },
+              "safari_ios": "mirror",
+              "samsunginternet_android": "mirror",
+              "webview_android": "mirror",
+              "webview_ios": "mirror"
+            },
+            "status": {
+              "experimental": true,
+              "standard_track": true,
+              "deprecated": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

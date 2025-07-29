@@ -113,6 +113,14 @@ from .components.input import (
     InputUrl
 )
 
+def session_id() -> str | None: # pragma: no cover
+    PrintLine(text='This is an experimental feature', level='WARNING')
+    return window.session_storage.get('_pyweber_sessionId', None)
+
+def session(): # pragma: no cover
+    PrintLine(text='This is an experimental feature', level='WARNING')
+    return sessions.get_session(session_id())
+
 __all__ = [
     'Template',
     'Pyweber',
@@ -131,6 +139,8 @@ __all__ = [
     'EventHandler',
     'Element',
     'sessions',
+    'session',
+    'session_id',
     'window',
     'config',
     'Colors',

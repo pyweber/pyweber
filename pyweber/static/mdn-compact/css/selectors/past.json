@@ -1,0 +1,42 @@
+{
+  "css": {
+    "selectors": {
+      "past": {
+        "__compat": {
+          "description": "`:past`",
+          "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/:past",
+          "spec_url": "https://drafts.csswg.org/selectors/#the-past-pseudo",
+          "tags": [
+            "web-features:time-relative-selectors"
+          ],
+          "support": {
+            "chrome": {
+              "version_added": "23"
+            },
+            "chrome_android": "mirror",
+            "edge": "mirror",
+            "firefox": {
+              "version_added": false
+            },
+            "firefox_android": "mirror",
+            "oculus": "mirror",
+            "opera": "mirror",
+            "opera_android": "mirror",
+            "safari": {
+              "version_added": "7"
+            },
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": false,
+            "standard_track": true,
+            "deprecated": false
+          }
+        }
+      }
+    }
+  }
+}

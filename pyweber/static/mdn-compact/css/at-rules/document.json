@@ -1,0 +1,48 @@
+{
+  "css": {
+    "at-rules": {
+      "document": {
+        "__compat": {
+          "description": "`@document`",
+          "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/@document",
+          "support": {
+            "chrome": {
+              "version_added": false
+            },
+            "chrome_android": "mirror",
+            "edge": "mirror",
+            "firefox": [
+              {
+                "prefix": "-moz-",
+                "version_added": "61",
+                "partial_implementation": true,
+                "notes": "Only supports an empty `url-prefix()` value, which is supported due to its [use in Firefox browser detection](https://css-tricks.com/snippets/css/css-hacks-targeting-firefox/). Still supported in user stylesheets."
+              },
+              {
+                "prefix": "-moz-",
+                "version_added": "1.5",
+                "version_removed": "61"
+              }
+            ],
+            "firefox_android": "mirror",
+            "oculus": "mirror",
+            "opera": "mirror",
+            "opera_android": "mirror",
+            "safari": {
+              "version_added": false
+            },
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": false,
+            "standard_track": false,
+            "deprecated": true
+          }
+        }
+      }
+    }
+  }
+}

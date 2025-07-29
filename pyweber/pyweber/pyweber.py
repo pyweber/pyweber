@@ -168,7 +168,7 @@ class Pyweber(
         process_response: bool = False
     ):
         if isinstance(template, Template):
-            return self._process_template_object(template=template, content_type=content_type)
+            return self._process_template_object(template=template, title=title, content_type=content_type)
         
         elif isinstance(template, Element):
             return self._process_element_object(
@@ -198,7 +198,8 @@ class Pyweber(
     def _process_json_object(self, template: Union[dict, list, set]):
         return ContentResult(content=json.dumps(template).encode(), content_type=ContentTypes.json)
     
-    def _process_template_object(self, template: Template, content_type: ContentTypes):
+    def _process_template_object(self, template: Template, title: str, content_type: ContentTypes):
+        template.title = title if title else template.title
         return ContentResult(content=template.build_html().encode(), content_type=content_type)
     
     def _process_element_object(
@@ -344,11 +345,12 @@ class Pyweber(
                 status_code=redirect_route.status_code
             )
 
-            return state.update(
-                status_code=middleware_result.status_code,
-                process_response=middleware_result.process_response,
-                template=middleware_result.content
-            )
+            if middleware_result:
+                return state.update(
+                    status_code=middleware_result.status_code,
+                    process_response=middleware_result.process_response,
+                    template=middleware_result.content
+                )
         
         return state.update(
             template=redirect_route.route.template,
@@ -517,8 +519,8 @@ class Pyweber(
         
         return template_result.template.clone()
 
-    def update(self):
-        return self.__update_handler() if self.__update_handler else None
+    def update(self, changed_file: str = None):
+        return self.__update_handler(module=changed_file) if self.__update_handler else None
     
     def launch_url(self, url: str, new_page: bool = False):
         return webbrowser.open(url=url, new=new_page)

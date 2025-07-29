@@ -61,6 +61,15 @@ class Template: # pragma: no cover
 
             if title:
                 title.content = value if value else title.content
+    
+    @property
+    def head(self): return self.root.querySelector('head')
+    
+    @property
+    def body(self): return self.root.querySelector('body')
+
+    @property
+    def style(self): return self.root.querySelectorAll('style')[-1]
 
     def get_icon(self):
         return str(config['app'].get('icon'))

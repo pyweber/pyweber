@@ -1,0 +1,37 @@
+{
+  "css": {
+    "properties": {
+      "-webkit-column-axis": {
+        "__compat": {
+          "support": {
+            "chrome": {
+              "version_added": "17",
+              "version_removed": "35"
+            },
+            "chrome_android": "mirror",
+            "edge": "mirror",
+            "firefox": {
+              "version_added": false
+            },
+            "firefox_android": "mirror",
+            "oculus": "mirror",
+            "opera": "mirror",
+            "opera_android": "mirror",
+            "safari": {
+              "version_added": "6"
+            },
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": true,
+            "standard_track": false,
+            "deprecated": false
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "css": {
+    "selectors": {
+      "grammar-error": {
+        "__compat": {
+          "description": "`::grammar-error`",
+          "mdn_url": "https://developer.mozilla.org/docs/Web/CSS/::grammar-error",
+          "spec_url": "https://drafts.csswg.org/css-pseudo/#selectordef-grammar-error",
+          "tags": [
+            "web-features:spelling-grammar-error"
+          ],
+          "support": {
+            "chrome": {
+              "version_added": "121"
+            },
+            "chrome_android": "mirror",
+            "edge": "mirror",
+            "firefox": {
+              "version_added": false
+            },
+            "firefox_android": "mirror",
+            "oculus": "mirror",
+            "opera": "mirror",
+            "opera_android": "mirror",
+            "safari": {
+              "version_added": "17.4"
+            },
+            "safari_ios": "mirror",
+            "samsunginternet_android": "mirror",
+            "webview_android": "mirror",
+            "webview_ios": "mirror"
+          },
+          "status": {
+            "experimental": false,
+            "standard_track": true,
+            "deprecated": false
+          }
+        }
+      }
+    }
+  }
+}
