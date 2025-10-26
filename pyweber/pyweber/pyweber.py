@@ -117,7 +117,7 @@ class Pyweber(
             resp=request,
             middlewares=self.get_before_request_middlewares
         )
-
+        
         if before_request_response:
             template_result = await self._process_templates(
                 state_result=StateResult(

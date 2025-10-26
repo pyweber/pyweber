@@ -6,7 +6,7 @@ from pyweber.core.events import TemplateEvents
 from pyweber.core.element import Element
 from pyweber.utils.loads import LoadStaticFiles
 from pyweber.config.config import config
-from pyweber.utils.types import HTTPStatusCode
+from pyweber.utils.types import HTTPStatusCode, GetBy
 
 class Template: # pragma: no cover
     def __init__(self, template: str, status_code: int = 200, title: str = None, **kwargs):
@@ -17,7 +17,7 @@ class Template: # pragma: no cover
         self.__icon: str = self.get_icon()
         self.title = title
         self.__root = self.parse_html()
-    
+
     @property
     def template(self):
         return self.__template
@@ -88,83 +88,21 @@ class Template: # pragma: no cover
         
         return html
     
-    def getElementById(self, element_id: str, element: Element = None) -> Element | None:
-        if element is None:
-            element = self.__root
-
-        if element.id == element_id:
-            return element
-
-        for child in element.childs:
-            result = self.getElementById(element_id, child)
-            if result is not None:
-                return result
-
-        return None
+    def getElement(self, by: GetBy, value: str, element: Element = None):
+        if not element: element = self.root
+        return element.getElement(by=by, value=value)
     
-    def getElementByUUID(self, element_uuid: str, element: Element = None) -> Element | None:
-        if element is None:
-            element = self.__root
-
-        if element.uuid == element_uuid:
-            return element
-
-        for child in element.childs:
-            result = self.getElementByUUID(element_uuid, child)
-            if result is not None:
-                return result
-
-        return None
-
-    def getElementByClass(self, class_name: str, element: Element = None) -> list[Element]:
-        if element is None:
-            element = self.__root
-
-        results = []
-
-        if element.classes and class_name in element.classes:
-            results.append(element)
-
-        for child in element.childs:
-            results.extend(self.getElementByClass(class_name, child))
-
-        return results
+    def getElements(self, by: GetBy, value: str, element: Element = None):
+        if not element: element = self.root
+        return  element.getElements(by=by, value=value)
     
-    def querySelector(self, selector: str, element: Element = None) -> Element | None:
-        if element is None:
-            element = self.__root
-
-        if self.__matches_selector(element, selector):
-            return element
-
-        for child in element.childs:
-            result = self.querySelector(selector, child)
-            if result is not None:
-                return result
-
-        return None
+    def querySelector(self, selector: str, element: Element = None):
+        if element is None: element = self.__root
+        return element.querySelector(selector=selector)
 
     def querySelectorAll(self, selector: str, element: Element = None) -> list[Element]:
-        if element is None:
-            element = self.__root
-
-        results = []
-
-        if self.__matches_selector(element, selector):
-            results.append(element)
-
-        for child in element.childs:
-            results.extend(self.querySelectorAll(selector, child))
-
-        return results
-
-    def __matches_selector(self, element: Element, selector: str) -> bool:
-        if selector.startswith('#'):
-            return element.id == selector[1:]
-        elif selector.startswith('.'):
-            return element.classes and selector[1:] in element.classes
-        else:
-            return element.tag == selector
+        if element is None: element = self.__root
+        return element.querySelectorAll(selector=selector)
     
     def __parse_html(self, html: str) -> Element:
         if not html.replace('<!DOCTYPE html>', '').strip().startswith('<html'):

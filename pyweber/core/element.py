@@ -111,14 +111,20 @@ class Element(ElementConstrutor): # pragma: no cover
         
         elif by in ['attrs', 'style']:
             conditions: list[str] = [pair.strip() for pair in value.split(';') if pair.strip()]
-            has = True
+            has = False
 
             el: dict[str, str] = getattr(element, by, {})
             for condition in conditions:
-                key, _, value = condition.partition(':')
+                key, _, val = condition.partition(':')
 
-                if key.strip() not in el or el.get(key.strip(), None) != value.strip():
-                    has = False
+                if not val: key, _, val = condition.partition('=')
+
+                if not val:
+                    if key.strip() in el:
+                        has = True
+
+                elif key.strip() in el and el.get(key.strip(), None) == val.strip():
+                    has = True
             
             if has:
                 results.append(element)
@@ -142,8 +148,8 @@ class Element(ElementConstrutor): # pragma: no cover
         results: list['Element'] = []
 
         if selector.startswith('.'):
-            if set(selector[1:].strip()) <= set(element.classes):
-                results.append(element)
+            classes = ' '.join(selector.split('.')).strip()
+            return self.getElements(by=GetBy.classes, value=classes)
         
         elif selector.startswith('#'):
             if selector[1:].strip() == element.id:
@@ -151,11 +157,7 @@ class Element(ElementConstrutor): # pragma: no cover
         
         elif selector.startswith('['):
             sel = selector.removeprefix('[').removesuffix(']')
-
-            attr, value = sel.split('=')
-
-            if attr.strip() in HTMLTag:
-                results.extend(self.getElements(by=attr.strip(), value=value.strip(), element=element))
+            return self.getElements(by=GetBy.attrs, value=sel)
         
         else:
             if selector.strip() == element.tag:
@@ -164,7 +166,7 @@ class Element(ElementConstrutor): # pragma: no cover
         for child in element.childs:
             results.extend(self.querySelectorAll(selector=selector, element=child))
 
-        return list(dict.fromkeys(results))
+        return results
     
     def __render_dynamic_elements(self, childs: ChildElements):
         new_childs: ChildElements = ChildElements(self)

@@ -53,6 +53,9 @@ class TemplateDiff: # pragma: no cover
             
             elif [v for v in new_element.classes if v not in old_element.classes]:
                 status = 'Changed'
+            
+            elif [v for v in old_element.classes if v not in new_element.classes]:
+                status = 'Changed'
         
         if status:
             self.add_element_on_diff(element=new_element, status=status)

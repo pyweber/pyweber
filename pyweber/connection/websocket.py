@@ -230,7 +230,6 @@ class WebSocket(BaseWebsockets): # pragma: no cover
                             session_id=ws_connection.id
                         )
                     
-                    self.update_app_template(new_template=sync_template, route=message.route)
                     if message.type and message.event_ref and not event_is_running(message=message, task_manager=self.task_manager):
                         self.update_session(
                             session_id=ws_connection.id,
@@ -240,6 +239,9 @@ class WebSocket(BaseWebsockets): # pragma: no cover
 
                         await self.message_handler(message=message)
         
+        except ws.ConnectionClosedError as e:
+            PrintLine(f'Websocket connection was lost: {e}', level='ERROR')
+
         except Exception as e:
             PrintLine(f'Websocket server error: {e}', level='ERROR')
             raise e
@@ -278,7 +280,6 @@ class WebSocket(BaseWebsockets): # pragma: no cover
                                     session_id=ws_connection
                                 )
                             
-                            self.update_app_template(new_template=sync_template, route=message.route)
                             if message.type and message.event_ref and not event_is_running(message=message, task_manager=self.task_manager):
                                 self.update_session(
                                     session_id=ws_connection,
@@ -305,22 +306,17 @@ class WebSocket(BaseWebsockets): # pragma: no cover
                 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
                 ssl_context.load_cert_chain(certfile=cert_file, keyfile=key_file)
             except Exception as e:
-                # PrintLine(text=f"WebSocket SSL configuration failed: {e}", level='ERROR')
                 raise e
             return ssl_context
         
         try:
             if cert_file and key_file:
                 ssl_context = ssl_setup()
-            
-            # protocol = 'wss' if ssl_context else 'ws'
-            # PrintLine(text=f"Server [ws] is running in {protocol}://{host}:{port}")
 
             async with async_serve(self.ws_handler_wsgi, host=host, port=port, ssl=ssl_context, max_size=2**48, write_limit=2**48) as server:
                 await server.serve_forever()
 
         except Exception as e:
-            # PrintLine(text=f'Websocket server error: {e}', level='ERROR')
             raise e
     
     async def __call__(self, scope, receive, send):

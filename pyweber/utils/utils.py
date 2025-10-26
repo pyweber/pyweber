@@ -43,5 +43,4 @@ def current_time(with_hour: bool, with_date: bool, splitter: str):
     
     if with_date:
         return f"{datetime.now().strftime('[%d/%m/%Y]')}\t"
-    
     return ''

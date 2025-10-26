@@ -92,15 +92,15 @@ class HttpServer: # pragma: no cover
                 )
 
                 if request.path:
-                    if self.started:
-                        if not self.is_file_request(request):
-                            self.update_server()
+                    # if self.started:
+                    #     if not self.is_file_request(request):
+                    #         self.update_server()
                     
                     response = await self.app.get_response(request=request)
                     client.sendall(response.build_response)
 
-                    if not self.is_file_request(request):
-                        self.started = True
+                    # if not self.is_file_request(request):
+                    #     self.started = True
         
         except BlockingIOError:
             pass
@@ -143,6 +143,7 @@ class HttpServer: # pragma: no cover
                     PrintLine(
                         text=f"Server online in {Colors.GREEN}{public_url}{Colors.RESET} or {Colors.GREEN}{local_url}{Colors.RESET}"
                     )
+                    self.generate_qrcode(text=local_url)
 
                 while True:
                     try:
@@ -186,6 +187,22 @@ class HttpServer: # pragma: no cover
             except Exception as e:
                 PrintLine(text=f'Error [server] 1: {e}', level='ERROR')
                 raise e
+    
+    def generate_qrcode(self, text: str):
+        import qrcode
+
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4
+        )
+
+        qr.add_data(data=text)
+        qr.make(fit=True)
+
+        PrintLine(text='Or connect using qrcode bellow:', level='INFO')
+        qr.print_ascii()
     
     def clear_cache(self, path: str = '.'):
         for root, folders, files in os.walk(top=path):

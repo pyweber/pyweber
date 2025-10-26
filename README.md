@@ -74,9 +74,7 @@ class Main(pw.Element):
 class Counter(pw.Template):
     def __init__(self):
         super().__init__(template='', title='Hello pyweber')
-        self.body.childs = [
-            Main()
-        ]
+        self.body.childs = [Main()]
 
 app = pw.Pyweber()
 

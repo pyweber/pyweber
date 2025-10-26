@@ -362,7 +362,7 @@ class RouteManager: # pragma: no cover
         title: str = None,
         process_response: bool = True
     ):
-        def decorator(handler: Callable):
+        def decorator(handler: Callable[..., Union[Template, Element, str, dict, list]]):
             async def wrapper(**kwargs):
                 kwargs = self.validate_callable_args(handler, **kwargs)
                 if inspect.iscoroutinefunction(handler):
@@ -371,9 +371,10 @@ class RouteManager: # pragma: no cover
                 else:
                     response = handler(**kwargs)
                 
-                self.__routes.get(route).template = response
+                # self.__routes.get(route).template = response
 
-                return self.__routes.get(route).template
+                # return self.__routes.get(route).template
+                return response
             
             self.add_route(
                 route=route,

@@ -1,6 +1,7 @@
 from importlib import import_module, reload
 from threading import Thread
 from typing import Callable
+from types import ModuleType
 import asyncio
 import os
 import sys
@@ -16,7 +17,8 @@ from pyweber.config.config import config
 class CreatApp: # pragma: no cover
     def __init__(self, target: Callable, **kwargs):
         self.target = target
-        self.app = self.get_app_instances()
+        self.app = None
+        self.started = False
         self.__reload_mode = kwargs.get('reload_mode', None) or os.environ.get('PYWEBER_RELOAD_MODE') or config.get('session', 'reload_mode')
         self.__cert_file = kwargs.get('cert_file', None) or os.environ.get('PYWEBER_CERT_FILE') or config.get('server', 'cert_file')
         self.__key_file = kwargs.get('key_file', None) or os.environ.get('PYWEBER_KEY_FILE') or config.get('server', 'key_file')
@@ -35,8 +37,7 @@ class CreatApp: # pragma: no cover
         )
     
     @property
-    def target(self):
-        return self.__target
+    def target(self): return self.__target
     
     @target.setter
     def target(self, target: Callable):
@@ -48,6 +49,9 @@ class CreatApp: # pragma: no cover
             raise TypeError('The target must be callable function')
             
         self.__target = target
+    
+    @property
+    def project_path(self): return Path(os.path.abspath(sys.argv[0])).parent
     
     def environ_vars(self, variable: str, /, default = None):
         return os.environ.get(variable, default=default)
@@ -76,19 +80,25 @@ class CreatApp: # pragma: no cover
     
     def get_main_module(self):
         main_module = os.path.basename(os.path.abspath(sys.argv[0])).split('.')[0]
-        
-        try:
-            if main_module not in sys.modules:
-                return import_module(main_module)
-            
+
+        if main_module in sys.modules:
+            if not self.started:
+                return sys.modules[main_module]
             return reload(sys.modules[main_module])
-        except Exception as e:
-            PrintLine(text=f'Error to import {main_module}: {e}', level='ERROR')
-            raise e
+        
+        return import_module(main_module)
+    
+    def project_modules(self):
+        modules: dict[str, ModuleType] = {}
+
+        for key, value in sys.modules.items():
+            if hasattr(value, '__file__') and str(self.project_path) in str(value.__file__):
+                modules[key] = value
+        
+        return modules
     
     def path_to_module(self, filepath: str):
-        project_dir = Path(os.path.abspath(sys.argv[0])).parent
-        rel_path = Path(filepath).resolve().relative_to(project_dir)
+        rel_path = Path(filepath).resolve().relative_to(self.project_path)
         module_path = rel_path.with_suffix('')
 
         return '.'.join(module_path.parts)
@@ -99,7 +109,9 @@ class CreatApp: # pragma: no cover
                 module_name = self.path_to_module(filepath=changed_file)
 
                 if module_name in sys.modules:
-                    reload(sys.modules[module_name])
+                    for key, module in self.project_modules().items():
+                        if key != '__main__' and getattr(module, '__spec__', None) is not None:
+                            reload(module)
                 else:
                     import_module(module_name)
             
@@ -120,9 +132,11 @@ class CreatApp: # pragma: no cover
         return Pyweber(update_handler=self.update)
     
     def load_target(self):
-        self.app.clear_routes()
-        self.app.clear_before_request_middleware()
-        self.app.clear_after_request_middleware()
+        if self.started:
+            self.app.clear_routes()
+            self.app.clear_before_request_middleware()
+            self.app.clear_after_request_middleware()
+
         self.app = self.get_app_instances()
 
         if self.target:
@@ -133,4 +147,5 @@ class CreatApp: # pragma: no cover
         self.ws_server.app = self.app
 
     def update(self, module: str = None):
+        self.started = True
         self.reload_modules(changed_file=module)

@@ -1,5 +1,29 @@
 # PyWeber Changelog
 
+## [1.0.2] - 2025-10-20
+
+### Added
+- Added `project_modules()` helper to dynamically identify and filter all Python modules that belong to the project scope, excluding third-party or system modules.
+- Introduced `project_path` property to resolve the root path of the active project, improving dynamic module resolution.
+- Added `get_mime_type()` in ContentTypes to get string content types in files.
+- Added the getElement and getElements methods to replace the `getElementbyClass`, `getElementbyUUID`, and `getElementbyID` methods.
+
+### Changed
+- Enhanced `reload_modules()` to reload all modules belonging to the project instead of only the changed module. This ensures dependent modules are also refreshed when a file change is detected, improving consistency during development.
+- Refactored internal module reload mechanism to support smarter updates using project-aware introspection.
+- Moved logic for determining the main module into a reusable method (`get_main_module()`), which ensures clean initialization of the app.
+- Updated `path_to_module()` to work in conjunction with the new `project_path` abstraction.
+- `getElements()` and `getElements()` in Element instance, now get Element with `attrs` or `style` only
+- Removed the `getElementbyClass`, `getElementbyUUID`, and `getElementbyID` methods from the Templates instance.
+
+### Fixed
+- Prevented unnecessary reload attempts on non-project modules by validating module origin through absolute path checks.
+- Fixed change template if remove class elements.
+- Fixed an issue where the `queryselector` and `queryselectorAll` methods for the Element instance returned None or []
+
+### Notes
+- Modules with top-level side effects (e.g., global DB connections) will be re-executed during reload Developers should encapsulate such logic within callable functions or use lazy initialization to avoid performance or state issues.
+
 ## [1.0.0] - 2025-07-29
 ---
 ### Improvements

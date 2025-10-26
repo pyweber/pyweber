@@ -105,8 +105,9 @@ class EventConstrutor: # pragma: no cover
     
     @property
     def __target_element(self) -> 'Element':
-        return self.__template.getElementByUUID(
-            element_uuid=self.__target_id
+        return self.__template.getElement(
+            by='uuid',
+            value=self.__target_id
         )
     
     def build_event(self):
