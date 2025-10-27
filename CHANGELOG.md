@@ -1,6 +1,15 @@
 # PyWeber Changelog
 
-## [1.0.2] - 2025-10-20
+## [1.0.3] - 2025-10-27
+
+### Changed
+- Responde headers update. Now, headers has CORS enabled
+
+### Fixed
+- Fixed CLI command redirecting to Python console instead of running the project in Linux systems
+- Fixed static file loading on Linux systems by improving path resolution logic
+
+## [1.0.2] - 2025-10-26
 
 ### Added
 - Added `project_modules()` helper to dynamically identify and filter all Python modules that belong to the project scope, excluding third-party or system modules.

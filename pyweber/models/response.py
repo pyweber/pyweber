@@ -27,7 +27,12 @@ class Response:
             "Date": datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT"),
             "Set-Cookie": cookies,
             "Request-Path": request.path,
-            "Response-Path": route
+            "Response-Path": route,
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "X-Forwarded-Proto": "https",
+            "X-Forwarded-Host": request.host,
         }
     
     @property

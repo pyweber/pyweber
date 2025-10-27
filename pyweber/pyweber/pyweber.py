@@ -1,6 +1,7 @@
 import inspect
 import json
 import os
+import sys
 import re
 import webbrowser
 from typing import Union, Callable, Any
@@ -413,7 +414,7 @@ class Pyweber(
         return re.match(r".*(\.[a-zA-Z0-9]+)+$", route.split('?')[0].split('/')[-1]) is not None
     
     def is_static_file(self, route: str):
-        return os.path.isfile(self.normaize_path(route=route))
+        return os.path.isfile(path=route) or os.path.isfile(self.normaize_path(route=route))
     
     def normaize_path(self, route: str):
         return os.path.normpath(path=route.removeprefix('/'))
@@ -430,17 +431,17 @@ class Pyweber(
                 ),
                 Route(
                     route='/docs',
-                    template=str(StaticFilePath.pyweber_docs.value),
+                    template=StaticFilePath.pyweber_docs.value.read_text('utf-8'),
                     title='Pyweber Documentation'
                 ),
                 Route(
                     route='/_pyweber/admin/{uuid}/.css',
-                    template=str(StaticFilePath.admin_css_file.value),
+                    template=StaticFilePath.admin_css_file.value.read_text('utf-8'),
                     content_type=ContentTypes.css
                 ),
                 Route(
                     route='/_pyweber/admin/{uuid}/.js',
-                    template=str(StaticFilePath.admin_js_file.value),
+                    template=StaticFilePath.admin_js_file.value.read_text('utf-8'),
                     content_type=ContentTypes.js
                 ),
                 Route(

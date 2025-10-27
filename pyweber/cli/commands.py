@@ -458,7 +458,7 @@ class CommandFunctions: # pragma: no cover
             if sys.platform == 'win32':
                 subprocess.run(['python', file], check=True, shell=True)
             else:
-                subprocess.run(['python3', file], check=True, shell=True)
+                subprocess.run(['python3', file], check=True)
         
         except subprocess.CalledProcessError as e:
             self.log_message(

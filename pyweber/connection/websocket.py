@@ -327,7 +327,7 @@ def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool: # p
     """Check if event is running"""
     if message.session_id in task_manager.active_handlers_async:
         template = sessions.get_session(session_id=message.session_id).template
-        event_id = template.getElementByUUID(message.target_uuid).events.__dict__.get(f'on{message.type}')
+        event_id = template.getElement(by='uuid', value=message.target_uuid).events.__dict__.get(f'on{message.type}')
 
         if event_id in task_manager.active_handlers_async[message.session_id]:
             return True
