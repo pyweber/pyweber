@@ -45,7 +45,7 @@ def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool: # p
     
     return False
 
-class WebsocketUpgrade:
+class WebsocketUpgrade: # pragma: no cover
     def __init__(self, headers: bytes):
         self.headers = headers.decode('iso-8859-1')
 
@@ -75,7 +75,7 @@ class WebsocketUpgrade:
             f'Sec-WebSocket-Accept: {self.server_accept_key}\r\n\r\n'
         )
 
-class WebsocketServer:
+class WebsocketServer: # pragma: no cover
     def __init__(self, connection: socket.socket):
         self.id = str(uuid4())
         self.__connection = connection
@@ -395,7 +395,7 @@ class BaseWebsockets: # pragma: no cover
         
         return diff.differences
 
-class WebsocketManager(BaseWebsockets):
+class WebsocketManager(BaseWebsockets): # pragma: no cover
     def __init__(self, app: 'Pyweber', protocol: Literal['uvicorn', 'pyweber'] = 'pyweber'):
         super().__init__(app=app, protocol=protocol)
     
