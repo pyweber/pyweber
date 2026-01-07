@@ -6,20 +6,22 @@ import ssl
 import shutil
 import asyncio
 from threading import Thread
+from typing import TYPE_CHECKING
+
 from pyweber.pyweber.pyweber import Pyweber
 from pyweber.models.request import Request, ClientInfo
 from pyweber.utils.utils import PrintLine, Colors
-from typing import TYPE_CHECKING, Callable
+from pyweber.connection.websocket import WebsocketUpgrade, WebsocketServer
+
 
 if TYPE_CHECKING: # pragma: no cover
     from pyweber.connection.websocket import TaskManager
 
 class HttpServer: # pragma: no cover
-    def __init__(self, update_handler: Callable):
+    def __init__(self):
         self.connections: list[socket.socket] = []
         self.route, self.port, self.host = None, None, None
         self.current_directory = os.path.abspath(__file__)
-        self.update_server = update_handler
         self.started = False
         self.ssl_context = None
         self.task_manager: 'TaskManager' = None
@@ -78,29 +80,30 @@ class HttpServer: # pragma: no cover
 
     async def handle_response(self, client: socket.socket | ssl.SSLSocket):
         try:
-            request_tuple = await self.process_request(client=client)
+            headers, body = await self.process_request(client=client)
             client_info = client.getpeername()
 
-            if request_tuple:
-                request=Request(
-                    headers=request_tuple[0].decode('iso-8859-1'),
-                    body=request_tuple[-1],
+            if headers:
+                request = Request(
+                    headers=headers.decode('iso-8859-1'),
+                    body=body,
                     client_info=ClientInfo(
                         host=client_info[0],
                         port=client_info[-1]
                     )
                 )
 
-                if request.path:
-                    # if self.started:
-                    #     if not self.is_file_request(request):
-                    #         self.update_server()
+                if 'Connection: Upgrade' in request.raw_headers:
+                    upgrade_connection = WebsocketUpgrade(headers=headers)
+                    ws_connection = WebsocketServer(connection=client)
+
+                    client.sendall(upgrade_connection.upgrade_response.encode('utf-8'))
                     
+                    await self.app.ws_server.connect_wsgi(ws_connection=ws_connection)
+
+                else:
                     response = await self.app.get_response(request=request)
                     client.sendall(response.build_response)
-
-                    # if not self.is_file_request(request):
-                    #     self.started = True
         
         except BlockingIOError:
             pass

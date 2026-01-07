@@ -1,5 +1,17 @@
 # PyWeber Changelog
 
+## [1.1.0] - 2026-01-07
+
+### Added
+- Added cache template to ensure that all requests with same route has same uuid to elements;
+- Created new Websocket manager go manage websocket connections. Now, http and websocket servers run on same address (host and port).
+
+### Changed
+- Fix Route Not Found when try to acess /docs
+
+### Fixed
+- Fix update_all method. Now you can share template states with other connected clients.
+
 ## [1.0.3] - 2025-10-27
 
 ### Changed

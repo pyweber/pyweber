@@ -98,7 +98,7 @@ class CLI: # pragma: no cover
         parser.add_argument(
             '--ws-port',
             type=int,
-            default=8765,
+            default=8800,
             help='Port to websocket run'
         )
     
@@ -250,7 +250,7 @@ class CLI: # pragma: no cover
                     'host': getattr(args, 'host', '0.0.0.0'),
                     'route': getattr(args, 'route', '/'),
                     'disable_ws': getattr(args, 'disable_ws', False),
-                    'ws_port': getattr(args, 'ws_port', 8765)
+                    'ws_port': getattr(args, 'ws_port', 8800)
                 }
                 self.commands_funcs.run_app(**run_kwargs)
 

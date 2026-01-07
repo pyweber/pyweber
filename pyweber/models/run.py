@@ -1,13 +1,14 @@
 from typing import TYPE_CHECKING, Callable
 from pyweber.models.create_app import CreatApp
 from pyweber.models.request import Request, ClientInfo
-from pyweber.connection.websocket import WebSocket
+from pyweber.connection.websocket import WebsocketManager
 import os
 
 if TYPE_CHECKING: # pragma: no cover
     from pyweber.pyweber.pyweber import Pyweber
 
 WS_RUNNING = False
+ws_server = WebsocketManager(app=lambda: ..., protocol='uvicorn')
 
 def run(
         target: Callable = None,
@@ -76,6 +77,7 @@ def run(
 
 async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None): # pragma: no cover
     global WS_RUNNING
+    global ws_server
 
     body = b""
     if scope["type"] == "http":
@@ -95,11 +97,14 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
         )
     )
     
-    ws_server = WebSocket(app=app, protocol='uvicorn')
+    ws_server.protocol = 'uvicorn'
 
     if not WS_RUNNING:
         WS_RUNNING = True
 
+        ws_server.app = app
+        app.ws_server = ws_server
+        
         if target and callable(target):
             target(app)
 

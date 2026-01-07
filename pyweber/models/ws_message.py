@@ -4,14 +4,13 @@ from pyweber.connection.session import sessions
 from pyweber.core.element import Element
 from pyweber.models.file import File
 from pyweber.models.file import Field
-from pyweber.utils.utils import PrintLine
 
 if TYPE_CHECKING: # pragma: no cover
     from pyweber.pyweber.pyweber import Pyweber
-    from pyweber.connection.websocket import WebSocket
+    from pyweber.connection.websocket import WebsocketManager
 
 class wsMessage: # pragma: no cover
-    def __init__(self, raw_message: dict[str, (str, float)], app, ws: 'WebSocket'):
+    def __init__(self, raw_message: dict[str, (str, float)], app, ws: 'WebsocketManager'):
         self.ws = ws
         self.__app = app
         self.__raw_message = raw_message

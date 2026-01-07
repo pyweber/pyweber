@@ -1,7 +1,6 @@
 import inspect
 import json
 import os
-import sys
 import re
 import webbrowser
 from typing import Union, Callable, Any
@@ -13,6 +12,7 @@ from pyweber.models.response import Response
 from pyweber.utils.types import ContentTypes, StaticFilePath, HTTPStatusCode
 from pyweber.utils.loads import LoadStaticFiles
 from pyweber.core.window import window
+from pyweber.connection.websocket import WebsocketManager
 
 from pyweber.models.middleware import MiddlewareManager
 from pyweber.models.error_pages import ErrorPages
@@ -26,6 +26,7 @@ from pyweber.models.routes import (
 from pyweber.models.openapi import OpenApiProcessor
 
 from pyweber.utils.utils import PrintLine
+    
 
 @dataclass
 class StateResult: # pragma: no cover
@@ -93,10 +94,28 @@ class Pyweber(
         self.data = None
         self.__visited__ = set()
         self.__request: Request = None
+        self.__cache_templates: dict[str, tuple[ContentResult, TemplateResult]] = {}
     
     # Request
     @property
     def request(self): return self.__request
+
+    # Project Run
+    @property
+    def run(self):
+        from pyweber.models.run import run
+        return run
+    
+    def clear_cache_templates(self):
+        self.__cache_templates.clear()
+    
+    @property
+    def ws_server(self): return self.__ws_server
+
+    @ws_server.setter
+    def ws_server(self, value: WebsocketManager):
+        assert isinstance(value, WebsocketManager)
+        self.__ws_server = value
 
     # Response
     async def get_response(self, request: Request) -> Response:
@@ -109,41 +128,47 @@ class Pyweber(
         _route, _ = self.resolve_path(route=request.path)
         title = None
 
-        if _route in self.list_routes:
-            title = self.get_route_by_path(route=_route).title
-            self.__request = request
-        
-        # process before request middlewares
-        before_request_response = await self.process_middleware(
-            resp=request,
-            middlewares=self.get_before_request_middlewares
-        )
-        
-        if before_request_response:
-            template_result = await self._process_templates(
-                state_result=StateResult(
-                    template=before_request_response.content,
-                    status_code=before_request_response.status_code,
-                    process_response=before_request_response.process_response,
-                    content_type=ContentTypes.html,
-                    redirect_path=request.path,
-                    callback=None,
-                    kwargs={}
-                )
-            )
-        
+        if _route in self.__cache_templates:
+            content_result, template_result = self.__cache_templates[_route]
+
         else:
-            template_result = await self.get_template(
-                route=request.path,
-                method=request.method
+            if _route in self.list_routes:
+                title = self.get_route_by_path(route=_route).title
+                self.__request = request
+            
+            # process before request middlewares
+            before_request_response = await self.process_middleware(
+                resp=request,
+                middlewares=self.get_before_request_middlewares
+            )
+            
+            if before_request_response:
+                template_result = await self._process_templates(
+                    state_result=StateResult(
+                        template=before_request_response.content,
+                        status_code=before_request_response.status_code,
+                        process_response=before_request_response.process_response,
+                        content_type=ContentTypes.html,
+                        redirect_path=request.path,
+                        callback=None,
+                        kwargs={}
+                    )
+                )
+            
+            else:
+                template_result = await self.get_template(
+                    route=request.path,
+                    method=request.method
+                )
+
+            content_result = self.template_to_bytes(
+                template=template_result.template,
+                content_type=template_result.content_type,
+                title=title,
+                process_response=template_result.process_response
             )
 
-        content_result = self.template_to_bytes(
-            template=template_result.template,
-            content_type=template_result.content_type,
-            title=title,
-            process_response=template_result.process_response
-        )
+            self.__cache_templates[_route] = (content_result, template_result)
         
         # process after request middlewares
         after_request_response = await self.process_middleware(
@@ -431,17 +456,17 @@ class Pyweber(
                 ),
                 Route(
                     route='/docs',
-                    template=StaticFilePath.pyweber_docs.value.read_text('utf-8'),
+                    template=StaticFilePath.pyweber_docs.value,
                     title='Pyweber Documentation'
                 ),
                 Route(
                     route='/_pyweber/admin/{uuid}/.css',
-                    template=StaticFilePath.admin_css_file.value.read_text('utf-8'),
+                    template=StaticFilePath.admin_css_file.value,
                     content_type=ContentTypes.css
                 ),
                 Route(
                     route='/_pyweber/admin/{uuid}/.js',
-                    template=StaticFilePath.admin_js_file.value.read_text('utf-8'),
+                    template=StaticFilePath.admin_js_file.value,
                     content_type=ContentTypes.js
                 ),
                 Route(
@@ -533,12 +558,9 @@ class Pyweber(
             content=message or f"Redirected to {Element( tag='a', attrs={'href': url}, content=url).to_html()}"
         )
     
-    def run(self, target: Callable = None, **kwargs):
-        from pyweber.models.run import run
-        return run(target, **kwargs)
-    
     async def __call__(self, scope, receive, send):
         from pyweber.models.run import run_as_asgi
+
         await run_as_asgi(scope, receive, send, app=self)
 
     def __repr__(self):

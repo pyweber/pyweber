@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Callable, Any
 import asyncio
 
 if TYPE_CHECKING: # pragma: no cover
-    from pyweber.connection.websocket import WebSocket
+    from pyweber.connection.websocket import WebsocketManager
     from pyweber.connection.session import Session
     from pyweber.pyweber.pyweber import Pyweber
     from pyweber.core.template import Template, Element
@@ -32,7 +32,7 @@ class EventHandler: # pragma: no cover
         event_data: EventData,
         app: 'Pyweber',
         session: 'Session',
-        ws: 'WebSocket',
+        ws: 'WebsocketManager',
     ):
         self.event_type = event_type
         self.route = route
@@ -81,7 +81,7 @@ class EventConstrutor: # pragma: no cover
         self,
         target_id: str,
         app: 'Pyweber',
-        ws: 'WebSocket',
+        ws: 'WebsocketManager',
         session: 'Session',
         route: str,
         event_data: dict[str, str],

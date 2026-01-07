@@ -6,11 +6,12 @@ if TYPE_CHECKING: # pragma: no cover
     from pyweber.core.window import Window
 
 class Session: # pragma: no cover
-    def __init__(self, template: 'Template', window: 'Window', session_id: str):
+    def __init__(self, template: 'Template', window: 'Window', session_id: str, current_route: str):
         self.template = template
         self.window = window
         self.session_id = session_id
         self.create_at = time()
+        self.current_route = current_route
 
 class SessionManager: # pragma: no cover
     def __init__(self):

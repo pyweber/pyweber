@@ -83,5 +83,8 @@ class ReloadHandler(FileSystemEventHandler): # pragma: no cover
     def restart_server(self, changed_file: str):
         if changed_file.endswith('.py'):
             PrintLine(text=f'♻  Restarting the server...')
-            self.reload_server.http_reload(changed_file)
+        
+        self.reload_server.http_reload(changed_file)
+
+        if changed_file.endswith('.py'):
             PrintLine(text=f'♻  Server restarted...')

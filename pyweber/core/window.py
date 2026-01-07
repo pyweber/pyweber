@@ -5,7 +5,7 @@ from uuid import uuid4
 from threading import Timer
 from typing import Callable, Union, Literal
 from pyweber.core.events import WindowEvents
-from pyweber.connection.websocket import WebSocket
+from pyweber.connection.websocket import WebsocketManager
 from pyweber.utils.types import WindowEventType, OrientationType, BaseStorage
 
 class Orientation: # pragma: no cover
@@ -65,7 +65,7 @@ class Location: # pragma: no cover
 
 class LocalStorage(BaseStorage): # pragma: no cover
     """Localstorage"""
-    def __init__(self, data: dict[str, (int, float)], session_id: str, ws: 'WebSocket'):
+    def __init__(self, data: dict[str, (int, float)], session_id: str, ws: 'WebsocketManager'):
         super().__init__(data=data)
         self.__ws = ws
         self.sesssion_id = session_id
@@ -104,7 +104,7 @@ class LocalStorage(BaseStorage): # pragma: no cover
 
 class SessionStorage(BaseStorage): # pragma: no cover
     """SessionStorage"""
-    def __init__(self, data: dict[str, (int, float)], session_id: str, ws: 'WebSocket'):
+    def __init__(self, data: dict[str, (int, float)], session_id: str, ws: 'WebsocketManager'):
         super().__init__(data=data)
         self.__ws = ws
         self.sesssion_id = session_id
@@ -161,7 +161,7 @@ class Window: # pragma: no cover
         self.inner_width: float = 0.0
         self.inner_height: float = 0.0
         self.session_id: str = None
-        self.__ws: 'WebSocket' = None
+        self.__ws: 'WebsocketManager' = None
         self.scroll_x: float = 0.0
         self.scroll_y: float = 0.0
         self.screen: Screen = None

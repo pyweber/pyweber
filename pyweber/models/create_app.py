@@ -2,33 +2,30 @@ from importlib import import_module, reload
 from threading import Thread
 from typing import Callable
 from types import ModuleType
-import asyncio
 import os
 import sys
 from pathlib import Path
 
 from pyweber.pyweber.pyweber import Pyweber
 from pyweber.connection.http import HttpServer
-from pyweber.connection.websocket import WebSocket
 from pyweber.connection.reload import ReloadServer
+from pyweber.connection.websocket import WebsocketManager
 from pyweber.utils.utils import PrintLine
 from pyweber.config.config import config
 
 class CreatApp: # pragma: no cover
     def __init__(self, target: Callable, **kwargs):
         self.target = target
-        self.app = None
+        self.app: Pyweber = None
         self.started = False
         self.__reload_mode = kwargs.get('reload_mode', None) or os.environ.get('PYWEBER_RELOAD_MODE') or config.get('session', 'reload_mode')
         self.__cert_file = kwargs.get('cert_file', None) or os.environ.get('PYWEBER_CERT_FILE') or config.get('server', 'cert_file')
         self.__key_file = kwargs.get('key_file', None) or os.environ.get('PYWEBER_KEY_FILE') or config.get('server', 'key_file')
         self.__server_host = kwargs.get('host', None) or os.environ.get('PYWEBER_SERVER_HOST') or config.get('server', 'host')
         self.__server_port = kwargs.get('port', None) or os.environ.get('PYWEBER_SERVER_PORT') or config.get('server', 'port')
-        self.__server_ws_port = kwargs.get('ws_port', None) or os.environ.get('PYWEBER_WS_PORT') or config.get('websocket', 'port')
         self.__server_route = kwargs.get('route', None) or os.environ.get('PYWEBER_SERVER_ROUTE') or config.get('server', 'route')
-        self.__disable_ws = kwargs.get('disable_ws', None) or os.environ.get('PYWEBER_DISABLE_WS') or config.get('websocket', 'disable_ws')
-        self.http_server = HttpServer(update_handler=self.update)
-        self.ws_server = WebSocket(app=self.app, protocol='pyweber')
+        self.http_server = HttpServer()
+        self.ws_server = WebsocketManager(app=self.app, protocol='pyweber')
         self.reload_server = ReloadServer(
             ws_reload=self.ws_server.send_message,
             http_reload=self.update,
@@ -58,16 +55,7 @@ class CreatApp: # pragma: no cover
     
     def run(self):
         self.load_target()
-        if self.__disable_ws not in ['True', True, '1', 1]:
-            Thread(target=asyncio.run, args=(self.ws_server.ws_start(
-                    host=self.__server_host,
-                    port=self.__server_ws_port,
-                    cert_file=self.__cert_file,
-                    key_file=self.__key_file
-                ),), daemon=True
-            ).start()
-
-        if self.__reload_mode in [True, 'True', 1, '1']:
+        if self.__reload_mode in [True, 'True', 'true', 1, '1']:
             Thread(target=self.reload_server.start, daemon=True).start()
         
         self.http_server.run(
@@ -136,15 +124,18 @@ class CreatApp: # pragma: no cover
             self.app.clear_routes()
             self.app.clear_before_request_middleware()
             self.app.clear_after_request_middleware()
+            self.app.clear_cache_templates()
 
         self.app = self.get_app_instances()
+        self.ws_server.app = self.app
+        self.app.ws_server = self.ws_server
 
         if self.target:
             getattr(self.module, self.target.__name__)(self.app)
         
         self.http_server.app = self.app
-        self.http_server.task_manager = self.ws_server.task_manager
-        self.ws_server.app = self.app
+        self.http_server.task_manager = self.app.ws_server.task_manager
+        self.app.ws_server.app = self.app
 
     def update(self, module: str = None):
         self.started = True
