@@ -17,7 +17,7 @@
 - Fix `update_all` method. Now you can share template states with other connected clients.
 - Fix response with incorrect method if cache template was enable.
 - Fix get incomplete message in websocket if message sended by client is long.
-- Fixed github issue [#2](https://github.com/pyweber/pyweber/issues/3). `Component` isn't Pyweber class.
+- Fixed github issue ([#3](https://github.com/pyweber/pyweber/issues/3)). `Component` isn't Pyweber class.
 
 ## [1.0.3] - 2025-10-27
 
