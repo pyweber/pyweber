@@ -119,71 +119,90 @@ class Pyweber(
 
     # Response
     async def get_response(self, request: Request) -> Response:
-        if not isinstance(request, Request):
-            raise TypeError(f'request must be a Request instances, but got {type(request).__name__}')
-        
-        if re.search(r'^/_pyweber/(?:.*?)/openapi.json$', request.path):
-            await self.__add_openapi_route()
-        
-        _route, _ = self.resolve_path(route=request.path)
-        title = None
+        try:
+            if not isinstance(request, Request):
+                raise TypeError(f'request must be a Request instances, but got {type(request).__name__}')
+            
+            if re.search(r'^/_pyweber/(?:.*?)/openapi.json$', request.path):
+                await self.__add_openapi_route()
+            
+            _route, _ = self.resolve_path(route=request.path)
+            title = None
+            _route_method = f"{_route}_{request.method}"
 
-        if _route in self.__cache_templates:
-            content_result, template_result = self.__cache_templates[_route]
+            if _route_method in self.__cache_templates:
+                content_result, template_result = self.__cache_templates[_route_method]
 
-        else:
-            if _route in self.list_routes:
-                title = self.get_route_by_path(route=_route).title
-                self.__request = request
-            
-            # process before request middlewares
-            before_request_response = await self.process_middleware(
-                resp=request,
-                middlewares=self.get_before_request_middlewares
-            )
-            
-            if before_request_response:
-                template_result = await self._process_templates(
-                    state_result=StateResult(
-                        template=before_request_response.content,
-                        status_code=before_request_response.status_code,
-                        process_response=before_request_response.process_response,
-                        content_type=ContentTypes.html,
-                        redirect_path=request.path,
-                        callback=None,
-                        kwargs={}
-                    )
-                )
-            
             else:
-                template_result = await self.get_template(
-                    route=request.path,
-                    method=request.method
+                if _route in self.list_routes:
+                    title = self.get_route_by_path(route=_route).title
+                    self.__request = request
+                
+                # process before request middlewares
+                before_request_response = await self.process_middleware(
+                    resp=request,
+                    middlewares=self.get_before_request_middlewares
+                )
+                
+                if before_request_response:
+                    template_result = await self._process_templates(
+                        state_result=StateResult(
+                            template=before_request_response.content,
+                            status_code=before_request_response.status_code,
+                            process_response=before_request_response.process_response,
+                            content_type=ContentTypes.html,
+                            redirect_path=request.path,
+                            callback=None,
+                            kwargs={}
+                        )
+                    )
+                
+                else:
+                    template_result = await self.get_template(
+                        route=request.path,
+                        method=request.method
+                    )
+
+                content_result = self.template_to_bytes(
+                    template=template_result.template,
+                    content_type=template_result.content_type,
+                    title=title,
+                    process_response=template_result.process_response
                 )
 
-            content_result = self.template_to_bytes(
-                template=template_result.template,
-                content_type=template_result.content_type,
-                title=title,
-                process_response=template_result.process_response
+                # self.__cache_templates[_route_method] = (content_result, template_result)
+            
+            # process after request middlewares
+            after_request_response = await self.process_middleware(
+                resp=Response(
+                    request=request,
+                    response_content=content_result.content,
+                    response_type=content_result.content_type,
+                    code=template_result.status_code,
+                    cookies=self.cookies,
+                    route=template_result.redirect_path
+                ),
+                middlewares=self.get_after_request_middlewares
             )
 
-            self.__cache_templates[_route] = (content_result, template_result)
-        
-        # process after request middlewares
-        after_request_response = await self.process_middleware(
-            resp=Response(
-                request=request,
-                response_content=content_result.content,
-                response_type=content_result.content_type,
-                code=template_result.status_code,
-                cookies=self.cookies,
-                route=template_result.redirect_path
-            ),
-            middlewares=self.get_after_request_middlewares
-        )
+            # To prevent Recursion Error
+            if template_result.redirect_path in self.__visited__:
+                self.__visited__.remove(template_result.redirect_path)
 
-        return after_request_response.content
+            return after_request_response.content
+
+        except Exception as error:
+            return Response(
+                request=request,
+                response_content=Template(
+                    template=ErrorPages().page_server_error.build_html(),
+                    error=str(error)
+                ).build_html().encode(),
+                code=500,
+                response_type=ContentTypes.html,
+                cookies=self.cookies,
+                route=request.path
+            )
     
     # Utils
     def template_to_bytes(

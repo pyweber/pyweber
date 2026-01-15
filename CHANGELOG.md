@@ -1,16 +1,23 @@
 # PyWeber Changelog
 
-## [1.1.0] - 2026-01-07
+## [1.1.0] - 2026-01-15
 
 ### Added
 - Added cache template to ensure that all requests with same route has same uuid to elements;
 - Created new Websocket manager go manage websocket connections. Now, http and websocket servers run on same address (host and port).
+- Added `preventDefaults` in javascript submit event
+- Added `string type` in event_data key sending with client
+- Added `Headers type` in client request
+- Added TemplateView if server get Error
 
 ### Changed
 - Fix Route Not Found when try to acess /docs
 
 ### Fixed
-- Fix update_all method. Now you can share template states with other connected clients.
+- Fix `update_all` method. Now you can share template states with other connected clients.
+- Fix response with incorrect method if cache template was enable.
+- Fix get incomplete message in websocket if message sended by client is long.
+- Fixed github issue [#2](https://github.com/pyweber/pyweber/issues/3). `Component` isn't Pyweber class.
 
 ## [1.0.3] - 2025-10-27
 

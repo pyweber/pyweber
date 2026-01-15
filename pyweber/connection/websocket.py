@@ -45,7 +45,7 @@ def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool: # p
     
     return False
 
-class WebsocketUpgrade: # pragma: no cover
+class WebsocketUpgrade:
     def __init__(self, headers: bytes):
         self.headers = headers.decode('iso-8859-1')
 
@@ -75,7 +75,7 @@ class WebsocketUpgrade: # pragma: no cover
             f'Sec-WebSocket-Accept: {self.server_accept_key}\r\n\r\n'
         )
 
-class WebsocketServer: # pragma: no cover
+class WebsocketServer:
     def __init__(self, connection: socket.socket):
         self.id = str(uuid4())
         self.__connection = connection
@@ -125,40 +125,43 @@ class WebsocketServer: # pragma: no cover
     async def manage_connection(self, message_handler: Callable):
         try:
             time = 0
+            current_opcode = None
 
             while True:
-                opcode, message = await self.receive_frame()
+                opcode, message, fin = await self.receive_frame()
 
                 if opcode is None:
                     break
 
-                if opcode == 0:
-                    self.__all_message += message
+                if opcode != 0:
+                    current_opcode = opcode
+                
+                self.__all_message += message
 
-                elif opcode in [1,2]:
-                    self.__all_message += message
-                    message = self.__all_message.decode('utf-8') if opcode == 1 else self.__all_message
+                if fin:
+                    if current_opcode in [1,2]:
+                        message = self.__all_message.decode('utf-8') if current_opcode == 1 else self.__all_message
+                        
+                        self.__messages.append(message)
+                        
+                        if inspect.iscoroutinefunction(message_handler):
+                            await message_handler(self)
+                        else:
+                            message_handler(self)
+
+                        self.__all_message = b''
                     
-                    self.__messages.append(message)
+                    elif current_opcode == 8:
+                        break
+
+                    elif current_opcode == 10:
+                        pass
                     
-                    if inspect.iscoroutinefunction(message_handler):
-                        await message_handler(self)
+                    elif current_opcode == 9:
+                        self.connection.sendall(await self.frame_to_send(b'', current_opcode=10))
+
                     else:
-                        message_handler(self)
-
-                    self.__all_message = b''
-                
-                elif opcode == 8:
-                    break
-
-                elif opcode == 10:
-                    pass
-                
-                elif opcode == 9:
-                    self.connection.sendall(await self.frame_to_send(b'', opcode=10))
-
-                else:
-                    PrintLine(f'Unknown websocket Error', level='ERROR')
+                        PrintLine(f'Unknown websocket Error', level='ERROR')
                 
                 if time > 30:
                     time = 0
@@ -180,14 +183,15 @@ class WebsocketServer: # pragma: no cover
         header = self.read_frames(2)
 
         if not header:
-            return None, None
+            return None, None, None
         
+        fin = (header[0] & 0x80) >> 7
         opcode = header[0] & 0x0F
         mask = (header[1] & 0x80) >> 7
         payload_len = header[1] & 0x7F
 
         if not mask:
-            return None, None
+            return None, None, None
         
         if payload_len == 126:
             extended_payload = self.read_frames(2)
@@ -203,7 +207,7 @@ class WebsocketServer: # pragma: no cover
         for i in range(payload_len):
             unmasked_payload[i] = payload[i] ^ masking_key[i % 4]
         
-        return opcode, bytes(unmasked_payload)
+        return opcode, bytes(unmasked_payload), fin
     
     async def frame_to_send(self, message: bytes, opcode: int = 1):
         assert isinstance(message, bytes)
@@ -395,7 +399,7 @@ class BaseWebsockets: # pragma: no cover
         
         return diff.differences
 
-class WebsocketManager(BaseWebsockets): # pragma: no cover
+class WebsocketManager(BaseWebsockets):
     def __init__(self, app: 'Pyweber', protocol: Literal['uvicorn', 'pyweber'] = 'pyweber'):
         super().__init__(app=app, protocol=protocol)
     

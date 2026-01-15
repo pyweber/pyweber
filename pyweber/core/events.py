@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Callable, Any
+from typing import TYPE_CHECKING, Callable, Any, Union
 import asyncio
 
 if TYPE_CHECKING: # pragma: no cover
@@ -9,7 +9,7 @@ if TYPE_CHECKING: # pragma: no cover
     from pyweber.core.window import Window
 
 class EventData: # pragma: no cover
-    def __init__(self, event_data: dict[str, int]):
+    def __init__(self, event_data: dict[str, Union[int, str]]):
         self.clientX = event_data.get('clientX', None)
         self.clientY = event_data.get('clientY', None)
         self.key = event_data.get('key', None)

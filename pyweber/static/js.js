@@ -607,11 +607,18 @@ function trackEvents() {
     ];
 
     for (const eventType of documentEvents) {
-        document.addEventListener(eventType, (event) => sendEvent({type: eventType, event: event, event_ref: EventRef.DOCUMENT}));
+        document.addEventListener(eventType, (event) => {
+            if (eventType === 'submit') {
+                event.preventDefault();
+            };
+            sendEvent({type: eventType, event: event, event_ref: EventRef.DOCUMENT});
+        });
     };
 
     windowEvents.forEach(eventType => {
-        window.addEventListener(eventType, (event) => sendEvent({type: eventType, event: event, event_ref: EventRef.WINDOW}));
+        window.addEventListener(eventType, (event) => {
+            sendEvent({type: eventType, event: event, event_ref: EventRef.WINDOW});
+        });
     });
 }
 

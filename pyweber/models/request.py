@@ -24,7 +24,7 @@ class ClientInfo: # pragma: no cover
 class Request: # pragma: no cover
     def __init__(
         self,
-        headers: Union[str, dict[str, Union[tuple[str, str], str]]],
+        headers: Union[Headers, str, dict[str, Union[tuple[str, str], str]]],
         body: Union[bytes] = None,
         client_info: ClientInfo = None
     ):
