@@ -48,15 +48,15 @@ class HttpServer: # pragma: no cover
             self.ssl_context = None
     
     async def process_request(self, client: socket.socket) -> tuple[bytes, bytes]:
-        request_data = b''
+        request_data = bytearray()
 
         while b'\r\n\r\n' not in request_data:
-            chunk = client.recv(1024)
+            chunk = client.recv(4096)
 
             if not chunk:
                 break
-
-            request_data += chunk
+            
+            request_data.extend(chunk)
         
         header_bytes, _, body_start = request_data.partition(b'\r\n\r\n')
         header_text = header_bytes.decode('iso-8859-1')
@@ -67,16 +67,27 @@ class HttpServer: # pragma: no cover
         if content_match:
             content_length = int(content_match.group(1))
         
-        body = body_start
+        body = bytearray(body_start)
+
+        if content_length < 64 * 1024:
+            buffer_size = 8192
+        elif content_length < 1024 * 1024:
+            buffer_size = 65536
+        else:
+            buffer_size = 262144
+
         while len(body) < content_length:
-            chunk = client.recv(4096)
+            remaining = content_length - len(body)
+            chunk_size = min(buffer_size, remaining)
+
+            chunk = client.recv(chunk_size)
 
             if not chunk:
                 break
-
-            body += chunk
+            
+            body.extend(chunk)
         
-        return header_bytes, body
+        return header_bytes, bytes(body)
 
     async def handle_response(self, client: socket.socket | ssl.SSLSocket):
         try:
@@ -132,6 +143,7 @@ class HttpServer: # pragma: no cover
         return local_ip
     
     def create_server(self, restart: bool = False):
+
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_server:
             client_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -143,19 +155,23 @@ class HttpServer: # pragma: no cover
                 if not restart:
                     public_url = f"{protocol}://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}"
                     local_url = f"{protocol}://{self.get_local_ip()}:{self.port}{self.route}"
-                    PrintLine(
-                        text=f"Server online in {Colors.GREEN}{public_url}{Colors.RESET} or {Colors.GREEN}{local_url}{Colors.RESET}"
-                    )
-                    self.generate_qrcode(text=local_url)
+
+                    if self.host not in ['localhost', '127.0.0.1']:
+                        PrintLine(
+                            text=f"Server online in {Colors.GREEN}{public_url}{Colors.RESET} or {Colors.GREEN}{local_url}{Colors.RESET}"
+                        )
+                        self.generate_qrcode(text=local_url)
+                    else:
+                        PrintLine(
+                            text=f"Server online in {Colors.GREEN}{public_url}{Colors.RESET}"
+                        )
+
 
                 while True:
                     try:
                         rlist, _, _ = select.select([client_server], [], [], 1)
 
-                        if not rlist:
-                            continue
-
-                        else:
+                        if rlist:
                             for server in rlist:
                                 if server is client_server:
                                     client_socket, _ = client_server.accept()
@@ -212,7 +228,7 @@ class HttpServer: # pragma: no cover
             if any(p in root for p in ['__pycache__', 'tests/config', '.pyweber']):
                 shutil.rmtree(path=root, ignore_errors=True)
             
-    def run(self, route: str, port: int, host: str, cert_file: str, key_file: str):
+    def run(self, host: str = 'localhost', port: int = 8800, route: str = '/', cert_file: str = None, key_file: str = None):
         self.route, self.port, self.host = route, port, host
 
         if cert_file and key_file:

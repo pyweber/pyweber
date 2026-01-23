@@ -14,6 +14,7 @@ class Response:
         response_type: ContentTypes,
         route: str
     ):
+        request_headers = request.accept_control_request_headers or "Content-Type, Authorization, X-Requested-With, Accept"
         self.__request = request
         self.__body = response_content
         self.__headers: dict[str, bytes] = {
@@ -28,9 +29,10 @@ class Response:
             "Set-Cookie": cookies,
             "Request-Path": request.path,
             "Response-Path": route,
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": request.origin,
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Headers": request_headers,
+            "Access-Control-Allow-Credentials": 'true',
             "X-Forwarded-Proto": "https",
             "X-Forwarded-Host": request.host,
         }

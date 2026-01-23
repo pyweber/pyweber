@@ -129,6 +129,10 @@ class Request: # pragma: no cover
         return {cookie.split('=')[0]: cookie.split('=')[-1] for cookie in self.headers.get('cookie', '').split(';') if cookie}
 
     @property
+    def accept_control_request_headers(self):
+        return self.headers.get('Access-Control-Request-Headers', '')
+
+    @property
     def headers(self):
         if self.request_mode.value == 'asgi':
             return {header[0].decode(): header[1].decode() for header in self.__raw_headers}

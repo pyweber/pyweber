@@ -1,6 +1,6 @@
 # PyWeber Changelog
 
-## [1.1.0] - 2026-01-15
+## [1.1.0] - 2026-01-23
 
 ### Added
 - Added cache template to ensure that all requests with same route has same uuid to elements;
@@ -9,9 +9,12 @@
 - Added `string type` in event_data key sending with client
 - Added `Headers type` in client request
 - Added TemplateView if server get Error
+- Added `accept_control_request_headers` properity do get client request headers
 
 ### Changed
 - Fix Route Not Found when try to acess /docs
+- Changed buffer size in http request. Now it's possible receive until 254 kb of buffer data at once.
+- Changed some response headers in HTTP Pyweber Response.
 
 ### Fixed
 - Fix `update_all` method. Now you can share template states with other connected clients.

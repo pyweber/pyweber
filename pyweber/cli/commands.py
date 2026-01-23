@@ -466,6 +466,8 @@ class CommandFunctions: # pragma: no cover
                 level='error'
             )
 
+            raise e
+
     def update(self, framework: str):
         try:
             update_script = StaticTemplates.UPDATE_FILE().replace('{framework}', framework)
