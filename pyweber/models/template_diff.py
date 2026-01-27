@@ -1,6 +1,6 @@
 from pyweber.core.element import Element
 from pyweber.core.template import Template
-from typing import Literal, Union
+from typing import Literal, Union, Any
 
 class TemplateDiff: # pragma: no cover
     def __init__(self):
@@ -56,6 +56,9 @@ class TemplateDiff: # pragma: no cover
             
             elif [v for v in old_element.classes if v not in new_element.classes]:
                 status = 'Changed'
+            
+            elif new_element.get_element_methods():
+                status = 'Changed'
         
         if status:
             self.add_element_on_diff(element=new_element, status=status)
@@ -86,3 +89,8 @@ class TemplateDiff: # pragma: no cover
             'element': element.to_html() if status in ['Added', 'Changed'] else element.uuid,
             'status': status
         }
+
+        if status != 'Removed':
+            self.differences[element.uuid]['methods'] = {**element.get_element_methods()}
+
+            element.remove_element_methods()

@@ -13,6 +13,7 @@ from pyweber.utils.utils import PrintLine
 from pyweber.connection.session import sessions, Session
 from pyweber.models.template_diff import TemplateDiff
 from pyweber.models.task_manager import TaskManager
+from pyweber.core.events import EventConstrutor, EventBook
 
 if TYPE_CHECKING: # pragma: no cover
     from pyweber.pyweber.pyweber import Pyweber
@@ -25,6 +26,7 @@ def need_message_keys(): # pragma: no cover
         'event_ref',
         'route',
         'target_uuid',
+        'current_target_uuid',
         'template',
         'values',
         'event_data',
@@ -244,10 +246,10 @@ class BaseWebsockets: # pragma: no cover
         self.app = app
     
     async def message_handler(self, message: wsMessage):
-        from pyweber.core.events import EventConstrutor, EventBook
 
         event_handler = EventConstrutor(
             target_id=message.target_uuid,
+            current_target_id=message.current_target_uuid,
             app=self.app,
             ws=self,
             session=sessions.get_session(session_id=message.session_id),
@@ -257,10 +259,10 @@ class BaseWebsockets: # pragma: no cover
         ).build_event()
 
         if message.event_ref == 'document':
-            if event_handler.element:
-                event_id = event_handler.element.events.__dict__.get(f'on{message.type}')
+            if event_handler.current_target:
+                event_id = event_handler.current_target.events.__dict__.get(f'on{message.type}')
                 if event_id and event_id in EventBook:
-                    handler = EventBook.get(event_id)
+                    handler: Callable[..., Any] = EventBook.get(event_id).get('event')
 
                     if inspect.iscoroutinefunction(handler):
                         if event_id not in self.task_manager.active_handlers_async.get(message.session_id, {}):
@@ -314,7 +316,7 @@ class BaseWebsockets: # pragma: no cover
 
                 if last_target:
                     self.old_template = updated_template
-
+            
         return json.dumps(data, ensure_ascii=False, indent=4)
 
     async def __send(self, data: Any, handler: Callable):
@@ -510,7 +512,13 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                     )
 
                     await self.send_message(
-                        data={'setSessionId': ws_server.id, 'window': message.window.get_all_event_ids},
+                        data={
+                            'setSessionId': ws_server.id,
+                            'windowEvents': message.window.get_all_event_ids,
+                            'documentEvents': [
+                                value.get('elements') for value in EventBook.values()
+                            ]
+                        },
                         session_id=ws_server.id
                     )
                 
@@ -551,7 +559,13 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                                 self.ws_connections[ws_connection] = send
 
                                 await self.send_message(
-                                    data={'setSessionId': ws_connection},
+                                    data={
+                                        'setSessionId': ws_connection,
+                                        'windowEvents': message.window.get_all_event_ids,
+                                        'documentEvents': [
+                                            value.get('elements') for value in EventBook.values()
+                                        ]
+                                    },
                                     session_id=ws_connection
                                 )
                             

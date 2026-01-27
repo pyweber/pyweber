@@ -2,6 +2,7 @@ let socket;
 let socketReady = false;
 let window_event_received = false;
 const earyEventsBuffer = [];
+const activeListeners = [];
 
 const EventRef = new Proxy(
     {DOCUMENT: 'document', WINDOW: 'window'},
@@ -42,17 +43,17 @@ function connectWebSocket() {
     socket.onmessage = async function(event) {
         const data = JSON.parse(event.data);
 
-        if (data.window) {
+        if (data.windowEvents) {
             Object.keys(sessionStorage).forEach(item => {
                 if (item !== '_pyweber_sessionId') {
                     sessionStorage.removeItem(item)
                 };
             });
 
-            for (let i=0; i<data.window.length; i++) {
-                palavra = data.window[i].replace(/^_on/, "");
+            for (let i=0; i<data.windowEvents.length; i++) {
+                palavra = data.windowEvents[i].replace(/^_on/, "");
                 evt = palavra.split("_")[0];
-                sessionStorage.setItem(evt, data.window[i]);
+                sessionStorage.setItem(evt, data.windowEvents[i]);
             };
 
             if (!window_event_received) {
@@ -62,6 +63,9 @@ function connectWebSocket() {
                 });
                 earyEventsBuffer.length = 0;
             }
+        };
+
+        if (data.documentEvents) {
         };
 
         if (data.template) {
@@ -286,7 +290,23 @@ function applyDifferences(differences) {
                 }
                 break;
         }
+
+        if (diff.methods) {
+            const target_element = parentElement.querySelector(`[uuid="${key}"]`);
+            execute_event_handlers(target_element, diff.methods);
+        };
     });
+}
+
+function execute_event_handlers(element, methods) {
+    if (element instanceof HTMLElement) {
+        Object.entries(methods).forEach(([method, params]) => {
+            if (typeof element[method] === 'function') {
+                const args = Object.values(params);
+                element[method](...args);
+            };
+        });
+    };
 }
 
 function createElementFromHTML(html) {
@@ -333,14 +353,11 @@ async function sendEvent({type, event, event_ref, window_response}) {
         return;
     };
 
-    const target = event.target instanceof HTMLElement ? event.target : null;
     const eventData = await getEventData({type, event, event_ref, window_response});
 
     if (socket.readyState === WebSocket.OPEN) {
-        if (target && event_ref == EventRef.DOCUMENT) {
-            if (target.getAttribute(`_on${type}`)) {
-                socket.send(JSON.stringify(eventData));
-            };
+        if (eventData.current_target_uuid && event_ref == EventRef.DOCUMENT) {
+            socket.send(JSON.stringify(eventData));
         };
 
         if (event_ref === EventRef.WINDOW) {
@@ -377,15 +394,56 @@ async function getEventData({type=null, event=null, event_ref=null, window_respo
         event_ref: event_ref,
         route: window.location.pathname,
         target_uuid: target?.getAttribute("uuid") ?? null,
+        current_target_uuid: target?.closest(`[_on${type}]`)?.getAttribute("uuid") ?? null,
         template: document.documentElement.outerHTML,
         values: JSON.stringify(values),
         event_data: {
             clientX: event?.clientX ?? null,
             clientY: event?.clientY ?? null,
+            screenX: event?.screenX ?? null,
+            screenY: event?.screenY ?? null,
+            pageX: event?.pageX ?? null,
+            pageY: event?.pageY ?? null,
+            button: event?.button ?? null,
+            buttons: event?.buttons ?? null,
             key: event?.key ?? null,
+            code: event?.code ?? null,
+            keyCode: event?.keyCode ?? null,
+            ctrlKey: event?.ctrlKey ?? false,
+            shiftKey: event?.shiftKey ?? false,
+            altKey: event?.altKey ?? false,
+            metaKey: event?.metaKey ?? false,
+            repeat: event?.repeat ?? false,
             deltaX: event?.deltaX ?? null,
             deltaY: event?.deltaY ?? null,
+            deltaZ: event?.deltaZ ?? null,
+            deltaMode: event?.deltaMode ?? null,
             touches: event?.touches?.length ?? null,
+            changedTouches: event?.changedTouches?.length ?? null,
+            targetTouches: event?.targetTouches?.length ?? null,
+
+            dataTransfer: event?.dataTransfer ? {
+                dropEffect: event.dataTransfer.dropEffect,
+                effectAllowed: event.dataTransfer.effectAllowed,
+                files: event.dataTransfer.files?.length ?? 0,
+                types: Array.from(event.dataTransfer.types ?? [])
+            } : null,
+
+            clipboardData: event?.clipboardData ? {
+                types: Array.from(event.clipboardData.types ?? []),
+                text: event.clipboardData.getData?.('text/plain') ?? null
+            } : null,
+
+            animationName: event?.animationName ?? null,
+            elapsedTime: event?.elapsedTime ?? null,
+            propertyName: event?.propertyName ?? null,
+            pseudoElement: event?.pseudoElement ?? null,
+
+            isTrusted: event?.isTrusted ?? null,
+            bubbles: event?.bubbles ?? null,
+            cancelable: event?.cancelable ?? null,
+            defaultPrevented: event?.defaultPrevented ?? false,
+            eventPhase: event?.eventPhase ?? null,
             timestamp: Date.now()
         },
         window_data: JSON.stringify(getWindowData()),
@@ -449,16 +507,18 @@ async function getFormValues() {
     for (const input of inputs) {
         const id = input.getAttribute('uuid');
         if (id) {
+            values[id] = {}
+
             if (input.type === 'radio') {
                 if (input.checked) {
                     input.setAttribute('checked', '');
-                    values[id] = input.value;
+                    values[id]['value'] = input.value;
                 } else {
                     input.removeAttribute('checked');
                 }
             } else if (input.type === 'checkbox') {
                 if (input.checked) {
-                    values[id] = input.value;
+                    values[id]['value'] = input.value;
                     input.setAttribute('checked', '');
                 } else {
                     input.removeAttribute('checked');
@@ -487,23 +547,26 @@ async function getFormValues() {
                         })
                     }));
 
-                    values[id] = arquivos;
+                    values[id]['value'] = arquivos;
                 }
             } else if (input.tagName === 'SELECT') {
-                values[id] = input.value;
+                values[id]['value'] = input.value;
 
                 const options = input.querySelectorAll('option');
                 options.forEach(option => {
                     if (option.value === input.value) {
                         option.setAttribute('selected', '');
-                        values[id] = option.value;
+                        values[id]['value'] = option.value;
                     } else {
                         option.removeAttribute('selected');
                     }
                 });
             } else {
-                values[id] = input.value;
+                values[id]['value'] = input.value;
             }
+
+            values[id]['selection_start'] = input.selectionStart
+            values[id]['selection_end'] = input.selectionEnd
         }
     };
 
@@ -608,9 +671,6 @@ function trackEvents() {
 
     for (const eventType of documentEvents) {
         document.addEventListener(eventType, (event) => {
-            if (eventType === 'submit') {
-                event.preventDefault();
-            };
             sendEvent({type: eventType, event: event, event_ref: EventRef.DOCUMENT});
         });
     };

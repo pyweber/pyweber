@@ -1,4 +1,6 @@
 from uuid import uuid4
+import re
+
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -83,6 +85,20 @@ class ElementConstrutor: # pragma: no cover
         self.files = files or []
         self.events = events or TemplateEvents()
         self.childs = childs or ChildElements(self)
+    
+    @property
+    def selection_start(self): return self.__selection_start
+
+    @selection_start.setter
+    def selection_start(self, value: Union[int, None]):
+        self.__selection_start = value
+
+    @property
+    def selection_end(self): return self.__selection_end
+
+    @selection_end.setter
+    def selection_end(self, value: Union[int, None]):
+        self.__selection_end = value
     
     @property
     def sanitize(self): return self.__sanitize
@@ -389,7 +405,7 @@ class ElementConstrutor: # pragma: no cover
 
         for key, value in element.events.__dict__.items():
             if value is not None:
-                html += f" _{key}='{self.create_event_id(value)}'"
+                html += f" _{key}='{self.create_event_id(value, key, element.uuid)}'"
             
         if not element.content and not element.childs and element.tag not in NonSelfClosingHTMLTags.non_autoclosing_tags():
             if element.tag == 'comment':
@@ -411,54 +427,66 @@ class ElementConstrutor: # pragma: no cover
             uuid_placeholder = f'{{{child.uuid}}}'
             
             if uuid_placeholder in final_content:
-                final_content = final_content.replace(uuid_placeholder, child_html)
+                final_content: str = final_content.replace(uuid_placeholder, child_html)
             else:
                 final_content += '\n' + child_html
         
         if final_content:
             if has_children or '\n' in final_content:
-                html += ' ' * (indent + 4) + final_content.strip() + '\n' + indentation
+                html += ' ' * (indent + 4) + final_content + '\n' + indentation
             else:
-                html += final_content.strip()
+                html += final_content
         
         html += f'</{element.tag}>' if element.tag != 'comment' else '-->'
 
         return html
     
     def __render_dynamic_values(self, content: str):
+
         if content:
-            begin = content.find('{{')
-            if begin != -1:
-                end = content.find('}}')
-                key = content[begin:end+2].removeprefix('{{').removesuffix('}}').strip()
-                new_content = self.kwargs.get(key, None)
-                
-                if new_content:
-                    if isinstance(new_content, ElementConstrutor):
-                        new_content = self.to_html(element=new_content)
-                    content = content.replace(content[begin:end+2], new_content)
+            pattern = r'\{\{(.*?)\}\}'
+            result = re.findall(pattern, content)
+
+            if result:
+                for r in result:
+                    value = self.kwargs.get(r.strip(), None)
+                    if value:
+
+                        if isinstance(value, ElementConstrutor):
+                            value = self.to_html(element=value)
+
+                        content = content.replace("{{" + r + "}}", str(value))
         
         return content
 
-    def create_event_id(self, event: Union[Callable, str]):
-        if isinstance(event, str) or callable(event):
-            from pyweber.core.events import EventBook
+    def create_event_id(self, event: Union[Callable, str], type: str, element_id: str = None):
+        from pyweber.core.events import EventBook
 
-            if isinstance(event, str):
-                event_id = EventBook.get(event, None)
+        element_id = element_id or self.uuid
 
-                if not event_id:
-                    raise KeyError(f'{event} not in Pyweber EventBook.')
-                
-                return event
+        if not isinstance(event, (str, Callable)):
+            raise TypeError(f"Event {event.__name__} is an invalid callable or event_id isn't exists")
 
-            elif callable(event):
-                event_id = f'event_{id(event)}'
-                EventBook[event_id] = event
-            
-                return event_id
+        if isinstance(event, str):
+            if event not in EventBook:
+                raise KeyError(f"{event} isn't exists in Pyweber EventBook")
 
-        raise ValueError(f'Event {event.__name__} is an invalid callable ou event_id')
+            event_id = event
+
+        else:
+            event_id = f'event_{id(event)}'
+            EventBook[event_id] = {
+                'event': event,
+                'elements': {
+                    element_id: []
+                }
+            }
+        
+        EventBook.get(event_id).get('elements', {}).get(element_id, []).append(
+            type.removeprefix('on')
+        )
+
+        return event_id
     
     def sanitize_values(self, text: str):
         for key, value in self.__character_to_replace__().items():

@@ -1,5 +1,5 @@
 import json
-from typing import TYPE_CHECKING, Union, List
+from typing import TYPE_CHECKING, Union, List, Any
 from pyweber.connection.session import sessions
 from pyweber.core.element import Element
 from pyweber.models.file import File
@@ -20,6 +20,7 @@ class wsMessage: # pragma: no cover
         self.type: str = self.get_value(key='type')
         self.event_ref: str = self.get_value(key='event_ref')
         self.target_uuid: str = self.get_value(key='target_uuid')
+        self.current_target_uuid: str = self.get_value(key='current_target_uuid')
         self.event_data: dict[str, int] = self.get_value(key='event_data') or {}
         self.session_id: str = self.get_value(key='sessionId')
         self.window_event: str = self.get_value(key='window_event')
@@ -91,7 +92,7 @@ class wsMessage: # pragma: no cover
 
         return window
     
-    def get_form_values(self) -> dict[str, (str, int, float)]:
+    def get_form_values(self) -> dict[str, dict[str, Any]]:
         return json.loads(self.get_value(key='values') or "{}") or {}
     
     def get_raw_window(self):
@@ -101,24 +102,29 @@ class wsMessage: # pragma: no cover
         return self.__raw_window.get(key, {})
     
     def insert_values(self, element: Element):
-        values: Union[List[dict[str, Union[str, List[int]]]], str] = self.__values.get(element.uuid, None)
-        if element.tag == 'input' and element.attrs.get('type') == 'file':
+        values: dict[str, Union[List[dict[str, Union[str, List[int]]]], str]] = self.__values.get(element.uuid, None)
+        
+        if values:
+            if element.tag == 'input' and element.attrs.get('type') == 'file':
 
-            element.files.extend([
-                File(
-                    field=Field(
-                        name=None,
-                        filename=value.get('name'),
-                        content_type=value.get('content_type'),
-                        value=bytes(value.get('content'))
-                    )
-                ) for value in values if value
-            ])
+                element.files.extend([
+                    File(
+                        field=Field(
+                            name=None,
+                            filename=value.get('name'),
+                            content_type=value.get('content_type'),
+                            value=bytes(value.get('content'))
+                        )
+                    ) for value in values.get('value', []) if value
+                ])
 
-            element.value = ';'.join([value.get('name') for value in values if value]) or None
+                element.value = ';'.join([value.get('name') for value in values if value]) or None
+                
+            else:
+                element.value = values.get('value', None)
             
-        else:
-            element.value = values
+            element.selection_start = values.get('selection_start', None)
+            element.selection_end = values.get('selection_end', None)
 
         if element.childs:
             for child in element.childs:

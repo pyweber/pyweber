@@ -1,5 +1,38 @@
 # PyWeber Changelog
 
+## [1.1.1] - 206-01-27
+
+### Added
+- Added new `EventData` attributes.
+- Added new `Element` proprities. Now you can get `selection_start` and `selection_end` values. This properites refers to cursor position in input ou textearea's elements.
+- Added new `Element` methods. The new methods include `focus`, `blur`, `select`, `set_selection_range` and `remove`
+- Added `target` and `current_target` in `EventHandler` attributes. The `target` attribute replaces the `element` attribute that will be remove in version **version 1.2.0**. The `current_target` refers to real element that has the event included while `target` referes to target that caused the event.
+
+
+```python
+import pyweber as pw
+
+def get_selection_values(self, e: pw.EventHandler):
+  e.target.selection_start # get where the text seleciton start
+  e.target.selection_end # get where the text selection end
+
+  text_input = e.template.querySelection("#input")
+
+  text_input.select() # select element values
+  text_input.blur() # remove focus
+  text_input.set_selection_range(10,10) # select specified text section in the element value
+
+  text_input.focus() # set focus
+
+  text_input.remove() # remove element in your parent
+
+  e.update()
+```
+
+### Fixed
+- Fixed render dynamic values in `Element` instances.
+- Fixed error for localstorage management
+
 ## [1.1.0] - 2026-01-23
 
 ### Added

@@ -94,12 +94,12 @@ class LocalStorage(BaseStorage): # pragma: no cover
             asyncio.get_running_loop()
             asyncio.create_task(self.__ws.send_message(
                 data={'localstorage': self.data},
-                session_id=self.__ws
+                session_id=self.sesssion_id
             ))
         except RuntimeError:
             asyncio.run(self.__ws.send_message(
                 data={'localstorage': self.data},
-                session_id=self.__ws
+                session_id=self.sesssion_id
             ))
 
 class SessionStorage(BaseStorage): # pragma: no cover

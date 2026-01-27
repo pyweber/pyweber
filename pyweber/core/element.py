@@ -41,6 +41,7 @@ class Element(ElementConstrutor): # pragma: no cover
         )
         self.uuid = getattr(self, 'uuid', None) or str(uuid4())
         self.data = data
+        self.__element_methods: dict[str, dict[str, Any]] = {}
     
     @property
     def parent(self):
@@ -92,6 +93,22 @@ class Element(ElementConstrutor): # pragma: no cover
             raise TypeError(f'Index must be a integer, but you got {type(index).__name__}')
 
         return self.__childs.pop(index)
+    
+    def remove(self):
+        if self.parent:
+            self.parent.remove_child(self)
+    
+    def focus(self):
+        self.__set_element_methods(method='focus')
+
+    def blur(self):
+        self.__set_element_methods(method='blur')
+
+    def select(self):
+        self.__set_element_methods(method='select')
+    
+    def set_selection_range(self, start: int, end: str):
+        self.__set_element_methods(method='setSelectionRange', start=start, end=end)
     
     def getElement(self, by: GetBy, value: str, element: 'Element' = None) -> 'Element':
         results = self.getElements(by=by, value=value, element=element)
@@ -168,31 +185,6 @@ class Element(ElementConstrutor): # pragma: no cover
 
         return results
     
-    def __render_dynamic_elements(self, childs: ChildElements):
-        new_childs: ChildElements = ChildElements(self)
-        if childs:
-            for child in childs:
-                if isinstance(child, str):
-                    if not child.startswith('{{') or not child.endswith('}}'):
-                        raise ValueError("{} must be starts with '{{' and ends with '}}'".format(child))
-                    
-                    key = child.removeprefix('{{').removesuffix('}}').strip()
-                    element = self.kwargs.get(key, None)
-
-                    if not element:
-                        self.content = (self.content or '') + child
-
-                    elif isinstance(element, ElementConstrutor):
-                        new_childs.append(element)
-                
-                elif isinstance(child, ElementConstrutor):
-                    new_childs.append(child)
-                
-                else:
-                    raise TypeError(f'all childs must be str or Element instances, but got {type(child).__name__}')
-        
-        return new_childs
-
     @property
     def clone(self):
         from pyweber.core.events import TemplateEvents
@@ -218,6 +210,44 @@ class Element(ElementConstrutor): # pragma: no cover
             cln.childs.append(child.clone)
 
         return cln
+    
+    def get_element_methods(self):
+        return self.__element_methods
+    
+    def __set_element_methods(self, method: str, **kwargs):
+        self.__element_methods[method] = kwargs
+    
+    def remove_element_methods(self, method: Any = None):
+        if not method:
+            self.__element_methods.clear()
+            return
+        
+        self.__element_methods.pop(method, None)
+    
+    def __render_dynamic_elements(self, childs: ChildElements):
+        new_childs: ChildElements = ChildElements(self)
+        if childs:
+            for child in childs:
+                if isinstance(child, str):
+                    if not child.startswith('{{') or not child.endswith('}}'):
+                        raise ValueError("{} must be starts with '{{' and ends with '}}'".format(child))
+                    
+                    key = child.removeprefix('{{').removesuffix('}}').strip()
+                    element = self.kwargs.get(key, None)
+
+                    if not element:
+                        self.content = (self.content or '') + child
+
+                    elif isinstance(element, ElementConstrutor):
+                        new_childs.append(element)
+                
+                elif isinstance(child, ElementConstrutor):
+                    new_childs.append(child)
+                
+                else:
+                    raise TypeError(f'all childs must be str or Element instances, but got {type(child).__name__}')
+        
+        return new_childs
     
     def __deepy_clone(self, obj):
         if isinstance(obj, list):

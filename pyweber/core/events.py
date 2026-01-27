@@ -10,16 +10,61 @@ if TYPE_CHECKING: # pragma: no cover
 
 class EventData: # pragma: no cover
     def __init__(self, event_data: dict[str, Union[int, str]]):
+        # Mouse
         self.clientX = event_data.get('clientX', None)
         self.clientY = event_data.get('clientY', None)
-        self.key = event_data.get('key', None)
+        self.screenX = event_data.get('screenX', None)
+        self.screenY = event_data.get('screenY', None)
+        self.pageX = event_data.get('pageX', None)
+        self.pageY = event_data.get('pageY', None)
+        self.button: int = event_data.get('button', None)
+        self.buttons = event_data.get('buttons', None)
+        
+        # Teclado
+        self.key: str = event_data.get('key', None)
+        self.code = event_data.get('code', None)
+        self.key_code = event_data.get('keyCode', None)
+        self.ctrl_key: bool = event_data.get('ctrlKey', False)
+        self.shift_key: bool = event_data.get('shiftKey', False)
+        self.alt_key: bool = event_data.get('altKey', False)
+        self.meta_key: bool = event_data.get('metaKey', False)
+        self.repeat: bool = event_data.get('repeat', False)
+        
+        # Scroll/Wheel
         self.deltaX = event_data.get('deltaX', None)
         self.deltaY = event_data.get('deltaY', None)
+        self.deltaZ = event_data.get('deltaZ', None)
+        self.delta_mode = event_data.get('deltaMode', None)
+        
+        # Touch
         self.touches = event_data.get('touches', None)
+        self.changed_touches = event_data.get('changedTouches', None)
+        self.target_touches = event_data.get('targetTouches', None)
+        
+        # Drag & Drop
+        self.data_transfer = event_data.get('dataTransfer', None)
+        
+        # Clipboard
+        self.clipboard_data = event_data.get('clipboardData', None)
+        
+        # Animação/Transição
+        self.animation_name = event_data.get('animationName', None)
+        self.elapsed_time = event_data.get('elapsedTime', None)
+        self.property_name = event_data.get('propertyName', None)
+        self.pseudo_element = event_data.get('pseudoElement', None)
+        
+        # Meta informações
+        self.is_trusted = event_data.get('isTrusted', None)
+        self.bubbles = event_data.get('bubbles', None)
+        self.cancelable = event_data.get('cancelable', None)
+        self.default_prevented: bool = event_data.get('defaultPrevented', False)
+        self.event_phase = event_data.get('eventPhase', None)
+        
         self.timestamp = event_data.get('timestamp', None)
 
     def __repr__(self):
-        return f'EventData(key: {self.key}, clientX: {self.clientX}, clientY: {self.clientY}, timestamp: {self.timestamp})'
+        text = ', '.join([f'{key}: {value}' for key, value in self.__dict__.items() if value]).strip()
+        return f"EventData({text})"
 
 class EventHandler: # pragma: no cover
     def __init__(
@@ -27,6 +72,8 @@ class EventHandler: # pragma: no cover
         event_type: str,
         route: str,
         element: 'Element',
+        target: 'Element',
+        current_target: 'Element',
         template: 'Template',
         window: 'Window',
         event_data: EventData,
@@ -38,6 +85,8 @@ class EventHandler: # pragma: no cover
         self.route = route
         self.app = app
         self.element = element
+        self.target = target
+        self.current_target = current_target
         self.template = template
         self.window = window
         self.event_data = event_data
@@ -60,7 +109,11 @@ class EventHandler: # pragma: no cover
         return self.__ws.window_response
     
     def __data_to_send__(self):
-        return {'template': self.session.template, 'window': self.session.window.get_all_event_ids}
+        return {
+            'template': self.session.template,
+            'windowEvents': self.session.window.get_all_event_ids,
+            'documentEvents': [value.get('elements') for value in EventBook.values()]
+        }
     
     def __send__(self, data: dict[str, Any], session_id: str):
         try:
@@ -80,6 +133,7 @@ class EventConstrutor: # pragma: no cover
     def __init__(
         self,
         target_id: str,
+        current_target_id: str,
         app: 'Pyweber',
         ws: 'WebsocketManager',
         session: 'Session',
@@ -91,6 +145,7 @@ class EventConstrutor: # pragma: no cover
         self.__event_data = event_data
         self.event_type = event_type
         self.__target_id = target_id
+        self.__current_target_id = current_target_id
         self.__ws = ws
         self.__app = app
         self.__session = session
@@ -110,11 +165,19 @@ class EventConstrutor: # pragma: no cover
             value=self.__target_id
         )
     
+    @property
+    def __current_target_element(self):
+        if self.__target_id == self.__current_target_id:
+            return self.__target_element
+        return self.__template.getElement(by='uuid', value=self.__current_target_id)
+    
     def build_event(self):
         return EventHandler(
             event_type=self.event_type,
             route=self.__route,
             element=self.__target_element,
+            target=self.__target_element,
+            current_target=self.__current_target_element,
             template=self.__template,
             window=self.__window,
             event_data=EventData(event_data=self.__event_data),
@@ -123,7 +186,7 @@ class EventConstrutor: # pragma: no cover
             ws=self.__ws
         )
 
-EventBook: dict[str, Callable] = {}
+EventBook: dict[str, dict[str, Union[Callable, dict[str, list[str]]]]] = {}
 
 class TemplateEvents: # pragma: no cover
     def __init__(
@@ -245,7 +308,10 @@ class TemplateEvents: # pragma: no cover
         self.ontouchmove = ontouchmove
         self.ontouchend = ontouchend
         self.ontouchcancel = ontouchcancel
-
+    
+    def events(self):
+        return [name.replace('on', '') for name, event in self.__dict__.items() if event]
+    
     def __repr__(self):
         """Representação legível dos eventos."""
         events = {k: v for k, v in self.__dict__.items() if v is not None}
