@@ -110,9 +110,8 @@ class EventHandler: # pragma: no cover
     
     def __data_to_send__(self):
         return {
-            'template': self.session.template,
-            'windowEvents': self.session.window.get_all_event_ids,
-            'documentEvents': [value.get('elements') for value in EventBook.values()]
+            'template': self.template,
+            'windowEvents': self.session.window.get_all_event_ids
         }
     
     def __send__(self, data: dict[str, Any], session_id: str):

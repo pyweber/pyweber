@@ -312,6 +312,10 @@ class HTTPStatusCode(Enum): # pragma: no cover
                 return value.name
         
         raise Warning(f'{code} is not an httpstatus code')
+    
+    @property
+    def code(self) -> int:
+        return int(self.value.split(' ')[0])
 
 class EventType(Enum): # pragma: no cover
     # Mouse Events

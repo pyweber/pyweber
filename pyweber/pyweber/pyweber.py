@@ -3,6 +3,8 @@ import json
 import os
 import re
 import webbrowser
+import traceback
+import logging
 from typing import Union, Callable, Any
 from dataclasses import dataclass
 from pyweber.core.element import Element
@@ -119,90 +121,76 @@ class Pyweber(
 
     # Response
     async def get_response(self, request: Request) -> Response:
-        try:
-            if not isinstance(request, Request):
-                raise TypeError(f'request must be a Request instances, but got {type(request).__name__}')
-            
-            if re.search(r'^/_pyweber/(?:.*?)/openapi.json$', request.path):
-                await self.__add_openapi_route()
-            
-            _route, _ = self.resolve_path(route=request.path)
-            title = None
-            _route_method = f"{_route}_{request.method}"
+        if not isinstance(request, Request):
+            raise TypeError(f'request must be a Request instances, but got {type(request).__name__}')
+        
+        if re.search(r'^/_pyweber/(?:.*?)/openapi.json$', request.path):
+            await self.__add_openapi_route()
+        
+        _route, _ = self.resolve_path(route=request.path)
+        title = None
+        _route_method = f"{_route}_{request.method}"
 
-            if _route_method in self.__cache_templates:
-                content_result, template_result = self.__cache_templates[_route_method]
+        if _route_method in self.__cache_templates:
+            content_result, template_result = self.__cache_templates[_route_method]
 
+        else:
+            if _route in self.list_routes:
+                title = self.get_route_by_path(route=_route).title
+                self.__request = request
+            
+            # process before request middlewares
+            before_request_response = await self.process_middleware(
+                resp=request,
+                middlewares=self.get_before_request_middlewares
+            )
+            
+            if before_request_response:
+                template_result = await self._process_templates(
+                    state_result=StateResult(
+                        template=before_request_response.content,
+                        status_code=before_request_response.status_code,
+                        process_response=before_request_response.process_response,
+                        content_type=ContentTypes.html,
+                        redirect_path=request.path,
+                        callback=None,
+                        kwargs={}
+                    )
+                )
+            
             else:
-                if _route in self.list_routes:
-                    title = self.get_route_by_path(route=_route).title
-                    self.__request = request
-                
-                # process before request middlewares
-                before_request_response = await self.process_middleware(
-                    resp=request,
-                    middlewares=self.get_before_request_middlewares
-                )
-                
-                if before_request_response:
-                    template_result = await self._process_templates(
-                        state_result=StateResult(
-                            template=before_request_response.content,
-                            status_code=before_request_response.status_code,
-                            process_response=before_request_response.process_response,
-                            content_type=ContentTypes.html,
-                            redirect_path=request.path,
-                            callback=None,
-                            kwargs={}
-                        )
-                    )
-                
-                else:
-                    template_result = await self.get_template(
-                        route=request.path,
-                        method=request.method
-                    )
-
-                content_result = self.template_to_bytes(
-                    template=template_result.template,
-                    content_type=template_result.content_type,
-                    title=title,
-                    process_response=template_result.process_response
+                template_result = await self.get_template(
+                    route=request.path,
+                    method=request.method
                 )
 
-                # self.__cache_templates[_route_method] = (content_result, template_result)
-            
-            # process after request middlewares
-            after_request_response = await self.process_middleware(
-                resp=Response(
-                    request=request,
-                    response_content=content_result.content,
-                    response_type=content_result.content_type,
-                    code=template_result.status_code,
-                    cookies=self.cookies,
-                    route=template_result.redirect_path
-                ),
-                middlewares=self.get_after_request_middlewares
+            content_result = self.template_to_bytes(
+                template=template_result.template,
+                content_type=template_result.content_type,
+                title=title,
+                process_response=template_result.process_response
             )
 
-            # To prevent Recursion Error
-            if template_result.redirect_path in self.__visited__:
-                self.__visited__.remove(template_result.redirect_path)
-
-            return after_request_response.content
-
-        except Exception as error:
-            return Response(
+            # self.__cache_templates[_route_method] = (content_result, template_result)
+        
+        # process after request middlewares
+        after_request_response = await self.process_middleware(
+            resp=Response(
                 request=request,
-                response_content=Template(
-                    template=ErrorPages().page_server_error.build_html(),
-                    error=str(error)
-                ).build_html().encode(),
-                code=500,
-                response_type=ContentTypes.html,
+                response_content=content_result.content,
+                response_type=content_result.content_type,
+                code=template_result.status_code,
                 cookies=self.cookies,
-                route=request.path
-            )
+                route=template_result.redirect_path
+            ),
+            middlewares=self.get_after_request_middlewares
+        )
+
+        # To prevent Recursion Error
+        if template_result.redirect_path in self.__visited__:
+            self.__visited__.remove(template_result.redirect_path)
+
+        return after_request_response.content
     
     # Utils
     def template_to_bytes(
@@ -408,31 +396,49 @@ class Pyweber(
         )
 
     async def _process_templates(self, state_result: StateResult):
-        template = state_result.template
+        try:
+            template = state_result.template
 
-        while callable(template) or isinstance(template, RedirectRoute):
-            if callable(template):
-                request_body = self.request.body if self.request else {}
-                kwargs = OpenApiProcessor.prepare_callback_kwargs(
-                    callback=state_result.callback,
-                    **{**state_result.kwargs, **request_body}
-                )
+            while callable(template) or isinstance(template, RedirectRoute):
+                if callable(template):
+                    request_body = self.request.body if self.request else {}
+                    kwargs = OpenApiProcessor.prepare_callback_kwargs(
+                        callback=state_result.callback,
+                        **{**state_result.kwargs, **request_body}
+                    )
 
-                template = await template(**kwargs) if inspect.iscoroutinefunction(template) else template(**kwargs)
-            
-            if isinstance(template, RedirectRoute):
-                redirect_path = self.build_route(route=template.route.full_route, **state_result.kwargs)
+                    template = await template(**kwargs) if inspect.iscoroutinefunction(template) else template(**kwargs)
+                
+                if isinstance(template, RedirectRoute):
+                    redirect_path = self.build_route(route=template.route.full_route, **state_result.kwargs)
 
-                self._check_recursion(route=redirect_path)
-                state_result = await self._process_redirect_route(
-                    state=state_result,
-                    redirect_route=template,
-                    redirect_path=redirect_path,
-                    **state_result.kwargs
-                )
+                    self._check_recursion(route=redirect_path)
+                    state_result = await self._process_redirect_route(
+                        state=state_result,
+                        redirect_route=template,
+                        redirect_path=redirect_path,
+                        **state_result.kwargs
+                    )
 
-                template = state_result.template
+                    template = state_result.template
         
+        except Exception as error:
+            error_details = {
+                'type': type(error).__name__,
+                'message': str(error),
+                'traceback': traceback.format_exc(),
+                'line': traceback.extract_tb(error.__traceback__)[-1].lineno
+            }
+
+            logging.error(traceback.format_exc())
+            
+            template = Template(
+                template=self.page_server_error.build_html(),
+                error=f'{error_details["message"]}, line {error_details["line"]}'
+            )
+            state_result.status_code = HTTPStatusCode.INTERNAL_SERVER_ERROR.code
+            state_result.content_type = ContentTypes.html
+            
         return TemplateResult(
             status_code=state_result.status_code,
             content_type=state_result.content_type,

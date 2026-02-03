@@ -20,44 +20,36 @@ class TaskManager: # pragma: no cover
         if event_id in self.active_handlers_async[session_id]:
             existing_task = self.active_handlers_async[session_id][event_id]
             if existing_task.done():
-                del self.active_handlers_async[session_id][event_id]
-            else:
                 # Tarefa já em execução, não criar uma nova
                 return event_id
-        
-        task = asyncio.create_task(self.__run_task_async(session_id, event_id, handler, event_handler))
+
+        # ruuning task
+        task = asyncio.create_task(handler(event_handler))
+
         self.active_handlers_async[session_id][event_id] = task
-        
-        return event_id
 
-    async def __run_task_async(self, session_id: str, event_id: str, handler, event_handler):
         try:
-            return await handler(event_handler)
+            result = await task
+            return result
         except asyncio.CancelledError:
-            # Tarefa foi cancelada normalmente
-            raise
-        except Exception as e:
-            # Capturar qualquer outra exceção
-            PrintLine(f"Error on async handler ({event_id}): {e}", level='ERROR')
-            raise e
-
-        finally:
-            if session_id in self.active_handlers_async and event_id in self.active_handlers_async[session_id]:
-                del self.active_handlers_async[session_id][event_id]
-
-                if not self.active_handlers_async[session_id]:
-                    del self.active_handlers_async[session_id]
+            return
+        except Exception as error:
+            PrintLine(f"Error on async handler ({event_id}): {error}", level='ERROR')
+            raise error
     
     async def cancel_all_tasks_async(self, session_id: str) -> int:
         count = 0
         if session_id in self.active_handlers_async:
-            tasks = list(self.active_handlers_async[session_id].items())
+            tasks = list(self.active_handlers_async[session_id].values())
             
-            for event_id, task in tasks:
+            for task in tasks:
                 if not task.done():
                     task.cancel()
                     count += 1
             
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+                
             del self.active_handlers_async[session_id]
         
         return count

@@ -12,6 +12,7 @@ class Session: # pragma: no cover
         self.session_id = session_id
         self.create_at = time()
         self.current_route = current_route
+        self.old_template = template
 
 class SessionManager: # pragma: no cover
     def __init__(self):

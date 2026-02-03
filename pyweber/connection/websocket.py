@@ -79,7 +79,7 @@ class WebsocketUpgrade: # pragma: no cover
 
 class WebsocketServer: # pragma: no cover
     def __init__(self, connection: socket.socket):
-        self.id = str(uuid4())
+        self.id = None
         self.__connection = connection
         self.__all_message: bytes = b''
         self.__messages: list[str | bytes] = []
@@ -241,9 +241,16 @@ class BaseWebsockets: # pragma: no cover
         self.protocol: Literal['pyweber', 'uvicorn'] = protocol
         self.task_manager = TaskManager()
         self.ws_connections: dict[str, WebsocketServer | Callable[..., Any]] = {}
-        self.window_response: dict[str, Any] = {}
         self.old_template: 'Template' = None
         self.app = app
+    
+    @property
+    def window_response(self): return self.__window_response
+
+    @window_response.setter
+    def window_response(self, value: dict[str, Any]):
+        assert isinstance(value, dict)
+        self.__window_response = value
     
     async def message_handler(self, message: wsMessage):
 
@@ -273,12 +280,13 @@ class BaseWebsockets: # pragma: no cover
                                 event_handler=event_handler
                             )
                     else:
-                        self.task_manager.create_task(
-                            session_id=message.session_id,
-                            event_id=event_id,
-                            handler=handler,
-                            event_handler=event_handler
-                        )
+                        if event_id not in self.task_manager.active_handlers.get(message.session_id, {}):
+                            self.task_manager.create_task(
+                                session_id=message.session_id,
+                                event_id=event_id,
+                                handler=handler,
+                                event_handler=event_handler
+                            )
         
         elif message.event_ref == 'window':
             handler = message.window.get_event(event_id=message.window_event)
@@ -306,16 +314,11 @@ class BaseWebsockets: # pragma: no cover
 
             if current_template:
                 updated_template = current_template.clone()
-
-                data['template'] = await self.get_template_diff(
-                    session_template=current_template,
-                    old_template=None
-                )
-
                 session.template = updated_template
 
-                if last_target:
-                    self.old_template = updated_template
+                data['template'] = await self.get_template_diff(
+                    session=session
+                )
             
         return json.dumps(data, ensure_ascii=False, indent=4)
 
@@ -379,25 +382,24 @@ class BaseWebsockets: # pragma: no cover
         start_time = time.time()
 
         while time.time() - start_time < timeout:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.4)
 
             if self.window_response:
                 break
         
         return self.window_response
     
-    async def get_template_diff(self, session_template: 'Template', old_template: 'Template' = None):
-        old_template = old_template if old_template else self.old_template
+    async def get_template_diff(self, session: Session):
 
         diff = TemplateDiff()
         
         for tag in ['head', 'body']:
-            old_element = self.old_template.querySelector(tag)
-
             diff.track_differences(
-                new_element=session_template.querySelector(tag),
-                old_element=old_element
+                new_element=session.template.querySelector(tag),
+                old_element=session.old_template.querySelector(tag)
             )
+        
+        session.old_template = session.template.clone()
         
         return diff.differences
 
@@ -437,7 +439,9 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
     async def get_sync_template(self, message: wsMessage):
         assert isinstance(message, wsMessage)
         sync_template = await message.template
-        self.old_template = sync_template.clone()
+        session = sessions.get_session(session_id=message.session_id)
+        if session:
+            session.old_template = sync_template.clone()
         return sync_template
     
     def update_app_template(self, new_template: 'Template', route: str):
@@ -463,12 +467,13 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
         session.current_route = route
     
     async def clear_session(self, session_id: str):
-        await self.task_manager.cancel_session_handlers(session_id=session_id)
-        await self.task_manager.cancel_all_tasks_async(session_id=session_id)
         sessions.remove_session(session_id=session_id)
 
         if session_id in self.ws_connections:
             del self.ws_connections[session_id]
+            
+        await self.task_manager.cancel_session_handlers(session_id=session_id)
+        await self.task_manager.cancel_all_tasks_async(session_id=session_id)
     
     def process_ws_message_handler(self, message: str):
         try:
@@ -497,12 +502,14 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
 
             if raw_message:
                 message = wsMessage(raw_message=raw_message, app=self.app, ws=self)
-
+                self.window_response = message.window_response
                 sync_template = await self.get_sync_template(message=message)
 
                 if not message.session_id or any(session_id not in sessions.all_sessions for session_id in [message.session_id, ws_server.id]):
                     ws_server.id = self.get_session_id(session_id=message.session_id)
                     self.ws_connections[ws_server.id] = ws_server
+
+                    PrintLine(text=f'Connected websocket with id: {message.session_id}')
 
                     self.add_session(
                         session_id=ws_server.id,
@@ -514,10 +521,7 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                     await self.send_message(
                         data={
                             'setSessionId': ws_server.id,
-                            'windowEvents': message.window.get_all_event_ids,
-                            'documentEvents': [
-                                value.get('elements') for value in EventBook.values()
-                            ]
+                            'windowEvents': message.window.get_all_event_ids
                         },
                         session_id=ws_server.id
                     )
@@ -554,7 +558,15 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
 
                             if not message.session_id or message.session_id not in sessions.all_sessions:
                                 ws_connection = self.get_session_id(session_id=message.session_id)
-                                self.add_session(session_id=ws_connection, template=sync_template, window=message.window, route=message.route)
+
+                                PrintLine(text=f'Connected websocket with id: {ws_connection}')
+
+                                self.add_session(
+                                    session_id=ws_connection,
+                                    template=sync_template,
+                                    window=message.window,
+                                    route=message.route
+                                )
 
                                 self.ws_connections[ws_connection] = send
 
@@ -562,9 +574,6 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                                     data={
                                         'setSessionId': ws_connection,
                                         'windowEvents': message.window.get_all_event_ids,
-                                        'documentEvents': [
-                                            value.get('elements') for value in EventBook.values()
-                                        ]
                                     },
                                     session_id=ws_connection
                                 )
@@ -585,14 +594,12 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
             PrintLine(text=f'Websocket server error: {e}', level='ERROR')
             raise e
         
-        # finally:
-        #     await self.clear_session(session_id=ws_connection)
+        finally:
+            await self.clear_session(session_id=ws_connection)
     
     async def connect_wsgi(self, ws_connection: WebsocketServer):
-        PrintLine(text=f'Connected websocket with id: {ws_connection.id}')
         await ws_connection.manage_connection(self.ws_handler_wsgi)
-        sessions.remove_session(session_id=ws_connection.id)
-        self.remove_connection(id=ws_connection.id)
+        await self.clear_session(session_id=ws_connection.id)
     
     async def __call__(self, scope, receive, send):
         assert scope.get('type', None) == 'websocket'
