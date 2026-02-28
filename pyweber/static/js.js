@@ -14,11 +14,9 @@ const EventRef = new Proxy(
 
 function connectWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.hostname;
-    const wsPort = window.PYWEBER_WS_PORT || 8800;
     const maxReconnectAttempts = 2
     let reconnectAttemps = 0
-    socket = new WebSocket(`${wsProtocol}//${wsHost}:${wsPort}`);
+    socket = new WebSocket(`${wsProtocol}//${window.location.host}`);
 
     socket.onopen = async function() {
         console.log('Connected to WebSocket!');

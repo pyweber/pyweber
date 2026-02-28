@@ -247,14 +247,8 @@ class Template: # pragma: no cover
             disable_ws = os.environ.get('PYWEBER_DISABLE_WS', False)
 
             if disable_ws not in [True, 'True', 'true', '1', 1]:
-                ws_port = os.environ.get('UVICORN_PORT', None) or os.environ.get('PYWEBER_WS_PORT', None) or config.get('websocket', 'port')
                 root.childs[0].childs.extend(
                     [
-                        self.__create_default_element(
-                            tag='script',
-                            content=f"window.PYWEBER_WS_PORT = {ws_port}",
-                            attrs={'type': 'text/javascript'}
-                        ),
                         self.__create_default_element(
                             tag='script',
                             attrs={'src': f'/_pyweber/static/{str(uuid4())}/.js', 'type': 'text/javascript'}
