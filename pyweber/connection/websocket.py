@@ -57,14 +57,15 @@ class WebsocketUpgrade: # pragma: no cover
     @property
     def client_secret_key(self) -> str:
         for text in self.headers.splitlines():
-            if 'Sec-WebSocket-Key:' in text:
-                return text.split(':')[-1].strip()
+            if 'sec-websocket-key' in text.lower():
+                return text.split(':',1)[-1].strip()
     
     @property
     def server_accept_key(self):
         sha_1_hash = hashlib.sha1(
             string=(self.client_secret_key+self.websocket_guid).encode('utf-8')
         ).digest()
+
 
         return base64.b64encode(sha_1_hash).decode('utf-8')
     
