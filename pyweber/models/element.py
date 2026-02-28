@@ -384,7 +384,7 @@ class ElementConstrutor: # pragma: no cover
             raise TypeError(f'element must be an Element instances, but got {type(element).__name__}')
         
         indentation = ' ' * indent
-        html = f"{indentation}<{element.tag} uuid='{element.uuid}'" if element.tag != 'comment' else f'{indentation}<!--'
+        html = f'{indentation}<{element.tag} uuid="{element.uuid}"' if element.tag != 'comment' else f'{indentation}<!--'
 
         if element.id:
             html += f' id="{element.id}"'
@@ -398,14 +398,14 @@ class ElementConstrutor: # pragma: no cover
             html += f' style="{style_str}"'
             
         for key, value in element.attrs.items():
-            if value:
-                html += f" {key}='{value}'"
+            if value and value not in [True, False]:
+                html += f' {key}="{value}"'
             else:
                 html += f" {key}"
 
         for key, value in element.events.__dict__.items():
             if value is not None:
-                html += f" _{key}='{self.create_event_id(value, key, element.uuid)}'"
+                html += f' _{key}="{self.create_event_id(value, key, element.uuid)}"'
             
         if not element.content and not element.childs and element.tag not in NonSelfClosingHTMLTags.non_autoclosing_tags():
             if element.tag == 'comment':

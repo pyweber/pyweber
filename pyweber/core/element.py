@@ -107,6 +107,9 @@ class Element(ElementConstrutor): # pragma: no cover
     def select(self):
         self.__set_element_methods(method='select')
     
+    def click(self):
+        self.__set_element_methods(method='click')
+    
     def set_selection_range(self, start: int, end: str):
         self.__set_element_methods(method='setSelectionRange', start=start, end=end)
     

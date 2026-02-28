@@ -115,10 +115,10 @@ class wsMessage: # pragma: no cover
                             content_type=value.get('content_type'),
                             value=bytes(value.get('content'))
                         )
-                    ) for value in values.get('value', []) if value
+                    ) for value in values.get('value', []) if isinstance(value, dict)
                 ])
 
-                element.value = ';'.join([value.get('name') for value in values if value]) or None
+                element.value = ';'.join([value.get('name') for value in values if isinstance(value, dict)]) or None
                 
             else:
                 element.value = values.get('value', None)

@@ -5,7 +5,7 @@
 ### Added
 - Added new `EventData` attributes.
 - Added new `Element` proprities. Now you can get `selection_start` and `selection_end` values. This properites refers to cursor position in input ou textearea's elements.
-- Added new `Element` methods. The new methods include `focus`, `blur`, `select`, `set_selection_range` and `remove`
+- Added new `Element` methods. The new methods include `focus`, `blur`, `select`, `set_selection_range`, `remove` and `click`
 - Added `target` and `current_target` in `EventHandler` attributes. The `target` attribute replaces the `element` attribute that will be remove in version **version 1.2.0**. The `current_target` refers to real element that has the event included while `target` referes to target that caused the event.
 
 
@@ -32,6 +32,7 @@ def get_selection_values(self, e: pw.EventHandler):
 ### Fixed
 - Fixed render dynamic values in `Element` instances.
 - Fixed error for localstorage management
+- Fixed Error in javascript functions when it get a string variable
 
 ## [1.1.0] - 2026-01-23
 

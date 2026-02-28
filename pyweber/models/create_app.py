@@ -66,15 +66,13 @@ class CreatApp: # pragma: no cover
             key_file=self.__key_file
         )
     
+    @property
+    def main_module(cls):
+        return os.path.basename(os.path.abspath(sys.argv[0])).split('.')[0]
+    
     def get_main_module(self):
-        main_module = os.path.basename(os.path.abspath(sys.argv[0])).split('.')[0]
-
-        if main_module in sys.modules:
-            if not self.started:
-                return sys.modules[main_module]
-            return reload(sys.modules[main_module])
-        
-        return import_module(main_module)
+        if self.main_module not in sys.modules:  return import_module(self.main_module)
+        return sys.modules.get(self.main_module)
     
     def project_modules(self):
         modules: dict[str, ModuleType] = {}
@@ -82,7 +80,6 @@ class CreatApp: # pragma: no cover
         for key, value in sys.modules.items():
             if hasattr(value, '__file__') and str(self.project_path) in str(value.__file__):
                 modules[key] = value
-        
         return modules
     
     def path_to_module(self, filepath: str):
@@ -95,10 +92,11 @@ class CreatApp: # pragma: no cover
         try:
             if changed_file and str(changed_file).endswith('.py'):
                 module_name = self.path_to_module(filepath=changed_file)
+                project_modules = self.project_modules()
 
                 if module_name in sys.modules:
-                    for key, module in self.project_modules().items():
-                        if key != '__main__' and getattr(module, '__spec__', None) is not None:
+                    for key, module in project_modules.items():
+                        if key != '__main__' or getattr(module, '__spec__', None) is not None:
                             reload(module)
                 else:
                     import_module(module_name)
@@ -108,7 +106,7 @@ class CreatApp: # pragma: no cover
         except Exception as e:
             PrintLine(text=f'Error to import module: {e}', level='ERROR')
             raise e
-    
+
     def get_app_instances(self):
         self.module = self.get_main_module()
 
