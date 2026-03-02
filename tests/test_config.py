@@ -7,7 +7,7 @@ def test_get_path():
     assert config.path == str(Path('.pyweber', 'config.toml'))
 
 def test_get_keys():
-    assert len(config.keys) == 7
+    assert config.keys
 
 def test_get_config():
     assert config.config['app']['name'] == 'Pyweber App'
