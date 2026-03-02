@@ -12,7 +12,6 @@ PyWeber supports configuration through environment variables, allowing you to ov
 | `PYWEBER_KEY_FILE` | Path to SSL key file for HTTPS | `None` | `PYWEBER_KEY_FILE=/path/to/key.pem` |
 | `PYWEBER_SERVER_HOST` | Host address for the HTTP server | `127.0.0.1` | `PYWEBER_SERVER_HOST=0.0.0.0` |
 | `PYWEBER_SERVER_PORT` | Port for the HTTP server | `8800` | `PYWEBER_SERVER_PORT=8080` |
-| `PYWEBER_WS_PORT` | Port for the WebSocket server | `8765` | `PYWEBER_WS_PORT=8766` |
 
 ## Usage
 

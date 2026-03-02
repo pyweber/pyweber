@@ -88,18 +88,10 @@ class CLI: # pragma: no cover
             help='Initial route when open website in first time'
         )
 
-        # por concluir modificar o run_app, templates e create-app
         parser.add_argument(
             '--disable-ws',
             action='store_true',
-            help='Enable websockets server'
-        )
-
-        parser.add_argument(
-            '--ws-port',
-            type=int,
-            default=8800,
-            help='Port to websocket run'
+            help='Disable websockets server'
         )
     
     def _add_create_command(self):
@@ -171,7 +163,7 @@ class CLI: # pragma: no cover
         mkcert_parser.add_argument(
             '--domains',
             type=str,
-            default='localhost,127.0.0.1',
+            default='localhost,127.0.0.1,0.0.0.0',
             help='Comma-separated list of domains/IPs to include in the certificate'
         )
     
@@ -250,7 +242,6 @@ class CLI: # pragma: no cover
                     'host': getattr(args, 'host', '0.0.0.0'),
                     'route': getattr(args, 'route', '/'),
                     'disable_ws': getattr(args, 'disable_ws', False),
-                    'ws_port': getattr(args, 'ws_port', 8800)
                 }
                 self.commands_funcs.run_app(**run_kwargs)
 
@@ -275,7 +266,6 @@ class CLI: # pragma: no cover
                 port = getattr(args, 'port')
                 host = getattr(args, 'host')
                 route = getattr(args, 'route')
-                ws_port = getattr(args, 'ws_port')
                 disable_ws = getattr(args, 'disable_ws', False)
 
                 self.commands_funcs.run_app(
@@ -287,7 +277,6 @@ class CLI: # pragma: no cover
                     port = port,
                     host = host,
                     route = route,
-                    ws_port = ws_port,
                     disable_ws=disable_ws
                 )
             
@@ -389,19 +378,17 @@ class CommandFunctions: # pragma: no cover
             )
             shutil.rmtree(path=self.project_name, ignore_errors=True)
     
-    def set_eviron_variables(self, reload: bool, port: int, host: str, route: str, ws_port: int, disable_ws: bool):
+    def set_eviron_variables(self, reload: bool, port: int, host: str, route: str, disable_ws: bool):
         os.environ['PYWEBER_RELOAD_MODE'] = str(reload)
         os.environ['PYWEBER_SERVER_PORT'] = str(port)
         os.environ['PYWEBER_SERVER_HOST'] = str(host)
         os.environ['PYWEBER_SERVER_ROUTE'] = str(route)
-        os.environ['PYWEBER_WS_PORT'] = str(ws_port)
         os.environ['PYWEBER_DISABLE_WS'] = str(disable_ws)
 
         config['session']['reload_mode'] = reload
         config['server']['host'] = host
         config['server']['port'] = port
         config['server']['route'] = route
-        config['websocket']['port'] = ws_port
         config['websocket']['disable_ws'] = disable_ws
     
     def check_https_context(self, auto_cert: bool, cert_file: str, key_file: str):
@@ -439,7 +426,6 @@ class CommandFunctions: # pragma: no cover
             port = kwargs.get('port')
             host = kwargs.get('host')
             route = kwargs.get('route')
-            ws_port = kwargs.get('ws_port')
             disable_ws = kwargs.get('disable_ws')
 
             self.log_message(
@@ -447,7 +433,7 @@ class CommandFunctions: # pragma: no cover
                 level='warning'
             )
 
-            self.set_eviron_variables(reload, port, host, route, ws_port, disable_ws)
+            self.set_eviron_variables(reload, port, host, route, disable_ws)
             self.check_https_context(auto_cert, cert_file, key_file)
 
             try:
@@ -557,7 +543,7 @@ class CommandFunctions: # pragma: no cover
             subprocess.run(['mkcert', '-install'], check=True, capture_output=True)
 
             # Gerar certificado
-            domain_list = [str(domain).strip() for domain in kwargs.get('domains', 'localhost, 127.0.0.1').strip().split(',')]
+            domain_list = [str(domain).strip() for domain in kwargs.get('domains', 'localhost, 127.0.0.1, 0.0.0.0').strip().split(',')]
             output_name = f"pyweber-{'-'.join(domain_list)}"
             output_path = cert_dir / output_name
 

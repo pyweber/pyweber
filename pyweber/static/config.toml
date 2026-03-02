@@ -16,9 +16,6 @@ https_enabled = false
 cert_file = ''
 key_file = ''
 
-[websocket]
-port = 8800
-
 [database.database_1]
 type = ''
 name = ''

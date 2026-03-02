@@ -25,6 +25,7 @@ class TemplateDiff: # pragma: no cover
         self.__raise_typr_error(old_element, new_element)
         
         status = None
+        methods = new_element.get_element_methods()
         
         if new_element.uuid != old_element.uuid:
             status = 'Added'
@@ -57,14 +58,14 @@ class TemplateDiff: # pragma: no cover
             elif [v for v in old_element.classes if v not in new_element.classes]:
                 status = 'Changed'
             
-            elif new_element.get_element_methods():
+            elif methods:
                 status = 'Changed'
-        
+            
         if status:
-            self.add_element_on_diff(element=new_element, status=status)
+            self.add_element_on_diff(element=new_element, status=status, methods=methods)
 
             if status == 'Added':
-                self.add_element_on_diff(element=old_element, status='Removed')
+                self.add_element_on_diff(element=old_element, status='Removed', methods=methods)
 
             self.__checked_elements.append(new_element.uuid)
         
@@ -77,13 +78,13 @@ class TemplateDiff: # pragma: no cover
                     self.track_differences(new_element_childs_map[uuid], old_child)
             
             else:
-                self.add_element_on_diff(element=old_child, status='Removed')
+                self.add_element_on_diff(element=old_child, status='Removed', methods=methods)
 
         for uuid, new_child in new_element_childs_map.items():
             if uuid not in old_element_childs_map:
-                self.add_element_on_diff(element=new_child, status='Added')
+                self.add_element_on_diff(element=new_child, status='Added', methods=methods)
     
-    def add_element_on_diff(self, element: Element, status: Literal['Added', 'Changed', 'Removed']):
+    def add_element_on_diff(self, element: Element, status: Literal['Added', 'Changed', 'Removed'], methods: dict[str, dict[str, Any]]):
         self.differences[element.uuid] = {
             'parent': element.parent.uuid if element.parent else None,
             'element': element.to_html() if status in ['Added', 'Changed'] else element.uuid,
@@ -91,6 +92,6 @@ class TemplateDiff: # pragma: no cover
         }
 
         if status != 'Removed':
-            self.differences[element.uuid]['methods'] = {**element.get_element_methods()}
+            self.differences[element.uuid]['methods'] = {**methods}
 
             element.remove_element_methods()

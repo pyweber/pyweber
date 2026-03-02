@@ -1,5 +1,5 @@
 from uuid import uuid4
-from typing import Union, Any
+from typing import Union, Any, Literal
 from pyweber.utils.types import HTMLTag, GetBy
 from pyweber.models.file import File
 from pyweber.models.element import (
@@ -110,6 +110,13 @@ class Element(ElementConstrutor): # pragma: no cover
     def click(self):
         self.__set_element_methods(method='click')
     
+    def scroll_into_view(
+        self,
+        behavior: Literal['instant', 'smooth'] = 'instant',
+        block: Literal['start', 'center', 'end'] = 'start'
+    ):
+        self.__set_element_methods(method='scrollIntoView', behavior=behavior, block=block)
+    
     def set_selection_range(self, start: int, end: str):
         self.__set_element_methods(method='setSelectionRange', start=start, end=end)
     
@@ -208,6 +215,7 @@ class Element(ElementConstrutor): # pragma: no cover
         cln.uuid = element.uuid
         cln.parent = element.parent
         cln.template = getattr(element, 'template', None)
+        cln._Element__element_methods = self.__deepy_clone(self.__element_methods)
 
         for child in element.childs:
             cln.childs.append(child.clone)
