@@ -112,9 +112,9 @@ class InputColor(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
         onfocus = None,
         onblur = None,
         onchange = None,
@@ -142,10 +142,10 @@ class InputText(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
-        readonly: bool = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
+        readonly: bool = None,
         onfocus = None,
         onblur = None,
         onchange = None,
@@ -168,7 +168,7 @@ class InputText(Input): # pragma: no cover
     @property
     def __update_attributes(self):
         for key, value in self.__dict__.items():
-            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly'] and value:
+            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly'] and value is not None:
                 if key in ['readonly'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
@@ -190,11 +190,11 @@ class InputPassword(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
-        readonly: bool = False,
-        showpassword: bool = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
+        readonly: bool = None,
+        showpassword: bool = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -219,7 +219,7 @@ class InputPassword(Input): # pragma: no cover
     @property
     def __update_attributes(self):
         for key, value in self.__dict__.items():
-            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly'] and value:
+            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly'] and value is not None:
                 if key in ['readonly'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
@@ -245,15 +245,15 @@ class InputEmail(Input): # pragma: no cover
         minlength: int = None,
         pattern: str = None,
         autocomplete: str = "email",
-        multiple: bool = False,
+        multiple: bool = None,
         form = None,
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
-        readonly: bool = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
+        readonly: bool = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -277,7 +277,7 @@ class InputEmail(Input): # pragma: no cover
     @property
     def __update_attributes(self):
         for key, value in self.__dict__.items():
-            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly', 'multiple'] and value:
+            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly', 'multiple'] and value is not None:
                 if key in ['readonly', 'multiple'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
@@ -298,10 +298,10 @@ class InputNumber(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
-        readonly: bool = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
+        readonly: bool = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -326,7 +326,7 @@ class InputNumber(Input): # pragma: no cover
                 if key in ['readonly'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
-                    self._Input__attrs[key] = value
+                    self._Input__attrs[key] = str(value)
 
 
 class InputFile(Input): # pragma: no cover
@@ -335,15 +335,15 @@ class InputFile(Input): # pragma: no cover
         name: str = None,
         id: str = None,
         accept: str = None,
-        multiple: bool = False,
+        multiple: bool = None,
         capture: Literal['camera', 'microphone'] = None,  # camera, microphone
         form = None,
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -359,7 +359,7 @@ class InputFile(Input): # pragma: no cover
     @property
     def __update_attributes(self):
         for key, value in self.__dict__.items():
-            if key in ['accept', 'multiple', 'capture'] and value:
+            if key in ['accept', 'multiple', 'capture'] and value is not None:
                 if key in ['multiple'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
@@ -372,14 +372,14 @@ class InputCheckbox(Input): # pragma: no cover
         name: str,
         value: str,
         id: str = None,
-        checked: bool = False,
+        checked: bool = None,
         form = None,
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -394,7 +394,7 @@ class InputCheckbox(Input): # pragma: no cover
     @property
     def __update_attributes(self):
         for key, value in self.__dict__.items():
-            if key in ['value', 'checked'] and value:
+            if key in ['value', 'checked'] and value is not None:
                 if key in ['checked'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
@@ -407,14 +407,14 @@ class InputRadio(Input): # pragma: no cover
         name: str = None,
         id: str = None,
         value: str = None,
-        checked: bool = False,
+        checked: bool = None,
         form = None,
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -429,7 +429,7 @@ class InputRadio(Input): # pragma: no cover
     @property
     def __update_attributes(self):
         for key, value in self.__dict__.items():
-            if key in ['checked'] and value:
+            if key in ['checked'] and value is not None:
                 if key in ['checked'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
@@ -450,9 +450,9 @@ class InputRange(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -487,10 +487,10 @@ class InputDate(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
-        readonly: bool = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
+        readonly: bool = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -528,10 +528,10 @@ class InputTime(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
-        readonly: bool = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
+        readonly: bool = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -572,10 +572,10 @@ class InputSearch(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
-        readonly: bool = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
+        readonly: bool = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -598,7 +598,7 @@ class InputSearch(Input): # pragma: no cover
     @property
     def __update_attributes(self):
         for key, value in self.__dict__.items():
-            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly'] and value:
+            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly'] and value is not None:
                 if key in ['readonly'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
@@ -621,10 +621,10 @@ class InputTel(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
-        readonly: bool = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
+        readonly: bool = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -647,7 +647,7 @@ class InputTel(Input): # pragma: no cover
     @property
     def __update_attributes(self):
         for key, value in self.__dict__.items():
-            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly'] and value:
+            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly'] and value is not None:
                 if key in ['readonly'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
@@ -670,10 +670,10 @@ class InputUrl(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
-        required = False,
-        readonly: bool = False,
+        disabled = None,
+        autofocus = None,
+        required = None,
+        readonly: bool = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -696,7 +696,7 @@ class InputUrl(Input): # pragma: no cover
     @property
     def __update_attributes(self):
         for key, value in self.__dict__.items():
-            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly'] and value:
+            if key in ['placeholder', 'autocomplete', 'size', 'maxlength', 'minlength', 'pattern', 'readonly'] and value is not None:
                 if key in ['readonly'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
@@ -719,7 +719,7 @@ class InputHidden(Input): # pragma: no cover
         onclick: Callable = None,
         sanitize: bool = False
     ):
-        super().__init__('hidden', name, id, form, None, classes, style, False, False, False, onfocus, onblur, onchange, oninput, onclick,)
+        super().__init__('hidden', name, id, form, None, classes, style, None, None, None, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
         self.value = value
 
@@ -732,14 +732,14 @@ class InputSubmit(Input): # pragma: no cover
         value: str = "Submit",
         formaction: str = None,
         formmethod: Literal['POST', 'GET'] = None,
-        formnovalidate: bool = False,
+        formnovalidate: bool = None,
         formtarget: Literal['_blank', '_self', '_parent', '_top'] = None,
         form = None,
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
+        disabled = None,
+        autofocus = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -747,7 +747,7 @@ class InputSubmit(Input): # pragma: no cover
         onclick: Callable = None,
         sanitize: bool = False
     ):
-        super().__init__('submit', name, id, form, tabindex, classes, style, disabled, autofocus, False, onfocus, onblur, onchange, oninput, onclick,)
+        super().__init__('submit', name, id, form, tabindex, classes, style, disabled, autofocus, None, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
         self.value = value
         self.formaction = formaction
@@ -759,7 +759,7 @@ class InputSubmit(Input): # pragma: no cover
     @property
     def __update_attributes(self):
         for key, value in self.__dict__.items():
-            if key in ['formaction', 'formmethod', 'formnovalidate', 'formtarget'] and value:
+            if key in ['formaction', 'formmethod', 'formnovalidate', 'formtarget'] and value is not None:
                 if key in ['formnovalidate'] and value == True:
                     self._Input__attrs[key] = ''
                 else:
@@ -776,8 +776,8 @@ class InputButton(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
+        disabled = None,
+        autofocus = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -785,7 +785,7 @@ class InputButton(Input): # pragma: no cover
         onclick: Callable = None,
         sanitize: bool = False
     ):
-        super().__init__('button', name, id, form, tabindex, classes, style, disabled, autofocus, False, onfocus, onblur, onchange, oninput, onclick,)
+        super().__init__('button', name, id, form, tabindex, classes, style, disabled, autofocus, None, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
         self.value = value
 
@@ -800,8 +800,8 @@ class InputReset(Input): # pragma: no cover
         tabindex = None,
         classes = None,
         style = None,
-        disabled = False,
-        autofocus = False,
+        disabled = None,
+        autofocus = None,
         onfocus: Callable = None,
         onblur: Callable = None,
         onchange: Callable = None,
@@ -809,6 +809,6 @@ class InputReset(Input): # pragma: no cover
         onclick: Callable = None,
         sanitize: bool = False
     ):
-        super().__init__('reset', name, id, form, tabindex, classes, style, disabled, autofocus, False, onfocus, onblur, onchange, oninput, onclick,)
+        super().__init__('reset', name, id, form, tabindex, classes, style, disabled, autofocus, None, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
         self.value = value

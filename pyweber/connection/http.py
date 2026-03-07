@@ -1,63 +1,61 @@
-import socket
-import select
+import asyncio
+import ssl
 import re
 import os
-import ssl
 import shutil
-import asyncio
-from threading import Thread
 from typing import TYPE_CHECKING
+import socket
 
 from pyweber.pyweber.pyweber import Pyweber
 from pyweber.models.request import Request, ClientInfo
 from pyweber.utils.utils import PrintLine, Colors
 from pyweber.connection.websocket import WebsocketUpgrade, WebsocketServer
 
-
 if TYPE_CHECKING: # pragma: no cover
     from pyweber.connection.websocket import TaskManager
 
+
 class HttpServer: # pragma: no cover
+
     def __init__(self):
-        self.connections: list[socket.socket] = []
-        self.route, self.port, self.host = None, None, None
-        self.current_directory = os.path.abspath(__file__)
-        self.started = False
+        self.route = None
+        self.port = None
+        self.host = None
         self.ssl_context = None
         self.task_manager: 'TaskManager' = None
+        self.__app: Pyweber = None
 
     @property
     def app(self):
         return self.__app
-    
+
     @app.setter
     def app(self, value: Pyweber):
         self.__app = value
-    
-    def is_file_request(self, request: Request):
-        return self.app.is_file_requested(route=request.path)
-    
-    def setup_ssl(self, cert_file: str, key_file: str):
-        self.ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
 
-        try:
-            self.ssl_context.load_cert_chain(certfile=cert_file, keyfile=key_file)
-            PrintLine(text=f"{Colors.GREEN}SSL configuration successful{Colors.RESET}")
-        except Exception as e:
-            PrintLine(text=f"{Colors.RED}SSL configuration failed: {e}{Colors.RESET}", level='ERROR')
-            self.ssl_context = None
-    
-    async def process_request(self, client: socket.socket) -> tuple[bytes, bytes]:
+    # ---------------- SSL ---------------- #
+
+    def setup_ssl(self, cert_file: str, key_file: str):
+        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        context.load_cert_chain(certfile=cert_file, keyfile=key_file)
+        self.ssl_context = context
+
+        PrintLine(
+            text=f"{Colors.GREEN}SSL configuration successful{Colors.RESET}"
+        )
+
+    # ---------------- HTTP PROCESS ---------------- #
+
+    async def process_request(self, reader: asyncio.StreamReader):
+
         request_data = bytearray()
 
         while b'\r\n\r\n' not in request_data:
-            chunk = client.recv(4096)
-
+            chunk = await reader.read(4096)
             if not chunk:
                 break
-            
             request_data.extend(chunk)
-        
+
         header_bytes, _, body_start = request_data.partition(b'\r\n\r\n')
         header_text = header_bytes.decode('iso-8859-1')
 
@@ -66,70 +64,104 @@ class HttpServer: # pragma: no cover
 
         if content_match:
             content_length = int(content_match.group(1))
-        
-        body = bytearray(body_start)
 
-        if content_length < 64 * 1024:
-            buffer_size = 8192
-        elif content_length < 1024 * 1024:
-            buffer_size = 65536
-        else:
-            buffer_size = 262144
+        body = bytearray(body_start)
 
         while len(body) < content_length:
             remaining = content_length - len(body)
-            chunk_size = min(buffer_size, remaining)
-
-            chunk = client.recv(chunk_size)
-
+            chunk = await reader.read(remaining)
             if not chunk:
                 break
-            
             body.extend(chunk)
-        
+
         return header_bytes, bytes(body)
 
-    async def handle_response(self, client: socket.socket | ssl.SSLSocket):
-        try:
-            headers, body = await self.process_request(client=client)
-            client_info = client.getpeername()
+    # ---------------- CLIENT HANDLER ---------------- #
 
-            if headers:
-                request = Request(
-                    headers=headers.decode('iso-8859-1'),
-                    body=body,
-                    client_info=ClientInfo(
-                        host=client_info[0],
-                        port=client_info[-1]
-                    )
+    async def handle_client(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter
+    ):
+        try:
+            headers, body = await self.process_request(reader)
+
+            peer = writer.get_extra_info("peername")
+            client_info = ClientInfo(
+                host=peer[0] if peer else "unknown",
+                port=peer[1] if peer else 0
+            )
+
+            if not headers:
+                writer.close()
+                await writer.wait_closed()
+                return
+
+            request = Request(
+                headers=headers.decode('iso-8859-1'),
+                body=body,
+                client_info=client_info
+            )
+
+            # -------- WebSocket Upgrade -------- #
+
+            if 'Connection: Upgrade' in request.raw_headers:
+                upgrade = WebsocketUpgrade(headers=headers)
+
+                writer.write(upgrade.upgrade_response.encode('utf-8'))
+                await writer.drain()
+
+                ws_connection = WebsocketServer(reader, writer)
+
+                await self.app.ws_server.connect_wsgi(
+                    ws_connection=ws_connection
                 )
 
-                if 'Connection: Upgrade' in request.raw_headers:
-                    upgrade_connection = WebsocketUpgrade(headers=headers)
-                    ws_connection = WebsocketServer(connection=client)
-
-                    client.sendall(upgrade_connection.upgrade_response.encode('utf-8'))
-                    
-                    await self.app.ws_server.connect_wsgi(ws_connection=ws_connection)
-
-                else:
-                    response = await self.app.get_response(request=request)
-                    client.sendall(response.build_response)
+            else:
+                response = await self.app.get_response(request=request)
+                writer.write(response.build_response)
+                await writer.drain()
         
-        except BlockingIOError:
+        except TypeError:
             pass
 
-        except UnicodeDecodeError:
-            PrintLine(
-                text=f'Error [Server]: Protocol http incompatible, please use same http protocol for response and request',
-                level='ERROR'
-            )
-        
-        finally:
-            if client in self.connections:
-                self.connections.remove(client)
+        except Exception as e:
+            PrintLine(text=f"Server error: {e}", level="ERROR")
 
-            client.close()
+        finally:
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                pass
+
+    # ---------------- RUN SERVER ---------------- #
+
+    async def start_server(self):
+
+        server = await asyncio.start_server(
+            self.handle_client,
+            self.host,
+            self.port,
+            ssl=self.ssl_context
+        )
+
+        protocol = 'https' if self.ssl_context else 'http'
+        public_url = f"{protocol}://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}"
+        local_url = f"{protocol}://{self.get_local_ip()}:{self.port}{self.route}"
+
+        if self.host not in ['localhost', '127.0.0.1']:
+            PrintLine(
+                text=f"Server online in {Colors.GREEN}{public_url}{Colors.RESET} or {Colors.GREEN}{local_url}{Colors.RESET}"
+            )
+            self.generate_qrcode(text=local_url)
+        else:
+            PrintLine(
+                text=f"Server online in {Colors.GREEN}{public_url}{Colors.RESET}"
+            )
+
+        async with server:
+            await server.serve_forever()
     
     def get_local_ip(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -141,71 +173,6 @@ class HttpServer: # pragma: no cover
             s.close()
         
         return local_ip
-    
-    def create_server(self, restart: bool = False):
-
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_server:
-            client_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-            try:
-                client_server.bind((self.host, self.port))
-                client_server.listen(5)
-                protocol = 'https' if self.ssl_context else 'http'
-
-                if not restart:
-                    public_url = f"{protocol}://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}"
-                    local_url = f"{protocol}://{self.get_local_ip()}:{self.port}{self.route}"
-
-                    if self.host not in ['localhost', '127.0.0.1']:
-                        PrintLine(
-                            text=f"Server online in {Colors.GREEN}{public_url}{Colors.RESET} or {Colors.GREEN}{local_url}{Colors.RESET}"
-                        )
-                        self.generate_qrcode(text=local_url)
-                    else:
-                        PrintLine(
-                            text=f"Server online in {Colors.GREEN}{public_url}{Colors.RESET}"
-                        )
-
-
-                while True:
-                    try:
-                        rlist, _, _ = select.select([client_server], [], [], 1)
-
-                        if rlist:
-                            for server in rlist:
-                                if server is client_server:
-                                    client_socket, _ = client_server.accept()
-                                    if self.ssl_context:
-                                        try:
-                                            client_socket = self.ssl_context.wrap_socket(
-                                                client_socket,
-                                                server_side=True
-                                            )
-                                        except Exception as e:
-                                            PrintLine(text=f"SSL Error: {e}", level='ERROR')
-                                            client_socket.close()
-                                            continue
-
-                                    self.connections.append(server)
-
-                                    Thread(
-                                        target=asyncio.run,
-                                        args=(self.handle_response(client_socket),),
-                                        daemon=True
-                                    ).start()
-                        
-                    except KeyboardInterrupt:
-                        self.clear_cache(path='.')
-                        PrintLine(text='Server offline')
-                        break
-        
-            except OSError as e:
-                PrintLine(text=f'Error to running server: {e}', level='ERROR')
-                raise e
-            
-            except Exception as e:
-                PrintLine(text=f'Error [server] 1: {e}', level='ERROR')
-                raise e
     
     def generate_qrcode(self, text: str):
         import qrcode
@@ -223,15 +190,31 @@ class HttpServer: # pragma: no cover
         PrintLine(text='Or connect using qrcode bellow:', level='INFO')
         qr.print_ascii()
     
-    def clear_cache(self, path: str = '.'):
-        for root, folders, files in os.walk(top=path):
-            if any(p in root for p in ['__pycache__', 'tests/config', '.pyweber']):
-                shutil.rmtree(path=root, ignore_errors=True)
-            
-    def run(self, host: str = 'localhost', port: int = 8800, route: str = '/', cert_file: str = None, key_file: str = None):
-        self.route, self.port, self.host = route, port, host
+
+    def run(
+        self,
+        host: str = 'localhost',
+        port: int = 8800,
+        route: str = '/',
+        cert_file: str = None,
+        key_file: str = None
+    ):
+        self.host = host
+        self.port = port
+        self.route = route
 
         if cert_file and key_file:
             self.setup_ssl(cert_file, key_file)
-        
-        self.create_server()
+
+        try:
+            asyncio.run(self.start_server())
+        except KeyboardInterrupt:
+            self.clear_cache('.')
+            PrintLine(text="Server offline")
+
+    # ---------------- CLEANUP ---------------- #
+
+    def clear_cache(self, path: str = '.'):
+        for root, folders, files in os.walk(path):
+            if any(p in root for p in ['__pycache__', 'tests/config', '.pyweber']):
+                shutil.rmtree(root, ignore_errors=True)

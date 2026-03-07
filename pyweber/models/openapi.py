@@ -2,6 +2,7 @@ import re
 import inspect
 from typing import Any, Callable
 import dataclasses
+import sys
 
 from pyweber.utils.types import ContentTypes
 
@@ -196,7 +197,13 @@ class OpenApiProcessor:
                         properities = {}
                         required = []
 
-                        for p, t in annotation.__dict__.get('__annotations__', {}).items():
+                        if sys.version_info >= (3, 14):
+                            import annotationlib
+                            annotations = annotationlib.get_annotations(annotation)
+                        else:
+                            annotations = annotation.__dict__.get('__annotations__', {})
+
+                        for p, t in annotations.items():
                             properities[p] = {
                                 'title': str(p).capitalize(),
                                 'type': cls.get_swagger_type(t)['type']['type']
@@ -260,9 +267,18 @@ class OpenApiProcessor:
 
             else:
                 if annotation.__name__ not in cls.mapping_swagger_types() and annotation != inspect._empty:
-                    instance = annotation()
-                    for key in instance.__annotations__.keys():
-                        setattr(instance, key, kwargs.pop(key))
+                    
+                    if sys.version_info < (3, 14):
+                        instance = annotation()
+                        for key in instance.__annotations__.keys():
+                            setattr(instance, key, kwargs.pop(key))
+                    else:
+                        import annotationlib
+                        instance=annotation
+
+                        print(instance)
+                        for key in annotationlib.get_annotations(instance).keys():
+                            setattr(instance, key, kwargs.pop(key))
 
                     kwd[name] = instance
 

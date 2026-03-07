@@ -36,6 +36,31 @@ class Response:
             "X-Forwarded-Proto": "https",
             "X-Forwarded-Host": request.host,
         }
+
+        self.http_status_code = HTTPStatusCode.search_by_code(code)
+        self.__check_status_code()
+    
+    def __check_status_code(self):
+        aditional_code: tuple[str, str] = ()
+
+        if self.status_code == 401:
+            aditional_code = ('WWW-Authenticate', f"Basic realm={config.get('app', 'name')}")
+            
+        elif self.status_code == 405:
+            aditional_code = ('Allow', 'GET, POST, PUT, DELETE')
+        
+        elif self.status_code == 503:
+            aditional_code = ('Retry-After', '60')
+        
+        elif self.status_code in range(300,400):
+            aditional_code = ('Location', self.response_path)
+        
+        if self.status_code not in range(300,400):
+            self.set_header('Response-Path', self.request_path)
+        
+        if aditional_code:
+            self.set_header(aditional_code[0], aditional_code[-1])
+            self.http_status_code += f"\r\n{': '.join(aditional_code)}"
     
     @property
     def headers(self) -> dict[str, (int, str, bytes)]:
@@ -66,10 +91,6 @@ class Response:
         return self.headers.get('Set-Cookie', [])
     
     @property
-    def code(self) -> int:
-        return self.headers.get('Status', None)
-    
-    @property
     def request_path(self) -> str:
         return self.headers.get('Request-Path', None)
     
@@ -78,24 +99,8 @@ class Response:
         return self.headers.get('Response-Path', None)
     
     @property
-    def status_code(self) -> str:
-        http_code: str = HTTPStatusCode.search_by_code(self.code)
-        
-        if http_code.startswith('3'):
-            return f'{http_code}\r\nLocation: {self.response_path}'
-        
-        if http_code.startswith('4'):
-            if http_code.startswith('401'):
-                return f"{http_code}\r\nWWW-Authenticate: Basic realm={config.get('app', 'name')}"
-            
-            if http_code.startswith('405'):
-                return f'{http_code}\r\nAllow: GET, POST, PUT, DELETE'
-        
-        if http_code.startswith('5'):
-            if http_code.startswith('503'):
-                return f'{http_code}\r\nRetry-After: 60'
-        
-        return http_code
+    def status_code(self) -> int:
+        return self.headers.get('Status', None)
     
     def __getitem__(self, key: str = None):
         if not key:
@@ -125,7 +130,7 @@ class Response:
 
     @property
     def build_response(self) -> bytes:
-        response = f'{self.http_version} {self.status_code}\r\n'
+        response = f'{self.http_version} {self.http_status_code}\r\n'
         reset_color = Colors.RESET
         bold_white_color = Colors.BOLD_WHITE
         bold_red_color = Colors.BOLD_RED
@@ -133,11 +138,11 @@ class Response:
         bold_yellow_color = Colors.BOLD_YELLOW
         bold_blue_color = Colors.BOLD_BLUE
 
-        if self.code >= 400:
+        if self.status_code >= 400:
             status_color = bold_red_color
-        elif self.code >= 300:
+        elif self.status_code >= 300:
             status_color = bold_yellow_color
-        elif self.code >= 200:
+        elif self.status_code >= 200:
             status_color = bold_green_color
         else:
             status_color = bold_blue_color
@@ -156,6 +161,6 @@ class Response:
         response += '\r\n'
         
         to_replace = '\r\n'
-        clear_status_code = self.status_code.replace(to_replace, ' ')
+        clear_status_code = self.http_status_code.replace(to_replace, ' ')
         PrintLine(text=f"{bold_white_color}{self.request.first_line} {status_color}{clear_status_code}{reset_color}")
         return response.encode() + self.response_content

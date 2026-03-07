@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Any
 from pyweber.models.create_app import CreatApp
 from pyweber.models.request import Request, ClientInfo
 from pyweber.connection.websocket import WebsocketManager
@@ -18,7 +18,6 @@ def run(
         host: str = None,
         port: int = None,
         route: str = '/',
-        ws_port: int = None,
         disable_ws: bool = False,
         reload_extensions: list[str] = None,
         ignore_reload_time: int = 10,
@@ -32,7 +31,7 @@ def run(
     def main(app: pw.Pyweber):
         app.add_route(
             route='/',
-            template=pw.Template(template='Hello, world', status=200)
+            template=pw.Template(template='Hello, world')
         )
 
     if __name__ == '__main__':
@@ -43,14 +42,25 @@ def run(
     ```python
     import pyweber as pw
 
-    app = Pyweber(...)
+    app = pw.Pyweber()
 
     @route('/')
     def home():
-        return pw.Template(template='Hello, world', status=200)
+        return pw.Template(template='Hello, world')
     
     if __name__ == '__main__':
-        pw.run()
+        app.run()
+    ```
+
+    To serve static files, you need to specify all directories as argument when create the app or use **static** method
+
+    ```
+    import pyweber as pw
+
+    app = pw.Pyweber('static')
+
+    # Or using Pyweber method to add static directory
+    app.static('assets')
     ```
     ---
     More details: https://pyweber.dev
@@ -62,7 +72,6 @@ def run(
         'key_file': key_file,
         'host': host,
         'port': port,
-        'ws_port': ws_port,
         'route': route,
         'disable_ws': disable_ws,
         'reload_extensions': reload_extensions or [],
@@ -74,6 +83,17 @@ def run(
         raise TypeError('The target must be callable function')
 
     CreatApp(target=target, **kwargs).run()
+
+def encode_header(headers: dict[str, Any], /,*ignore_headers: str):
+    byte_headers: list[tuple[bytes, bytes]] = []
+
+    for header, value in headers.items():
+        header = header.strip().lower()
+
+        if header not in set(map(lambda el: el.strip().lower(), ignore_headers)):
+            byte_headers.append((header.encode(), str(value).encode()))
+    
+    return byte_headers
 
 async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None): # pragma: no cover
     global WS_RUNNING
@@ -117,13 +137,8 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
     elif scope.get('type') == 'http':
         os.environ['PYWEBER_WS_PORT'] = str(request.port)
         response = await app.get_response(request=request)
-        
-        headers = [
-            (b'content-type', response.response_type.encode()),
-            (b'content-length', str(len(response.response_content)).encode()),
-            (b'connection', b'close'),
-            (b'date', response.response_date.encode())
-        ]
+
+        headers = encode_header(response['headers'], 'set-cookie', 'code')
 
         if app.cookies:
             for cookie in app.cookies:
@@ -131,7 +146,7 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
 
         await send({
             'type': 'http.response.start',
-            'status': response.code,
+            'status': response.status_code,
             'headers': headers
         })
 

@@ -49,10 +49,10 @@ class TestResponse:
 
         assert response.request == mock_request
         assert response.response_content == content
-        assert response.code == code
+        assert response.status_code == code
         assert response.cookies == cookies
         assert response.request_path == "/test"
-        assert response.response_path == route
+        assert response.response_path == response.request_path
 
     def test_headers_property_returns_correct_headers(self, sample_response):
         """Testa se a propriedade headers retorna os cabeçalhos corretos"""
@@ -96,7 +96,7 @@ class TestResponse:
 
     def test_code_property(self, sample_response):
         """Testa a propriedade code"""
-        assert sample_response.code == 200
+        assert sample_response.status_code == 200
 
     def test_request_path_property(self, sample_response):
         """Testa a propriedade request_path"""
@@ -110,7 +110,7 @@ class TestResponse:
     def test_status_code_property_2xx(self, mock_search, sample_response):
         """Testa status_code para códigos 2xx"""
         mock_search.return_value = "200 OK"
-        assert sample_response.status_code == "200 OK"
+        assert sample_response.http_status_code == "200 OK"
 
     @patch('pyweber.utils.types.HTTPStatusCode.search_by_code')
     def test_status_code_property_3xx_redirect(self, mock_search, mock_request):
@@ -127,7 +127,7 @@ class TestResponse:
         )
 
         expected = "301 Moved Permanently\r\nLocation: /new-location"
-        assert response.status_code == expected
+        assert response.http_status_code == expected
 
     @patch('pyweber.utils.types.HTTPStatusCode.search_by_code')
     def test_status_code_property_405_method_not_allowed(self, mock_search, mock_request):
@@ -144,7 +144,7 @@ class TestResponse:
         )
 
         expected = "405 Method Not Allowed\r\nAllow: GET, POST, PUT, DELETE"
-        assert response.status_code == expected
+        assert response.http_status_code == expected
 
     @patch('pyweber.utils.types.HTTPStatusCode.search_by_code')
     def test_status_code_property_503_service_unavailable(self, mock_search, mock_request):
@@ -161,7 +161,7 @@ class TestResponse:
         )
 
         expected = "503 Service Unavailable\r\nRetry-After: 60"
-        assert response.status_code == expected
+        assert response.http_status_code == expected
 
     def test_getitem_no_key(self, sample_response):
         """Testa __getitem__ sem chave"""
@@ -373,7 +373,7 @@ class TestResponseIntegration:
         response.new_content(b'{"id": 1, "name": "John", "created": true}')
 
         # Verificações
-        assert response.code == 201
+        assert response.status_code == 201
         assert response.headers["X-API-Version"] == "1.0"
         assert response.headers["Server"] == "Pyweber/2.0"
         assert b"created" in response.response_content

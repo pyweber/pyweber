@@ -74,6 +74,24 @@ class Element(ElementConstrutor): # pragma: no cover
         
         self.__childs = value
     
+    @property
+    def index(self) -> Union[int, None]:
+        return self.parent.childs.index(self) if self.parent else None
+    
+    def first_child(self) -> Union['Element', None]:
+        return self.childs[0] if self.childs else None
+    
+    def last_child(self) -> Union['Element', None]:
+        return self.childs[-1] if self.childs else None
+    
+    def child_before(self) -> Union['Element', None]:
+        if self.parent:
+            return self.parent.childs[self.index-1] if len(self.parent.childs) > 0 else None
+    
+    def next_child(self) ->Union['Element', None]:
+        if self.parent:
+            return self.parent.childs[self.index+1] if len(self.parent.childs) >= self.index+1 else None
+    
     def add_child(self, child: 'Element'):
         if not isinstance(child,  Element):
             raise TypeError("Child must be Element instances")

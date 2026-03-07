@@ -1,10 +1,8 @@
 import json
 import inspect
 import asyncio
-import time
 import hashlib
 import base64
-import socket
 from uuid import uuid4
 from typing import Callable, TYPE_CHECKING, Any, Literal, Union
 
@@ -79,55 +77,53 @@ class WebsocketUpgrade: # pragma: no cover
         )
 
 class WebsocketServer: # pragma: no cover
-    def __init__(self, connection: socket.socket):
+
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         self.id = None
-        self.__connection = connection
+        self.reader = reader
+        self.writer = writer
         self.__all_message: bytes = b''
         self.__messages: list[str | bytes] = []
-    
+
     def __iter__(self):
         return self
-    
+
     async def __aiter__(self):
         return self.__iter__()
-    
+
     def __next__(self):
         try:
-            message = [self.__messages[0]]
+            message = self.__messages[0]
             self.__messages.pop(0)
-            return message[-1]
+            return message
         except IndexError:
             raise StopIteration
-    
+
     async def __anext__(self):
         return self.__next__()
-    
-    @property
-    def connection(self): return self.__connection
 
     async def send(self, message: bytes):
         assert isinstance(message, bytes)
-        self.connection.sendall(await self.frame_to_send(message))
-    
-    def close(self):
-        self.__connection.close()
-    
-    def read_frames(self, length: int):
-        data = b''
+        frame = await self.frame_to_send(message)
+        self.writer.write(frame)
+        await self.writer.drain()
 
-        while len(data) < length:
-            chunk = self.connection.recv(length - len(data))
+    async def close(self):
+        try:
+            self.writer.close()
+            await self.writer.wait_closed()
+        except Exception:
+            pass
 
-            if not chunk:
-                raise ConnectionError(f'Connetion {self.id} closed')
-            
-            data += chunk
-        
-        return data
-    
+    async def read_exact(self, length: int) -> bytes:
+        try:
+            return await self.reader.readexactly(length)
+        except asyncio.IncompleteReadError:
+            raise ConnectionError(f'Connection {self.id} closed')
+
     async def manage_connection(self, message_handler: Callable):
         try:
-            time = 0
+            time_counter = 0
             current_opcode = None
 
             while True:
@@ -138,56 +134,63 @@ class WebsocketServer: # pragma: no cover
 
                 if opcode != 0:
                     current_opcode = opcode
-                
+
                 self.__all_message += message
 
                 if fin:
-                    if current_opcode in [1,2]:
-                        message = self.__all_message.decode('utf-8') if current_opcode == 1 else self.__all_message
-                        
+
+                    if current_opcode in [1, 2]:  # text or binary
+                        message = (
+                            self.__all_message.decode('utf-8')
+                            if current_opcode == 1
+                            else self.__all_message
+                        )
+
                         self.__messages.append(message)
-                        
+
                         if inspect.iscoroutinefunction(message_handler):
                             await message_handler(self)
                         else:
                             message_handler(self)
 
                         self.__all_message = b''
-                    
-                    elif current_opcode == 8:
+
+                    elif current_opcode == 8:  # close
                         break
 
+                    elif current_opcode == 9:  # ping
+                        pong = await self.frame_to_send(b'', opcode=10)
+                        self.writer.write(pong)
+                        await self.writer.drain()
+
                     elif current_opcode == 10:
-                        pass
-                    
-                    elif current_opcode == 9:
-                        self.connection.sendall(await self.frame_to_send(b'', current_opcode=10))
+                        pass  # pong
 
                     else:
-                        PrintLine(f'Unknown websocket Error', level='ERROR')
-                
-                if time > 30:
-                    time = 0
-                    self.connection.sendall(await self.frame_to_send(b'', opcode=9))
-                
-                time += 0.01
+                        PrintLine('Unknown websocket opcode', level='ERROR')
+
+                if time_counter > 30:
+                    ping = await self.frame_to_send(b'', opcode=9)
+                    self.writer.write(ping)
+                    await self.writer.drain()
+                    time_counter = 0
+
+                time_counter += 0.01
                 await asyncio.sleep(0.01)
-        
+
         except ConnectionError as e:
             PrintLine(f'Connection error with {self.id}: {e}')
         except Exception as e:
             PrintLine(f'Unknown websocket error: {e}', level='ERROR')
             raise e
         finally:
-            self.close()
+            await self.close()
             PrintLine(text=f'Connection {self.id} closed.')
-    
-    async def receive_frame(self):
-        header = self.read_frames(2)
 
-        if not header:
-            return None, None, None
-        
+    async def receive_frame(self):
+
+        header = await self.read_exact(2)
+
         fin = (header[0] & 0x80) >> 7
         opcode = header[0] & 0x0F
         mask = (header[1] & 0x80) >> 7
@@ -195,24 +198,27 @@ class WebsocketServer: # pragma: no cover
 
         if not mask:
             return None, None, None
-        
+
         if payload_len == 126:
-            extended_payload = self.read_frames(2)
+            extended_payload = await self.read_exact(2)
             payload_len = int.from_bytes(extended_payload, byteorder='big')
+
         elif payload_len == 127:
-            extended_payload = self.read_frames(8)
+            extended_payload = await self.read_exact(8)
             payload_len = int.from_bytes(extended_payload, byteorder='big')
-        
-        masking_key = self.read_frames(4)
-        payload = self.read_frames(payload_len)
+
+        masking_key = await self.read_exact(4)
+        payload = await self.read_exact(payload_len)
+
         unmasked_payload = bytearray(payload_len)
 
         for i in range(payload_len):
             unmasked_payload[i] = payload[i] ^ masking_key[i % 4]
-        
+
         return opcode, bytes(unmasked_payload), fin
-    
+
     async def frame_to_send(self, message: bytes, opcode: int = 1):
+
         assert isinstance(message, bytes)
 
         if opcode == 1:
@@ -220,19 +226,22 @@ class WebsocketServer: # pragma: no cover
                 message.decode('utf-8')
             except UnicodeDecodeError:
                 opcode = 2
-        
+
         payload_len = len(message)
-        frame = [0x80 | opcode]
+        frame = bytearray()
+        frame.append(0x80 | opcode)
 
         if payload_len <= 125:
             frame.append(payload_len)
+
         elif payload_len <= 65535:
             frame.append(126)
             frame.extend(payload_len.to_bytes(2, byteorder='big'))
+
         else:
             frame.append(127)
             frame.extend(payload_len.to_bytes(8, byteorder='big'))
-        
+
         frame.extend(message)
 
         return bytes(frame)
@@ -242,6 +251,7 @@ class BaseWebsockets: # pragma: no cover
         self.protocol: Literal['pyweber', 'uvicorn'] = protocol
         self.task_manager = TaskManager()
         self.ws_connections: dict[str, WebsocketServer | Callable[..., Any]] = {}
+        self._window_response_future: dict[str, asyncio.Future] = {}
         self.old_template: 'Template' = None
         self.app = app
     
@@ -315,7 +325,7 @@ class BaseWebsockets: # pragma: no cover
 
             if current_template:
                 updated_template = current_template.clone()
-                session.template = updated_template
+                # session.template = updated_template
 
                 data['template'] = await self.get_template_diff(
                     session=session
@@ -331,7 +341,7 @@ class BaseWebsockets: # pragma: no cover
         target_connections: dict[str, Callable | WebsocketServer] = {}
 
         if session_id:
-            target_connections = {session_id: self.ws_connections[session_id]}
+            target_connections = {session_id: self.ws_connections.get(session_id, None)}
         else:
             if route:
                 target_connections = {}
@@ -341,19 +351,14 @@ class BaseWebsockets: # pragma: no cover
                         target_connections[i] = conn
             else:
                 target_connections = {i: conn for i, conn in self.ws_connections.items()}
-        
-        total_target = len(target_connections)
-        counter = 0
 
         try:
             if self.protocol == 'uvicorn':
                 
                 for s_id, handler in target_connections.items():
-                    counter += 1
                     json_data = await self.data_to_json(
                         data={key: value for key, value in data.items()},
                         session_id=s_id,
-                        last_target=(total_target==counter)
                     )
 
                     await self.__send(
@@ -362,12 +367,9 @@ class BaseWebsockets: # pragma: no cover
                     )
             else:
                 for s_id, handler in target_connections.items():
-                    counter += 1
-
                     json_data = await self.data_to_json(
                         data={key: value for key, value in data.items()},
                         session_id=s_id,
-                        last_target=(total_target==counter)
                     )
 
                     await self.__send(
@@ -379,16 +381,42 @@ class BaseWebsockets: # pragma: no cover
             PrintLine(text=f"Websocket server error {e}", level='ERROR')
             raise e
     
-    async def get_window_response(self, timeout: int):
-        start_time = time.time()
+    # async def get_window_response(self, timeout: int):
+    #     start_time = time.time()
 
-        while time.time() - start_time < timeout:
-            await asyncio.sleep(0.4)
+    #     while time.time() - start_time < timeout:
+    #         await asyncio.sleep(0.4)
 
-            if self.window_response:
-                break
+    #         if self.window_response:
+    #             break
         
-        return self.window_response
+    #     return self.window_response
+    
+    async def get_window_response(self, timeout: int, session_id: str):
+        """Retorna window_response assim que estiver disponível ou timeout."""
+
+        # Cria Future se não existir
+        if session_id not in self._window_response_future:
+            self._window_response_future[session_id] = asyncio.get_event_loop().create_future()
+
+        try:
+            # Espera pela resposta ou timeout
+            result = await asyncio.wait_for(self._window_response_future[session_id], timeout)
+            return result
+        except asyncio.TimeoutError:
+            # Timeout: retorna None ou valor atual
+            return None
+        finally:
+            # Limpa a future para próxima chamada
+            self._window_response_future.pop(session_id, None)
+    
+    async def set_window_response(self, response: dict, session_id: str):
+        """Quando chega uma resposta do client, dispara a future."""
+        self.window_response = response
+
+        future = self._window_response_future.get(session_id)
+        if future and not future.done():
+            future.set_result(response)
     
     async def get_template_diff(self, session: Session):
 
@@ -472,9 +500,12 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
 
         if session_id in self.ws_connections:
             del self.ws_connections[session_id]
-            
-        await self.task_manager.cancel_session_handlers(session_id=session_id)
-        await self.task_manager.cancel_all_tasks_async(session_id=session_id)
+        
+        try:
+            await self.task_manager.cancel_session_handlers(session_id=session_id)
+            await self.task_manager.cancel_all_tasks_async(session_id=session_id)
+        except TypeError:
+            pass
     
     def process_ws_message_handler(self, message: str):
         try:
@@ -503,14 +534,15 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
 
             if raw_message:
                 message = wsMessage(raw_message=raw_message, app=self.app, ws=self)
-                self.window_response = message.window_response
+
+                if message.window_response:
+                    await self.set_window_response(message.window_response, message.session_id)
+
                 sync_template = await self.get_sync_template(message=message)
 
                 if not message.session_id or any(session_id not in sessions.all_sessions for session_id in [message.session_id, ws_server.id]):
                     ws_server.id = self.get_session_id(session_id=message.session_id)
                     self.ws_connections[ws_server.id] = ws_server
-
-                    PrintLine(text=f'Connected websocket with id: {message.session_id}')
 
                     self.add_session(
                         session_id=ws_server.id,
@@ -554,13 +586,14 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
 
                         if raw_message:
                             message = wsMessage(raw_message=json.loads(text), app=self.app, ws=self)
-                            self.window_response = message.window_response
+
+                            if message.window_response:
+                                await self.set_window_response(message.window_response, message.session_id)
+
                             sync_template = await self.get_sync_template(message=message)
 
                             if not message.session_id or message.session_id not in sessions.all_sessions:
                                 ws_connection = self.get_session_id(session_id=message.session_id)
-
-                                PrintLine(text=f'Connected websocket with id: {ws_connection}')
 
                                 self.add_session(
                                     session_id=ws_connection,

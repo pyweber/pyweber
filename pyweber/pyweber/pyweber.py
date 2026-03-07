@@ -86,17 +86,23 @@ class Pyweber(
     MiddlewareManager,
     RouteManager
 ): # pragma: no cover
-    def __init__(self, **kwargs):
+    def __init__(self, *assets_directories, **data: Any):
+        """Pyweber
+        Args:
+            assets_directories (*args): description
+            data (**kwargs): description
+        """
         MiddlewareManager.__init__(self)
         RouteManager.__init__(self)
         CookieManager.__init__(self)
         ErrorPages.__init__(self)
-        self.__update_handler: Callable = kwargs.get('update_handler', None)
+        self.__update_handler: Callable = data.pop('update_handler', None)
         self.__add_framework_routes()
-        self.data = None
+        self.data = data
         self.__visited__ = set()
         self.__request: Request = None
         self.__cache_templates: dict[str, tuple[ContentResult, TemplateResult]] = {}
+        self.__static_directories: set[str] = set(assets_directories)
     
     # Request
     @property
@@ -118,13 +124,16 @@ class Pyweber(
     def ws_server(self, value: WebsocketManager):
         assert isinstance(value, WebsocketManager)
         self.__ws_server = value
+    
+    def static(self, *directories: str):
+        self.__static_directories.update(directories)
 
     # Response
     async def get_response(self, request: Request) -> Response:
         if not isinstance(request, Request):
             raise TypeError(f'request must be a Request instances, but got {type(request).__name__}')
         
-        if re.search(r'^/_pyweber/(?:.*?)/openapi.json$', request.path):
+        if re.search(r'^/_pyweber/(?:\w{8}-\w{4}-\w{4}-\w{4}-\w{12})/openapi.json$', request.path):
             await self.__add_openapi_route()
         
         _route, _ = self.resolve_path(route=request.path)
@@ -333,15 +342,22 @@ class Pyweber(
     
         if not state_result.template or isinstance(state_result.template, str):
             path = state_result.template or path
-
+            
             if self.is_static_file(route=path) or self.is_file_requested(route=path):
                 content_type = self.get_content_type(route=self.normaize_path(route=path))
                 if self.is_static_file(route=path):
-                    state_result.update(
-                        template=self.load_static_files(path=path),
-                        content_type=content_type,
-                        status_code=200
-                    )
+                    if route.startswith('/_pyweber/static/') or any(route.startswith(f'/{drt}') for drt in self.__static_directories):
+                        state_result.update(
+                            template=self.load_static_files(path=path),
+                            content_type=content_type,
+                            status_code=200
+                        )
+                    else:
+                        state_result.update(
+                            template=b'File not found',
+                            status_code=404,
+                            content_type=ContentTypes.txt
+                        )
                 else:
                     state_result.update(
                         template=b'File not found',
@@ -469,7 +485,7 @@ class Pyweber(
     def normaize_path(self, route: str):
         return os.path.normpath(path=route.removeprefix('/'))
     
-    def load_static_files(self, path: os.path):
+    def load_static_files(self, path: str):
         return LoadStaticFiles(path=path).load
 
     def __add_framework_routes(self):
@@ -477,7 +493,9 @@ class Pyweber(
             routes=[
                 Route(
                     route='/admin',
-                    template=str(StaticFilePath.admin_page.value)
+                    template=Template(
+                        template=self.load_static_files(str(StaticFilePath.admin_page.value))
+                    )
                 ),
                 Route(
                     route='/docs',

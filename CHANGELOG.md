@@ -1,5 +1,37 @@
 # PyWeber Changelog
 
+## [1.2.0] - 2026-03-06
+
+### Added
+- Element has new methods to get childs. We added this methods: `next_childs`, `before_childs`, `index`, `last_child`, `first_child`
+
+### Changed
+- Now, only can acess assets project of directory specified when the Pyweber App is created. To specify the directory assets, you can do as show bellow:
+```python
+import pyweber as pw
+
+app = Pyweber('static') # where **statict** is the static project directory
+```
+```python
+import pyweber as pw
+
+app = pw.Pyweber()
+app.static('static')
+```
+
+You can choose more that one asset directory
+```python
+import pyweber as pw
+
+app = Pyweber('assets', 'static', 'images')
+```
+
+## Fixed
+- Fixed `Recursion Error` when you use uvicorn to run server.
+
+## Removed
+- Removed `code` properity has been removed from the Response class. If you want to acess the integer http status_code, use `status_code` instead
+
 ## [1.1.1] - 2026-03-02
 
 ### Added
@@ -30,8 +62,7 @@ def get_selection_values(self, e: pw.EventHandler):
 ```
 
 ### Changed
-- Isn't necessary specify the websocket port.
-- Removed 
+- Isn't necessary specify the websocket port for built-in websocket server. It automatically detect the hostname and port server.
 
 ### Fixed
 - Fixed render dynamic values in `Element` instances.
