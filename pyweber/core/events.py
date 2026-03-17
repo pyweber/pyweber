@@ -71,7 +71,6 @@ class EventHandler: # pragma: no cover
         self,
         event_type: str,
         route: str,
-        element: 'Element',
         target: 'Element',
         current_target: 'Element',
         template: 'Template',
@@ -84,7 +83,6 @@ class EventHandler: # pragma: no cover
         self.event_type = event_type
         self.route = route
         self.app = app
-        self.element = element
         self.target = target
         self.current_target = current_target
         self.template = template
@@ -174,7 +172,6 @@ class EventConstrutor: # pragma: no cover
         return EventHandler(
             event_type=self.event_type,
             route=self.__route,
-            element=self.__target_element,
             target=self.__target_element,
             current_target=self.__current_target_element,
             template=self.__template,

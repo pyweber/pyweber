@@ -3,7 +3,7 @@
 ## [1.2.0] - 2026-03-06
 
 ### Added
-- Element has new methods to get childs. We added this methods: `next_childs`, `before_childs`, `index`, `last_child`, `first_child`
+- Element has new methods to get childs. We added this methods: `next_childs`, `previous_childs`, `index`, `last_child`, `first_child`
 
 ### Changed
 - Now, only can acess assets project of directory specified when the Pyweber App is created. To specify the directory assets, you can do as show bellow:
@@ -28,6 +28,7 @@ app = Pyweber('assets', 'static', 'images')
 
 ## Fixed
 - Fixed `Recursion Error` when you use uvicorn to run server.
+- Fixed ignored server `route` then specify in CLI (`pyweber run --route=...`) or defined in pyweber config file.
 
 ## Removed
 - Removed `code` properity has been removed from the Response class. If you want to acess the integer http status_code, use `status_code` instead

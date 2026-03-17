@@ -17,7 +17,7 @@ def run(
         key_file: str = None,
         host: str = None,
         port: int = None,
-        route: str = '/',
+        route: str = None,
         disable_ws: bool = False,
         reload_extensions: list[str] = None,
         ignore_reload_time: int = 10,

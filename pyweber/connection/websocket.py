@@ -127,59 +127,64 @@ class WebsocketServer: # pragma: no cover
             current_opcode = None
 
             while True:
-                opcode, message, fin = await self.receive_frame()
+                try:
+                    opcode, message, fin = await self.receive_frame()
 
-                if opcode is None:
-                    break
-
-                if opcode != 0:
-                    current_opcode = opcode
-
-                self.__all_message += message
-
-                if fin:
-
-                    if current_opcode in [1, 2]:  # text or binary
-                        message = (
-                            self.__all_message.decode('utf-8')
-                            if current_opcode == 1
-                            else self.__all_message
-                        )
-
-                        self.__messages.append(message)
-
-                        if inspect.iscoroutinefunction(message_handler):
-                            await message_handler(self)
-                        else:
-                            message_handler(self)
-
-                        self.__all_message = b''
-
-                    elif current_opcode == 8:  # close
+                    if opcode is None:
                         break
 
-                    elif current_opcode == 9:  # ping
-                        pong = await self.frame_to_send(b'', opcode=10)
-                        self.writer.write(pong)
+                    if opcode != 0:
+                        current_opcode = opcode
+
+                    self.__all_message += message
+
+                    if fin:
+
+                        if current_opcode in [1, 2]:  # text or binary
+                            message = (
+                                self.__all_message.decode('utf-8')
+                                if current_opcode == 1
+                                else self.__all_message
+                            )
+
+                            self.__messages.append(message)
+
+                            if inspect.iscoroutinefunction(message_handler):
+                                await message_handler(self)
+                            else:
+                                message_handler(self)
+
+                            self.__all_message = b''
+
+                        elif current_opcode == 8:  # close
+                            break
+
+                        elif current_opcode == 9:  # ping
+                            pong = await self.frame_to_send(b'', opcode=10)
+                            self.writer.write(pong)
+                            await self.writer.drain()
+
+                        elif current_opcode == 10:
+                            pass  # pong
+
+                        else:
+                            PrintLine('Unknown websocket opcode', level='ERROR')
+
+                    if time_counter > 30:
+                        ping = await self.frame_to_send(b'', opcode=9)
+                        self.writer.write(ping)
                         await self.writer.drain()
+                        time_counter = 0
 
-                    elif current_opcode == 10:
-                        pass  # pong
-
-                    else:
-                        PrintLine('Unknown websocket opcode', level='ERROR')
-
-                if time_counter > 30:
-                    ping = await self.frame_to_send(b'', opcode=9)
-                    self.writer.write(ping)
-                    await self.writer.drain()
-                    time_counter = 0
-
-                time_counter += 0.01
-                await asyncio.sleep(0.01)
+                    time_counter += 0.01
+                    await asyncio.sleep(0.01)
+                
+                except (ConnectionError, ConnectionResetError, AttributeError):
+                    continue
 
         except ConnectionError as e:
             PrintLine(f'Connection error with {self.id}: {e}')
+        
         except Exception as e:
             PrintLine(f'Unknown websocket error: {e}', level='ERROR')
             raise e

@@ -84,7 +84,7 @@ class Element(ElementConstrutor): # pragma: no cover
     def last_child(self) -> Union['Element', None]:
         return self.childs[-1] if self.childs else None
     
-    def child_before(self) -> Union['Element', None]:
+    def previous_child(self) -> Union['Element', None]:
         if self.parent:
             return self.parent.childs[self.index-1] if len(self.parent.childs) > 0 else None
     
@@ -117,6 +117,7 @@ class Element(ElementConstrutor): # pragma: no cover
             self.parent.remove_child(self)
     
     def focus(self):
+        self.set_selection_range(self.selection_end, self.selection_end)
         self.__set_element_methods(method='focus')
 
     def blur(self):

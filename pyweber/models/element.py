@@ -52,7 +52,6 @@ class ChildElements(list['Element']): # pragma: no cover
                 raise TypeError(f'element must be Element istances, but got {type(element).__name__}')
             
             self.append(element=element)
-        
         return self
 
 class ElementConstrutor: # pragma: no cover
@@ -394,14 +393,15 @@ class ElementConstrutor: # pragma: no cover
             html += f' value="{element.value}"'
 
         if element.style and len(element.style) > 0:
-            style_str = '; '.join([f"{key}: {value}" for key, value in element.style.items()])
+            style_str = '; '.join([f"{key}: {value}" for key, value in element.style.items() if value is not None])
             html += f' style="{style_str}"'
             
         for key, value in element.attrs.items():
-            if value and value not in [True, False]:
-                html += f' {key}="{value}"'
-            else:
-                html += f" {key}"
+            if value is not None:
+                if value and value not in [True, False]:
+                    html += f' {key}="{value}"'
+                else:
+                    html += f" {key}"
 
         for key, value in element.events.__dict__.items():
             if value is not None:
