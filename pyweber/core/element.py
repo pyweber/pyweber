@@ -286,3 +286,6 @@ class Element(ElementConstrutor): # pragma: no cover
             return {chave: self.__deepy_clone(valor) for chave, valor in obj.items()}
         else:
             return obj
+    
+    def __str__(self):
+        return self.to_html()

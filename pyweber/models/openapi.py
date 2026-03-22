@@ -69,6 +69,9 @@ class OpenApiProcessor:
         if hasattr(annotation, '__dataclass_fields__'):
             return 'dataclass'
         
+        if annotation.__name__ == 'File':
+            return 'file'
+        
         if hasattr(annotation, '__init__') and annotation.__init__ != object.__init__:
             return 'normal_class'
         
@@ -141,6 +144,7 @@ class OpenApiProcessor:
 
         master_props = {}
         master_required = []
+        has_binary = False
 
         for title, parameter in cls.get_callback_parameters(callback=callback).items():
             if title not in cls.get_route_parameters(route=route):
@@ -148,7 +152,16 @@ class OpenApiProcessor:
                 annotation = parameter.annotation
                 parameter_solved = cls.resolve_class_type(parameter=parameter)
 
-                if parameter_solved == 'pydantic':
+                if parameter_solved == 'file':
+                    master_props[parameter.name] = {
+                        'title': parameter.name.capitalize(),
+                        'type': 'string',
+                        'format': 'binary'
+                    }
+                    master_required.append(parameter.name)
+                    has_binary = True
+
+                elif parameter_solved == 'pydantic':
                     pydantic_scheme = annotation.model_json_schema()
                     master_props = {**master_props, **pydantic_scheme['properties']}
                     master_required.extend(pydantic_scheme['required'])
@@ -156,10 +169,18 @@ class OpenApiProcessor:
                 elif parameter_solved == 'dataclass':
                     properities = {}
                     required = []
-                    for p in getattr(annotation, '__dataclass_fields__', {}).values():
+
+
+                    if sys.version_info >= (3, 14):
+                        import annotationlib
+                        field_annotations = annotationlib.get_annotations(annotation)
+                    else:
+                        field_annotations = getattr(annotation, '__dataclass_fields__', {})
+
+                    for p in field_annotations.values():
                         properities[p.name] = {
                             'title': str(p.name).capitalize(),
-                            'type': cls.get_swagger_type(p.type)['type']['type']
+                            'type': cls.get_swagger_type(p.type)['type']['type'],
                         }
 
                         if not isinstance(p.default, dataclasses._MISSING_TYPE):
@@ -235,7 +256,8 @@ class OpenApiProcessor:
                         master_props = {**master_props, **properities}
 
         if len(master_props.keys()) > 0:
-            request_body['content'][ContentTypes.json.value] = {
+
+            schema = {
                 'schema': {
                     'properties': master_props,
                     'required': list(set(master_required)),
@@ -243,7 +265,14 @@ class OpenApiProcessor:
                     'type': 'object'
                 }
             }
-        
+
+            if has_binary:
+                request_body['content'][ContentTypes.form_data.value] = schema
+
+            else:
+                request_body['content'][ContentTypes.json.value] = schema
+                request_body['content'][ContentTypes.form_encode.value] = schema
+
         return request_body
     
     @classmethod
@@ -257,7 +286,10 @@ class OpenApiProcessor:
             class_resolved = cls.resolve_class_type(parameter)
             annotation = parameter.annotation
 
-            if class_resolved in ['pydantic', 'dataclass', 'normal_class']:
+            if class_resolved == 'file':
+                kwd[name] = kwargs.pop(name)[0]
+
+            elif class_resolved in ['pydantic', 'dataclass', 'normal_class']:
                 parameters = {}
 
                 for key in cls.get_callback_parameters(annotation).keys():
@@ -275,8 +307,6 @@ class OpenApiProcessor:
                     else:
                         import annotationlib
                         instance=annotation
-
-                        print(instance)
                         for key in annotationlib.get_annotations(instance).keys():
                             setattr(instance, key, kwargs.pop(key))
 
