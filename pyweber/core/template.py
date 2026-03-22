@@ -9,7 +9,7 @@ from pyweber.config.config import config
 from pyweber.utils.types import HTTPStatusCode, GetBy
 
 class Template: # pragma: no cover
-    def __init__(self, template: str, status_code: int = 200, title: str = None, **kwargs):
+    def __init__(self, template: str, status_code: int = 200, title: str = None, include_uuid: bool = True, **kwargs):
         self.__template = self.__read_file(file_path=template)
         self.kwargs = kwargs
         self.data = None
@@ -17,6 +17,7 @@ class Template: # pragma: no cover
         self.__icon: str = self.get_icon()
         self.title = title
         self.__root = self.parse_html()
+        self.__include_uuid = include_uuid
 
     @property
     def template(self):
@@ -81,7 +82,7 @@ class Template: # pragma: no cover
         return self.__inject_default_elements(root=self.__parse_html(html=html))
 
     def build_html(self, include_doctype: bool = True):
-        html = self.root.to_html()
+        html = self.root.to_html(include_uuid=self.__include_uuid)
         
         if include_doctype:
             html = f'<!DOCTYPE html>\n{html}'

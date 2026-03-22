@@ -252,7 +252,7 @@ class ElementConstrutor: # pragma: no cover
         if not isinstance(key, str) or not isinstance(value, str):
             raise TypeError('Key or value must be a string')
         
-        self.__style[key] = value
+        self.__style[key] = str(value).lower
     
     def get_style(self, key: str, default= None):
         return self.__style.get(key, default)
@@ -375,7 +375,7 @@ class ElementConstrutor: # pragma: no cover
         
         setattr(self.__events, event_type.value, None)
     
-    def to_html(self, element: 'ElementConstrutor' = None, indent: int = 0):
+    def to_html(self, element: 'ElementConstrutor' = None, indent: int = 0, include_uuid: bool = True):
         if not element:
             element = self
         
@@ -383,7 +383,8 @@ class ElementConstrutor: # pragma: no cover
             raise TypeError(f'element must be an Element instances, but got {type(element).__name__}')
         
         indentation = ' ' * indent
-        html = f'{indentation}<{element.tag} uuid="{element.uuid}"' if element.tag != 'comment' else f'{indentation}<!--'
+        uuid_attribute = f' uuid="{element.uuid}"' if include_uuid else ""
+        html = f'{indentation}<{element.tag}{uuid_attribute}' if element.tag != 'comment' else f'{indentation}<!--'
 
         if element.id:
             html += f' id="{element.id}"'
@@ -393,7 +394,7 @@ class ElementConstrutor: # pragma: no cover
             html += f' value="{element.value}"'
 
         if element.style and len(element.style) > 0:
-            style_str = '; '.join([f"{key}: {value}" for key, value in element.style.items() if value is not None])
+            style_str = '; '.join([f"{key}: {value}" for key, value in element.style.items()])
             html += f' style="{style_str}"'
             
         for key, value in element.attrs.items():
@@ -416,14 +417,14 @@ class ElementConstrutor: # pragma: no cover
         if element.tag != 'comment':
             html += '>'
         
-        final_content = str((self.__render_dynamic_values(content=element.content) or ''))
+        final_content = str((self.__render_dynamic_values(content=element.content, include_uuid=include_uuid) or ''))
         has_children = bool(element.childs)
         
         if has_children or '\n' in final_content:
             html += '\n'
         
         for child in element.childs:
-            child_html = self.to_html(child, indent + 4)
+            child_html = self.to_html(child, indent + 4, include_uuid=include_uuid)
             uuid_placeholder = f'{{{child.uuid}}}'
             
             if uuid_placeholder in final_content:
@@ -441,7 +442,7 @@ class ElementConstrutor: # pragma: no cover
 
         return html
     
-    def __render_dynamic_values(self, content: str):
+    def __render_dynamic_values(self, content: str, include_uuid: bool = True):
 
         if content:
             pattern = r'\{\{(.*?)\}\}'
@@ -453,11 +454,12 @@ class ElementConstrutor: # pragma: no cover
                     if value:
 
                         if isinstance(value, ElementConstrutor):
-                            value = self.to_html(element=value)
+                            value = self.to_html(element=value, include_uuid=include_uuid)
 
                         content = content.replace("{{" + r + "}}", str(value))
         
         return content
+
 
     def create_event_id(self, event: Union[Callable, str], type: str, element_id: str = None):
         from pyweber.core.events import EventBook
