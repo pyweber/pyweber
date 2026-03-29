@@ -21,6 +21,7 @@ def run(
         disable_ws: bool = False,
         reload_extensions: list[str] = None,
         ignore_reload_time: int = 10,
+        mobile: bool = False,
         **kwargs
     ): # pragma: no cover
     """
@@ -76,6 +77,7 @@ def run(
         'disable_ws': disable_ws,
         'reload_extensions': reload_extensions or [],
         'ignore_reload_time': ignore_reload_time,
+        'mobile': mobile,
         **kwargs
     }
 

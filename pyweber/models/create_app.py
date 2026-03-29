@@ -24,6 +24,7 @@ class CreatApp: # pragma: no cover
         self.__server_host = kwargs.get('host', None) or os.environ.get('PYWEBER_SERVER_HOST') or config.get('server', 'host')
         self.__server_port = kwargs.get('port', None) or os.environ.get('PYWEBER_SERVER_PORT') or config.get('server', 'port')
         self.__server_route = kwargs.get('route', None) or os.environ.get('PYWEBER_SERVER_ROUTE') or config.get('server', 'route')
+        self.mobile_mode = kwargs.get('mobile', None) or os.environ.get('PYWEBER_MOBILE_MODE') or config.get('server', 'mobile')
         self.http_server = HttpServer()
         self.ws_server = WebsocketManager(app=self.app, protocol='pyweber')
         self.reload_server = ReloadServer(
@@ -63,7 +64,8 @@ class CreatApp: # pragma: no cover
             port=int(self.__server_port),
             host=self.__server_host,
             cert_file=self.__cert_file,
-            key_file=self.__key_file
+            key_file=self.__key_file,
+            mobile=self.mobile_mode in [True, 'True', 'true', 1, '1']
         )
     
     @property

@@ -93,6 +93,12 @@ class CLI: # pragma: no cover
             action='store_true',
             help='Disable websockets server'
         )
+
+        parser.add_argument(
+            '--mobile',
+            action='store_true',
+            help='Include QrCode when starting run project'
+        )
     
     def _add_create_command(self):
         create_parser = self.subparsers.add_parser(
@@ -242,6 +248,7 @@ class CLI: # pragma: no cover
                     'host': getattr(args, 'host', '0.0.0.0'),
                     'route': getattr(args, 'route', '/'),
                     'disable_ws': getattr(args, 'disable_ws', False),
+                    'mobile': getattr(args, 'mobile', False)
                 }
                 self.commands_funcs.run_app(**run_kwargs)
 
@@ -267,6 +274,7 @@ class CLI: # pragma: no cover
                 host = getattr(args, 'host')
                 route = getattr(args, 'route')
                 disable_ws = getattr(args, 'disable_ws', False)
+                mobile = getattr(args, 'mobile', False)
 
                 self.commands_funcs.run_app(
                     file=file,
@@ -277,7 +285,8 @@ class CLI: # pragma: no cover
                     port = port,
                     host = host,
                     route = route,
-                    disable_ws=disable_ws
+                    disable_ws=disable_ws,
+                    mobile=mobile
                 )
             
             elif args.command == 'create-config-file':
@@ -378,18 +387,28 @@ class CommandFunctions: # pragma: no cover
             )
             shutil.rmtree(path=self.project_name, ignore_errors=True)
     
-    def set_eviron_variables(self, reload: bool, port: int, host: str, route: str, disable_ws: bool):
+    def set_eviron_variables(
+        self,
+        reload: bool,
+        port: int,
+        host: str,
+        route: str,
+        disable_ws: bool,
+        mobile: bool
+    ):
         os.environ['PYWEBER_RELOAD_MODE'] = str(reload)
         os.environ['PYWEBER_SERVER_PORT'] = str(port)
         os.environ['PYWEBER_SERVER_HOST'] = str(host)
         os.environ['PYWEBER_SERVER_ROUTE'] = str(route)
         os.environ['PYWEBER_DISABLE_WS'] = str(disable_ws)
+        os.environ['PYWEBER_MOBILE_MODE'] = str(mobile)
 
         config['session']['reload_mode'] = reload
         config['server']['host'] = host
         config['server']['port'] = port
         config['server']['route'] = route
         config['websocket']['disable_ws'] = disable_ws
+        config['session']['mobile'] = mobile
     
     def check_https_context(self, auto_cert: bool, cert_file: str, key_file: str):
         if auto_cert:
@@ -427,13 +446,14 @@ class CommandFunctions: # pragma: no cover
             host = kwargs.get('host')
             route = kwargs.get('route')
             disable_ws = kwargs.get('disable_ws')
+            mobile = kwargs.get('mobile')
 
             self.log_message(
                 message=f'✨ Trying to start the project',
                 level='warning'
             )
 
-            self.set_eviron_variables(reload, port, host, route, disable_ws)
+            self.set_eviron_variables(reload, port, host, route, disable_ws, mobile)
             self.check_https_context(auto_cert, cert_file, key_file)
 
             try:

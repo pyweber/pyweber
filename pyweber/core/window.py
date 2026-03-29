@@ -3,7 +3,7 @@ import base64
 import json
 from uuid import uuid4
 from threading import Timer
-from typing import Callable, Union, Literal
+from typing import Callable, Literal
 from pyweber.core.events import WindowEvents
 from pyweber.connection.websocket import WebsocketManager
 from pyweber.utils.types import WindowEventType, OrientationType, BaseStorage
@@ -241,7 +241,7 @@ class Window: # pragma: no cover
             session_id=self.session_id
         )
 
-        response = await asyncio.create_task(self.__ws.get_window_response(timeout=timeout))
+        response = await asyncio.create_task(self.__ws.get_window_response(timeout=timeout, session_id=self.session_id))
 
         return Confirm(
             confirm_result=response.get('confirm_result', None),
@@ -255,7 +255,7 @@ class Window: # pragma: no cover
             session_id=self.session_id
         )
 
-        response = await asyncio.create_task(self.__ws.get_window_response(timeout=timeout))
+        response = await asyncio.create_task(self.__ws.get_window_response(timeout=timeout, session_id=self.session_id))
 
         return Prompt(
             prompt_result=response.get('prompt_result', None),
@@ -283,7 +283,7 @@ class Window: # pragma: no cover
     def atob(self, encoded_string: str) -> str:
         """Decodifica uma string codificada em Base64."""
         return base64.b64decode(encoded_string).decode("utf-8")
-
+    
     def btoa(self, string: str) -> str:
         """Codifica uma string em Base64."""
         return base64.b64encode(string.encode("utf-8")).decode("utf-8")

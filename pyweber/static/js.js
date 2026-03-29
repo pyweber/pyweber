@@ -19,7 +19,6 @@ function connectWebSocket() {
     socket = new WebSocket(`${wsProtocol}//${window.location.host}`);
 
     socket.onopen = async function() {
-        console.log('Connected to WebSocket!');
         socketReady = true;
         const event_data = await getEventData({})
         socket.send(JSON.stringify(event_data));
