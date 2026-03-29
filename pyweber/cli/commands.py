@@ -870,11 +870,11 @@ class ConfigManagerCLI: # pragma: no cover
 
         return walk(config.config)
 
-def app():
+def app(): # pragma: no cover
     cli = CLI()
     cli.run()
 
-def guide_config():
+def guide_config(): # pragma: no cover
     text= """
 📘 Config Guide (Type hints optional — default is str):
 
@@ -895,7 +895,7 @@ def guide_config():
 """
     return text
 
-class DefaultTypes:
+class DefaultTypes: # pragma: no cover
     integer = ['integer', 'int', 'number']
     string = ['text', 'string', 'str']
     floats = ['double', 'float']
