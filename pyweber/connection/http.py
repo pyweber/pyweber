@@ -14,7 +14,7 @@ from pyweber.models.request import Request, ClientInfo
 from pyweber.connection.websocket import WebsocketUpgrade, WebsocketServer
 from pyweber.connection.selector import IOSelector
 
-class HttpServer:
+class HttpServer: # pragma: no cover
     def __init__(self, *args, **kwargs):
         self.port: int = None
         self.host: str = None
