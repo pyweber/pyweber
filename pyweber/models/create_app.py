@@ -74,7 +74,7 @@ class CreatApp: # pragma: no cover
     
     def get_main_module(self):
         if self.main_module not in sys.modules:  return import_module(self.main_module)
-        return sys.modules.get(self.main_module)
+        return reload(sys.modules.get(self.main_module))
     
     def project_modules(self):
         modules: dict[str, ModuleType] = {}
@@ -95,10 +95,11 @@ class CreatApp: # pragma: no cover
             if changed_file and str(changed_file).endswith('.py'):
                 module_name = self.path_to_module(filepath=changed_file)
                 project_modules = self.project_modules()
+                main_module = self.main_module
 
                 if module_name in sys.modules:
                     for key, module in project_modules.items():
-                        if key != '__main__' or getattr(module, '__spec__', None) is not None:
+                        if main_module != module_name and (key != '__main__' or getattr(module, '__spec__', None) is not None):
                             reload(module)
                 else:
                     import_module(module_name)

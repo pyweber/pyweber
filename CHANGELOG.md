@@ -32,6 +32,7 @@ app = Pyweber('assets', 'static', 'images')
 ## Fixed
 - Fixed `Recursion Error` when you use uvicorn to run server.
 - Fixed ignored server `route` then specify in CLI (`pyweber run --route=...`) or defined in pyweber config file.
+- Fixed value as None when the input is File Type
 
 ## Removed
 - Removed `code` properity has been removed from the Response class. If you want to acess the integer http status_code, use `status_code` instead
