@@ -34,7 +34,8 @@ def need_message_keys(): # pragma: no cover
         'window_data',
         'window_response',
         'window_event',
-        'sessionId'
+        'sessionId',
+        'file_content'
     ]
 
 def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool: # pragma: no cover
@@ -264,6 +265,7 @@ class BaseWebsockets: # pragma: no cover
         self.task_manager = TaskManager()
         self.ws_connections: dict[str, Union[WebsocketServer, Callable[..., Any]]] = {}
         self._window_response_future: dict[str, asyncio.Future] = {}
+        self._file_content_future: dict[str, asyncio.Future] = {}
         self.old_template: 'Template' = None
         self.app = app
     
@@ -275,9 +277,8 @@ class BaseWebsockets: # pragma: no cover
         assert isinstance(value, dict)
         self.__window_response = value
     
-    async def message_handler(self, message: wsMessage):
-
-        event_handler = EventConstrutor(
+    def event_handler(self, message: wsMessage):
+        return EventConstrutor(
             target_id=message.target_uuid,
             current_target_id=message.current_target_uuid,
             app=self.app,
@@ -287,6 +288,10 @@ class BaseWebsockets: # pragma: no cover
             event_data=message.event_data,
             event_type=message.type
         ).build_event()
+    
+    async def message_handler(self, message: wsMessage):
+
+        event_handler = self.event_handler(message)
 
         if message.event_ref == 'document':
             if event_handler.current_target:
@@ -414,6 +419,25 @@ class BaseWebsockets: # pragma: no cover
         if future and not future.done():
             future.set_result(response)
     
+    async def get_file_content(self, timeout: int, file_id: str):
+        if file_id not in self._file_content_future:
+            self._file_content_future[file_id] = asyncio.get_event_loop().create_future()
+        try:
+            result = await asyncio.wait_for(self._file_content_future[file_id], timeout)
+            return result
+        except asyncio.TimeoutError:
+            return None
+        finally:
+            self._file_content_future.pop(file_id, None)
+    
+    async def set_file_content(self, response: dict, file_id: str):
+        self.file_content = response
+
+        future = self._file_content_future.get(file_id)
+
+        if future and not future.done():
+            future.set_result(response)
+    
     async def get_template_diff(self, session: Session):
 
         diff = TemplateDiff()
@@ -516,7 +540,9 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
             if not message.get('template') and message.get('window_data'):
                 return {}
             
-            if message.get('route') not in self.app.list_routes:
+            route = message.get('route', '')
+            route = route[:-1] if route.endswith('/') and len(route) > 1 else route
+            if route not in self.app.list_routes:
                 return {}
             
             return message
@@ -532,6 +558,9 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                 continue
 
             message = wsMessage(raw_message=raw_message, app=self.app, ws=self)
+
+            if message.file_content:
+                await self.set_file_content(message.file_content, message.file_content.get('file_id'))
 
             if message.window_response:
                 await self.set_window_response(message.window_response, message.session_id)
@@ -591,6 +620,9 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
 
                             if message.window_response:
                                 await self.set_window_response(message.window_response, message.session_id)
+                            
+                            if message.file_content:
+                                await self.set_file_content(message.file_content, message.session_id)
 
                             sync_template = await self.get_sync_template(message=message)
 

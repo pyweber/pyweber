@@ -1,4 +1,5 @@
 import re
+from uuid import uuid4
 from pyweber.models.field import Field
 
 class FieldStorage: # pragma: no cover
@@ -51,13 +52,14 @@ class FieldStorage: # pragma: no cover
             name = re.search(r"name=\"(.+)\"", keys)
             filename = re.search(r"filename=\"(.+)\"", keys)
             content_type = re.search(r"Content-Type: (.+)", keys)
-            field = Field()
+            field = Field(field_id=str(uuid4()))
 
             if filename:
                 field.content_type = content_type.group(1)
                 field.name = name.group(1).split('";')[0]
                 field.filename = filename.group(1)
                 field.value = v
+                field.size = len(field.value)
 
                 fids.append(field)
             elif name:
@@ -65,6 +67,7 @@ class FieldStorage: # pragma: no cover
                 field.content_type = None
                 field.value = v.decode()
                 field.filename = None
+                field.size = len(field.value)
                 fids.append(field)
         
         return fids

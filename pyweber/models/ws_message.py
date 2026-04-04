@@ -30,6 +30,10 @@ class wsMessage: # pragma: no cover
     @property
     def window_response(self) -> dict[str, (str, int)]:
         return self.__raw_message.get('window_response', {})
+
+    @property
+    def file_content(self) -> dict[str, Any]:
+        return self.__raw_message.get('file_content', {})
     
     def get_value(self, key: str):
         return self.__raw_message.get(key, None)
@@ -113,7 +117,8 @@ class wsMessage: # pragma: no cover
                             name=None,
                             filename=value.get('name'),
                             content_type=value.get('content_type'),
-                            value=bytes(value.get('content'))
+                            field_id=value.get('file_id'),
+                            size=int(value.get('size'))
                         )
                     ) for value in values.get('value', []) if isinstance(value, dict)
                 ])

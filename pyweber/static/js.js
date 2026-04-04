@@ -3,6 +3,8 @@ let socketReady = false;
 let window_event_received = false;
 const earyEventsBuffer = [];
 const activeListeners = [];
+const fileMap = {};
+const fileSignatureMap = {};
 
 const EventRef = new Proxy(
     {DOCUMENT: 'document', WINDOW: 'window'},
@@ -62,8 +64,18 @@ function connectWebSocket() {
             }
         };
 
-        if (data.documentEvents) {
-        };
+        if (data.read_file) {
+            const response = await get_file_content(
+                data.read_file,
+                data.start,
+                data.end
+            );
+
+            const event_data = await getEventData(
+                {file_content: response}
+            );
+            socket.send(JSON.stringify(event_data));
+        }
 
         if (data.template) {
             applyDifferences(data.template);
@@ -377,7 +389,7 @@ function fromBase64(base64) {
     return new TextDecoder().decode(Uint8Array.from(atob(base64), c => c.charCodeAt(0)));
 };
 
-async function getEventData({type=null, event=null, event_ref=null, window_response=null}) {
+async function getEventData({type=null, event=null, event_ref=null, window_response=null, file_content=null}) {
     let target;
 
     if (event){
@@ -446,6 +458,7 @@ async function getEventData({type=null, event=null, event_ref=null, window_respo
         window_data: JSON.stringify(getWindowData()),
         window_response: window_response ? window_response : {},
         window_event: event_ref === EventRef.WINDOW ? sessionStorage.getItem(type): null,
+        file_content: file_content ? file_content : {},
         sessionId: getsessionId()
     };
 
@@ -496,10 +509,70 @@ function getWindowData() {
     return windowData;
 }
 
+async function get_file_content(file_id, start, end) {
+    const file = fileMap[file_id];
+
+    if (!file) {
+        return {
+            data: 'File not Found',
+            file_id: file_id,
+            status: 'error'
+        };
+    };
+
+    const fileSize = file.size;
+    const safeStart = Math.max(0, start);
+    const safeEnd = end !== null ? Math.min(end, fileSize) : fileSize;
+
+    if (safeStart >= fileSize) {
+        return {
+            data: 'Start index does not gather than filesize',
+            start: safeStart,
+            end: safeEnd,
+            size: fileSize,
+            file_id: file_id,
+            status: 'error'
+        };
+    };
+
+    const chunk = file.slice(safeStart, safeEnd);
+    const buffer = await chunk.arrayBuffer();
+
+    return {
+        data: new Uint8Array(buffer),
+        start: safeStart,
+        end: safeEnd,
+        size: fileSize,
+        file_id: file_id,
+        status: 'sucess'
+    };
+}
+
+function getOrCreateFileId(file) {
+    // 1. tenta por referência
+    for (const [id, existingFile] of Object.entries(fileMap)) {
+        if (existingFile === file) return id;
+    }
+
+    // 2. tenta por assinatura
+    const signature = `${file.name}_${file.size}_${file.lastModified}`;
+
+    if (fileSignatureMap[signature]) {
+        return fileSignatureMap[signature];
+    }
+
+    // 3. cria novo
+    const file_id = crypto.randomUUID();
+
+    fileMap[file_id] = file;
+    fileSignatureMap[signature] = file_id;
+
+    return file_id;
+}
+
 async function getFormValues() {
     const values = {};
     const inputs = document.querySelectorAll('input, textarea, select, option');
-
     
     for (const input of inputs) {
         const id = input.getAttribute('uuid');
@@ -525,24 +598,16 @@ async function getFormValues() {
                 if (input.files) {
                     const files = Array.from(input.files);
 
-                    const arquivos = await Promise.all(files.map(file => {
-                        return new Promise(resolve => {
-                            const reader = new FileReader();
+                    const arquivos = files.map(file => {
+                        const file_id = getOrCreateFileId(file);
 
-                            reader.onload = function (e) {
-                                const arraybuffer = e.target.result;
-                                const bytes = new Uint8Array(arraybuffer);
-
-                                resolve({
-                                    content: Array.from(bytes),
-                                    size: file.size,
-                                    name: file.name,
-                                    content_type: file.type || "application/octet-stream",
-                                });
-                            };
-                            reader.readAsArrayBuffer(file);
-                        })
-                    }));
+                        return {
+                            size: file.size,
+                            name: file.name,
+                            file_id: file_id,
+                            content_type: file.type || "application/octet-stream",
+                        }
+                    });
 
                     values[id]['value'] = arquivos;
                 }

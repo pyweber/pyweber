@@ -77,10 +77,12 @@ class Route: # pragma: no cover
         title: str = '',
         process_response: bool = True,
         callback: Callable[..., Any] = None,
+        query_paramns: list[str] = None,
         **kwargs
     ):
         self.group = group
         self.route = route
+        self.query_params = query_paramns
         self.template = template
         self.methods = methods or self.default_method()
         self.name = name
@@ -92,6 +94,17 @@ class Route: # pragma: no cover
         self.callback = callback
         self.kwargs = kwargs
     
+    @property
+    def query_params(self):
+        return self.__query_params
+    
+    @query_params.setter
+    def query_params(self, value: list[str]):
+        if value and not isinstance(value, list):
+            raise ValueError("Query Paraments isn't not valid")
+        
+        self.__query_params = value
+        
     @property
     def callback(self): return self.__callback
 
@@ -297,12 +310,20 @@ class RouteManager: # pragma: no cover
         self.__route_names: dict[str, str] = {}
         self.groups: list[str] = []
     
+
+    def __partition__(self, route: str, spliter: str):
+        p, _, q = route.partition(spliter)
+        return p, q
+    
+    def __get_query_params__(self, params_str: str):
+        return [val.split('=',1)[0] for val in params_str.split('&')] if params_str else []
+    
     def is_redirected(self, route: str) -> bool:
         return self.get_redirected_route(route=route) is not None
     
     @property
     def default_group(self): return Route.default_group()
-
+    
     @property
     def list_routes(self) -> list[str]:
         return [route.full_route for route in self.__routes.values() if '_pyweber' not in str(route.route)]
@@ -326,8 +347,17 @@ class RouteManager: # pragma: no cover
     def to_route(self, target: str, status_code: int = 302, **kwargs):
         if not self.is_redirect_status_code(status_code=status_code):
             raise ValueError(f'status code {status_code} is invalid Redirect HttpStatusCode')
+        
+        route = self.get_route_by_name(target)
 
-        route = self.get_route_by_name(name=target) or self.get_route_by_path(route=target)
+        if not route:
+            route = self.get_route_by_path(target)
+
+            if route:
+                _, kwd = self.resolve_path(target)
+
+                kwargs = {**kwargs, **kwd}
+
         if route:
             return RedirectRoute(route=route, status_code=status_code, **kwargs)
         
@@ -370,10 +400,6 @@ class RouteManager: # pragma: no cover
 
                 else:
                     response = handler(**kwargs)
-                
-                # self.__routes.get(route).template = response
-
-                # return self.__routes.get(route).template
                 return response
             
             self.add_route(
@@ -406,6 +432,8 @@ class RouteManager: # pragma: no cover
         process_response: bool = True,
         **kwargs
     ):
+        route, query_params = self.__partition__(route, '/?')
+
         group = self.get_group(group=group)
         if self.full_route(route=route, group=group) in self.__routes:
             raise RouteAlreadyExistError(route=route)
@@ -429,7 +457,8 @@ class RouteManager: # pragma: no cover
             content_type=content_type,
             title=title,
             process_response=process_response,
-            callback=handler
+            callback=handler,
+            query_paramns=self.__get_query_params__(query_params)
         )
 
         self.__routes[_route.full_route] = _route

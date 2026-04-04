@@ -163,14 +163,15 @@ class Pyweber(
                         content_type=ContentTypes.html,
                         redirect_path=request.path,
                         callback=None,
-                        kwargs={}
+                        kwargs=request.query_params
                     )
                 )
             
             else:
                 template_result = await self.get_template(
                     route=request.path,
-                    method=request.method
+                    method=request.method,
+                    **request.query_params
                 )
 
             content_result = self.template_to_bytes(
@@ -286,8 +287,10 @@ class Pyweber(
             return ContentTypes.unkown
         return ContentTypes.html
 
-    async def get_template(self, route: str, method: str = 'GET'):
-        path, kwargs = self.resolve_path(route=route)
+    async def get_template(self, route: str, method: str = 'GET', **kwargs):
+        path, kwd = self.resolve_path(route=route)
+
+        kwargs = {**kwargs, **kwd}
 
         state_result = StateResult(
             template=None,
@@ -417,17 +420,17 @@ class Pyweber(
 
             while callable(template) or isinstance(template, RedirectRoute):
                 if callable(template):
-                    request_body = self.request.body if self.request else {}
+                    request_params = {**self.request.body, **self.request.query_params} if self.request else {}
                     kwargs = OpenApiProcessor.prepare_callback_kwargs(
                         callback=state_result.callback,
-                        **{**state_result.kwargs, **request_body}
+                        **{**state_result.kwargs, **request_params}
                     )
 
                     template = await template(**kwargs) if inspect.iscoroutinefunction(template) else template(**kwargs)
-                
-                if isinstance(template, RedirectRoute):
-                    redirect_path = self.build_route(route=template.route.full_route, **state_result.kwargs)
 
+                if isinstance(template, RedirectRoute):
+                    redirect_path = self.build_route(route=template.route.full_route, **{**state_result.kwargs, **template.kwargs})
+                    
                     self._check_recursion(route=redirect_path)
                     state_result = await self._process_redirect_route(
                         state=state_result,

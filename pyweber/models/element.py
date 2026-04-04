@@ -1,5 +1,6 @@
 from uuid import uuid4
 import re
+import inspect
 
 from typing import (
     TYPE_CHECKING,
@@ -20,6 +21,7 @@ from pyweber.models.file import File
 if TYPE_CHECKING: # pragma: no cover
     from pyweber.core.template import Template
     from pyweber.core.element import Element
+    from pyweber.connection.websocket import WebsocketManager
 
 class ChildElements(list['Element']): # pragma: no cover
     def __init__(self, parent: 'Element'):
@@ -117,6 +119,40 @@ class ElementConstrutor: # pragma: no cover
     def template(self, value: 'Template'):
         self.__template = value
     
+    async def stream(
+        self,
+        file: File,
+        ws_server: WebsocketManager,
+        session_id: str,
+        speed_max: int = 8192,
+        timeout: float = 5,
+        updater_event: Callable[..., Any] = None
+    ):
+        parts = file.size // speed_max + 1
+        content = b''
+
+        for part in range(parts):
+            await ws_server.send_message(
+                data={'read_file': file.file_id, 'start': speed_max * part, 'end': speed_max * (part+1)},
+                session_id=session_id
+            )
+
+            response = await ws_server.get_file_content(timeout=timeout, file_id=file.file_id)
+
+            if isinstance(updater_event, Callable):
+                if inspect.iscoroutinefunction(updater_event):
+                    await updater_event(**response)
+                else:
+                    updater_event(**response)
+            
+            if response.get('status') == 'sucess':
+                content += bytes(response.get('data').values())
+        
+        if file.size == len(content):
+            return content
+        
+        raise ValueError('File content incomplete.')
+        
     @property
     def files(self):
         if self.tag == 'input' and self.attrs.get('type', None) == 'file': 

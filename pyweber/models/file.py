@@ -4,8 +4,9 @@ class File: # pragma: no cover
     def __init__(self, field: Field):
         self.filename = field.filename
         self.content = field.value
-        self.size = len(self.content)
+        self.size = field.size
         self.content_type = field.content_type
+        self.file_id = field.field_id
     
     def __len__(self):
         return self.size

@@ -278,6 +278,9 @@ class Element(ElementConstrutor): # pragma: no cover
                     raise TypeError(f'all childs must be str or Element instances, but got {type(child).__name__}')
         
         return new_childs
+
+    def update(self):
+        raise NotImplementedError
     
     def __deepy_clone(self, obj):
         if isinstance(obj, list):
