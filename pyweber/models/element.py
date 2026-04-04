@@ -122,7 +122,7 @@ class ElementConstrutor: # pragma: no cover
     async def stream(
         self,
         file: File,
-        ws_server: WebsocketManager,
+        ws_server: 'WebsocketManager',
         session_id: str,
         speed_max: int = 8192,
         timeout: float = 5,

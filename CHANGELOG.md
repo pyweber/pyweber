@@ -6,7 +6,9 @@
 - Element has new methods to get childs. We added this methods: `next_childs`, `previous_childs`, `index`, `last_child`, `first_child`
 - Added support for `multipart/form-data` in swegger documentation for API tests purpose
 - Added `include_uuid` attribute to include or ignore uuid when converting pyweber Element to Html tree.
-- Added `mobile` argument in `run` and `Pywber CLI` if need include QrCode when starting run project 
+- Added `mobile` argument in `run` and `Pywber CLI` if need include QrCode when starting run project
+- Added `stream` attribute in Element classes to get file content.
+- Added suport to query parameters in pywber routes.
 
 ### Changed
 - Now, only can acess assets project of directory specified when the Pyweber App is created. To specify the directory assets, you can do as show bellow:
