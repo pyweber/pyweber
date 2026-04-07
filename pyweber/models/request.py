@@ -140,15 +140,14 @@ class Request: # pragma: no cover
         return self.__parse_headers_wsgi()
     
     @property
-    def body(self) -> Union[str, dict[str, Union[list[File], str]]]:
+    def body(self) -> Union[dict[str, Union[list[File], str]]]:
         if self.content_type == ContentTypes.json.value:
             return json.loads(self.__raw_body)
         elif self.content_type == ContentTypes.form_encode.value:
             return {key.decode(): '; '.join([v.decode() for v in value]) for key, value in parse_qs(self.__raw_body).items()}
         elif ContentTypes.form_data.value in self.content_type:
             return self.__parse_form_data()
-        else:
-            return {}
+        return {'body': self.__raw_body}
     
     @property
     def first_line(self):

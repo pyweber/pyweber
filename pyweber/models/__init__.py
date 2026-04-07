@@ -6,6 +6,8 @@ from .file import File
 from .field import Field
 from .field_storage import FieldStorage
 from .openapi import OpenApiProcessor
+from .file_stream import file_chunk_manager, FileResult
+from .strem_stats import AdaptiveController, StreamStats
 
 __all__ = [
     'Headers',
@@ -18,5 +20,9 @@ __all__ = [
     'Route',
     'run',
     'run_as_asgi',
-    'OpenApiProcessor'
+    'OpenApiProcessor',
+    'file_chunk_manager',
+    'FileResult',
+    'AdaptiveController',
+    'StreamStats'
 ]

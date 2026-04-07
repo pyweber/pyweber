@@ -7,8 +7,9 @@ const fileMap = {};
 const fileSignatureMap = {};
 
 const EventRef = new Proxy(
-    {DOCUMENT: 'document', WINDOW: 'window'},
-    {set(target, prop, value) {
+    { DOCUMENT: 'document', WINDOW: 'window' },
+    {
+        set(target, prop, value) {
             throw new Error(`Cannot modified constant ${prop}`);
         }
     }
@@ -20,26 +21,26 @@ function connectWebSocket() {
     let reconnectAttemps = 0
     socket = new WebSocket(`${wsProtocol}//${window.location.host}`);
 
-    socket.onopen = async function() {
+    socket.onopen = async function () {
         socketReady = true;
         const event_data = await getEventData({})
         socket.send(JSON.stringify(event_data));
     };
 
-    socket.onerror = function(error) {
+    socket.onerror = function (error) {
         console.error('Erro with Websocket connection:', error);
     };
 
-    socket.onclose = function() {
+    socket.onclose = function () {
         if (reconnectAttemps <= maxReconnectAttempts) {
-            reconnectAttemps ++;
+            reconnectAttemps++;
             console.log('Websocket connection closed. Trying again in 1 second...');
             setTimeout(connectWebSocket, 1000);
             location.reload();
         };
     };
 
-    socket.onmessage = async function(event) {
+    socket.onmessage = async function (event) {
         const data = JSON.parse(event.data);
 
         if (data.windowEvents) {
@@ -49,7 +50,7 @@ function connectWebSocket() {
                 };
             });
 
-            for (let i=0; i<data.windowEvents.length; i++) {
+            for (let i = 0; i < data.windowEvents.length; i++) {
                 palavra = data.windowEvents[i].replace(/^_on/, "");
                 evt = palavra.split("_")[0];
                 sessionStorage.setItem(evt, data.windowEvents[i]);
@@ -64,17 +65,10 @@ function connectWebSocket() {
             }
         };
 
-        if (data.read_file) {
-            const response = await get_file_content(
-                data.read_file,
-                data.start,
-                data.end
-            );
-
-            const event_data = await getEventData(
-                {file_content: response}
-            );
-            socket.send(JSON.stringify(event_data));
+        if (data.request_file) {
+            const response = await get_file_content(data.request_file, data.start, data.end);
+            await send_file_chunk(response.file_id, response.status, response.data);
+            console.log(response)
         }
 
         if (data.template) {
@@ -91,7 +85,7 @@ function connectWebSocket() {
             setSessionId(data.setSessionId);
             return;
         };
-        
+
         // Window methods
         if (data.alert) {
             window.alert(data.alert);
@@ -109,7 +103,7 @@ function connectWebSocket() {
 
         if (data.confirm) {
             const result = window.confirm(data.confirm);
-            const event_data = await getEventData({window_response: { confirm_result: result, confirm_id: data.confirm_id }});
+            const event_data = await getEventData({ window_response: { confirm_result: result, confirm_id: data.confirm_id } });
             socket.send(
                 JSON.stringify(event_data)
             );
@@ -118,7 +112,7 @@ function connectWebSocket() {
 
         if (data.prompt) {
             const result = window.prompt(data.prompt.message, data.prompt.default || "");
-            const event_data = await getEventData({window_response: { prompt_result: result, prompt_id: data.prompt_id }});
+            const event_data = await getEventData({ window_response: { prompt_result: result, prompt_id: data.prompt_id } });
 
             socket.send(
                 JSON.stringify(event_data)
@@ -132,24 +126,24 @@ function connectWebSocket() {
         };
 
         if (data.scroll_to) {
-            window.scrollTo({left: data.scroll_to.x, top: data.scroll_to.y, behavior: data.scroll_to.behavior});
+            window.scrollTo({ left: data.scroll_to.x, top: data.scroll_to.y, behavior: data.scroll_to.behavior });
             return;
         };
 
         if (data.scroll_by) {
-            window.scrollBy({left: data.scroll_by.x, top: data.scroll_by.y, behavior: data.scroll_by.behavior});
+            window.scrollBy({ left: data.scroll_by.x, top: data.scroll_by.y, behavior: data.scroll_by.behavior });
             return;
         };
 
         if (data.set_timeout) {
             const timerId = setTimeout(async () => {
                 // Notificar o Python que o timeout foi concluído
-                const event_data = await getEventData({window_response: { timeout_completed: true, timeout_id: data.set_timeout.id }});
+                const event_data = await getEventData({ window_response: { timeout_completed: true, timeout_id: data.set_timeout.id } });
                 socket.send(
                     JSON.stringify(event_data)
                 );
             }, data.set_timeout.delay);
-            
+
             // Armazenar o ID do timer para poder cancelá-lo mais tarde
             window.pyTimers = window.pyTimers || {};
             window.pyTimers[data.set_timeout.id] = timerId;
@@ -159,13 +153,13 @@ function connectWebSocket() {
         if (data.set_interval) {
             const intervalId = setInterval(async () => {
                 // Notificar o Python que o intervalo foi executado
-                const event_data = await getEventData({window_response: { interval_executed: true, interval_id: data.set_interval.id }});
+                const event_data = await getEventData({ window_response: { interval_executed: true, interval_id: data.set_interval.id } });
 
                 socket.send(
                     JSON.stringify(event_data)
                 );
             }, data.set_interval.interval);
-            
+
             // Armazenar o ID do intervalo para poder cancelá-lo mais tarde
             window.pyIntervals = window.pyIntervals || {};
             window.pyIntervals[data.set_interval.id] = intervalId;
@@ -203,13 +197,13 @@ function connectWebSocket() {
                     JSON.stringify(event_data)
                 );
             });
-            
+
             // Armazenar o ID do frame para poder cancelá-lo mais tarde
             window.pyAnimationFrames = window.pyAnimationFrames || {};
             window.pyAnimationFrames[data.request_animation_frame.id] = frameId;
             return;
         };
-        
+
         // cancel_animation_frame
         if (data.cancel_animation_frame) {
             if (window.pyAnimationFrames && window.pyAnimationFrames[data.cancel_animation_frame.id]) {
@@ -232,7 +226,7 @@ function connectWebSocket() {
             const values = Object.entries(data.sessionstorage);
             const sessionId = getsessionId();
             sessionStorage.clear();
-            
+
             values.forEach(([key, value]) => {
                 if (key !== '_pyweber_sessionId') {
                     sessionStorage.setItem(key, value);
@@ -242,7 +236,7 @@ function connectWebSocket() {
             })
         };
 
-        
+
         if (data.Error) {
             console.log(data)
         };
@@ -252,10 +246,18 @@ function connectWebSocket() {
     return socket
 }
 
+async function send_file_chunk(file_id, status, data) {
+    await fetch(`/_pyweber/file_chunk?file_id=${file_id}&status=${status}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: data instanceof ArrayBuffer ? data : new TextEncoder().encode(data)
+    });
+}
+
 function applyDifferences(differences) {
     Object.keys(differences).forEach(key => {
         const diff = differences[key];
-        
+
         // Se não tem parent, só pode ser uma mudança no elemento raiz
         if (!diff.parent) {
             if (diff.status === 'Changed') {
@@ -265,22 +267,22 @@ function applyDifferences(differences) {
             }
             return;
         }
-        
+
         // Para elementos com parent
         const parentElement = document.querySelector(`[uuid="${diff.parent}"]`);
         if (!parentElement) return;
-        
-        switch(diff.status) {
+
+        switch (diff.status) {
             case 'Added':
                 const temp = createElementFromHTML(diff.element);
                 parentElement.appendChild(temp);
                 break;
-                
+
             case 'Removed':
                 const toRemove = parentElement.querySelector(`[uuid="${diff.element}"]`);
                 if (toRemove) toRemove.remove();
                 break;
-                
+
             case 'Changed':
                 let uuid;
                 if (typeof diff.element === 'string' && diff.element.startsWith('<')) {
@@ -289,7 +291,7 @@ function applyDifferences(differences) {
                 } else {
                     uuid = diff.element;
                 }
-                
+
                 if (uuid) {
                     const toChange = parentElement.querySelector(`[uuid="${uuid}"]`);
                     if (toChange) {
@@ -355,14 +357,14 @@ function setSessionId(sessionId) {
     }
 }
 
-async function sendEvent({type, event, event_ref, window_response}) {
+async function sendEvent({ type, event, event_ref, window_response }) {
 
     if (event_ref === EventRef.WINDOW && !window_event_received) {
-        earyEventsBuffer.push({type, event, event_ref, window_response});
+        earyEventsBuffer.push({ type, event, event_ref, window_response });
         return;
     };
 
-    const eventData = await getEventData({type, event, event_ref, window_response});
+    const eventData = await getEventData({ type, event, event_ref, window_response });
 
     if (socket.readyState === WebSocket.OPEN) {
         if (eventData.current_target_uuid && event_ref == EventRef.DOCUMENT) {
@@ -389,10 +391,10 @@ function fromBase64(base64) {
     return new TextDecoder().decode(Uint8Array.from(atob(base64), c => c.charCodeAt(0)));
 };
 
-async function getEventData({type=null, event=null, event_ref=null, window_response=null, file_content=null}) {
+async function getEventData({ type = null, event = null, event_ref = null, window_response = null, file_content = null }) {
     let target;
 
-    if (event){
+    if (event) {
         target = event.target instanceof HTMLElement ? event.target : null;
     };
 
@@ -457,7 +459,7 @@ async function getEventData({type=null, event=null, event_ref=null, window_respo
         },
         window_data: JSON.stringify(getWindowData()),
         window_response: window_response ? window_response : {},
-        window_event: event_ref === EventRef.WINDOW ? sessionStorage.getItem(type): null,
+        window_event: event_ref === EventRef.WINDOW ? sessionStorage.getItem(type) : null,
         file_content: file_content ? file_content : {},
         sessionId: getsessionId()
     };
@@ -513,38 +515,22 @@ async function get_file_content(file_id, start, end) {
     const file = fileMap[file_id];
 
     if (!file) {
-        return {
-            data: 'File not Found',
-            file_id: file_id,
-            status: 'error'
-        };
-    };
+        return { file_id, status: 'error', data: 'File not found' };
+    }
 
-    const fileSize = file.size;
     const safeStart = Math.max(0, start);
-    const safeEnd = end !== null ? Math.min(end, fileSize) : fileSize;
+    const safeEnd = end !== null ? Math.min(end, file.size) : file.size;
 
-    if (safeStart >= fileSize) {
-        return {
-            data: 'Start index does not gather than filesize',
-            start: safeStart,
-            end: safeEnd,
-            size: fileSize,
-            file_id: file_id,
-            status: 'error'
-        };
-    };
+    if (safeStart >= file.size) {
+        return { file_id, status: 'error', data: `Start index ${safeStart} exceeds file size ${file.size}` };
+    }
 
-    const chunk = file.slice(safeStart, safeEnd);
-    const buffer = await chunk.arrayBuffer();
+    const buffer = await file.slice(safeStart, safeEnd).arrayBuffer();
 
     return {
-        data: new Uint8Array(buffer),
-        start: safeStart,
-        end: safeEnd,
-        size: fileSize,
-        file_id: file_id,
-        status: 'sucess'
+        file_id,
+        status: 'success',
+        data: buffer
     };
 }
 
@@ -573,7 +559,7 @@ function getOrCreateFileId(file) {
 async function getFormValues() {
     const values = {};
     const inputs = document.querySelectorAll('input, textarea, select, option');
-    
+
     for (const input of inputs) {
         const id = input.getAttribute('uuid');
         if (id) {
@@ -663,83 +649,83 @@ function trackEvents() {
     const windowEvents = [
         // Eventos de Janela e Navegação
         "afterprint", "beforeprint", "beforeunload", "hashchange", "load", "pageshow", "pagehide", "popstate", "resize", "scroll", "DOMContentLoaded",
-    
+
         // Eventos de Foco e Blur
         "focus", "blur",
-    
+
         // Eventos de Rede
         "online", "offline",
-    
+
         // Eventos de Armazenamento
         "storage",
-    
+
         // Eventos de Mensagens e Comunicação
         "message", "messageerror",
-    
+
         // Eventos de Mídia e Recursos
         "error", "abort", "loadstart", "progress", "loadend", "timeout",
-    
+
         // Eventos de Animação e Transição
         "animationstart", "animationend", "animationiteration", "transitionstart", "transitionend", "transitioncancel",
-    
+
         // Eventos de Fullscreen e Pointer Lock
         "fullscreenchange", "fullscreenerror", "pointerlockchange", "pointerlockerror",
-    
+
         // Eventos de Dispositivo
         "devicemotion", "deviceorientation", "deviceorientationabsolute",
-    
+
         // Eventos de Gamepad
         "gamepadconnected", "gamepaddisconnected",
-    
+
         // Eventos de Service Worker e Cache
         "install", "activate", "fetch", "message", "messageerror", "notificationclick", "notificationclose", "push", "pushsubscriptionchange", "sync", "periodicsync", "backgroundfetchsuccess", "backgroundfetchfailure", "backgroundfetchabort", "backgroundfetchclick", "contentdelete",
-    
+
         // Eventos de Clipboard
         "cut", "copy", "paste",
-    
+
         // Eventos de Seleção de Texto
         "select", "selectionchange",
-    
+
         // Eventos de Formulário
         "submit", "reset", "input", "change", "invalid", "search", "toggle", "formdata",
-    
+
         // Eventos de Mídia (Áudio/Video)
         "play", "pause", "ended", "volumechange", "seeked", "seeking", "timeupdate", "canplay", "canplaythrough", "cuechange", "durationchange", "emptied", "loadeddata", "loadedmetadata", "loadstart", "stalled", "suspend", "waiting",
-    
+
         // Eventos de Toque (Mobile)
         "touchstart", "touchend", "touchmove", "touchcancel",
-    
+
         // Eventos de Pointer (Mouse/Touch)
         "pointerover", "pointerenter", "pointerdown", "pointermove", "pointerup", "pointercancel", "pointerout", "pointerleave", "gotpointercapture", "lostpointercapture",
-    
+
         // Eventos de Drag & Drop
         "drag", "dragstart", "dragend", "dragover", "dragenter", "dragleave", "drop",
-    
+
         // Eventos de Teclado
         "keydown", "keyup",
-    
+
         // Eventos de Composição (IME)
         "compositionstart", "compositionupdate", "compositionend",
-    
+
         // Eventos de Visibilidade
         "visibilitychange",
-    
+
         // Eventos de Rejeição de Promises
         "rejectionhandled", "unhandledrejection",
-    
+
         // Eventos de Segurança
         "securitypolicyviolation"
     ];
 
     for (const eventType of documentEvents) {
         document.addEventListener(eventType, (event) => {
-            sendEvent({type: eventType, event: event, event_ref: EventRef.DOCUMENT});
+            sendEvent({ type: eventType, event: event, event_ref: EventRef.DOCUMENT });
         });
     };
 
     windowEvents.forEach(eventType => {
         window.addEventListener(eventType, (event) => {
-            sendEvent({type: eventType, event: event, event_ref: EventRef.WINDOW});
+            sendEvent({ type: eventType, event: event, event_ref: EventRef.WINDOW });
         });
     });
 }

@@ -14,13 +14,10 @@ class Field: # pragma: no cover
     ):
         self.name = name
         self.filename = filename
-        self.__value = value
+        self.value = value
         self.content_type = content_type
         self.field_id = field_id
         self.size = size
-
-    @property
-    def value(self): return bytes(self.__value)
 
     def __repr__(self):
         return f"Field(name={self.name}, value_length={self.size})"

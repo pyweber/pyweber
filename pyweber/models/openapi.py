@@ -30,7 +30,7 @@ class OpenApiProcessor:
         }
 
         return examples.get(format_type, 'pyweber')
-    
+
     @staticmethod
     def mapping_swagger_types():
         return {
@@ -43,21 +43,21 @@ class OpenApiProcessor:
             'dict': {'type': 'object', 'formats': []},
             'bool': {'type': 'boolean', 'formats': []}
         }
-    
+
     @staticmethod
     def default_format_type(type: str):
         return {'string': None, 'integer': 'int32', 'float': 'float', 'boolean': 'boolean'}.get(type, None)
-    
+
     @staticmethod
     def get_swagger_type(py_type: type, format_type: str = None):
         mapping_types = OpenApiProcessor.mapping_swagger_types()
         swagger_type = mapping_types.get(py_type.__name__, mapping_types['str'])
         return {'type': {'type': swagger_type['type'], 'format': format_type if format_type in swagger_type['formats'] else None}}
-    
+
     @staticmethod
     def is_valid_route_param_type(py_type: str):
         return py_type in ['str', 'int', 'float', 'bool']
-    
+
     @classmethod
     def resolve_class_type(cls, parameter: inspect.Parameter):
         assert isinstance(parameter, inspect.Parameter)
@@ -65,36 +65,39 @@ class OpenApiProcessor:
 
         if hasattr(annotation, '__pydantic_validator__'):
             return 'pydantic'
-        
+
         if hasattr(annotation, '__dataclass_fields__'):
             return 'dataclass'
-        
-        if annotation.__name__ == 'File':
+
+        if annotation.__name__ in ['File', 'bytes', 'bytearray']:
             return 'file'
-        
+
+        if annotation.__name__ == 'Request':
+            return 'request'
+
         if hasattr(annotation, '__init__') and annotation.__init__ != object.__init__:
             return 'normal_class'
-        
+
         return 'empty_class'
-    
+
     @classmethod
     def get_type_parameter(cls, parameter: inspect.Parameter):
         if parameter.annotation == inspect._empty:
             return cls.get_swagger_type(str)
-        
+
         if parameter.annotation.__name__ in cls.mapping_swagger_types():
             return cls.get_swagger_type(parameter.annotation)
-        
+
     @classmethod
     def get_route_parameters(cls, route: str) -> list[str]:
         assert isinstance(route, str)
         return re.findall(r"{\s*(.*?)\s*}", route)
-    
+
     @classmethod
     def get_callback_parameters(cls, callback: Callable):
         assert callable(callback)
         return {param.name: param for param in inspect.signature(callback).parameters.values()}
-    
+
     @classmethod
     def get_route_spec(cls, route: str, callback: Callable):
         assert isinstance(route, str) and callable(callback)
@@ -102,13 +105,18 @@ class OpenApiProcessor:
         parameter_details = cls.get_callback_parameters(callback)
         route_parameters: dict[str, dict[str, Any]] = {}
 
-        for parameter in cls.get_route_parameters(route=route):
+        r, _, q = route.partition('?')
+        path_params = set(cls.get_route_parameters(r))
+        query_params = set(cls.get_route_parameters(q))
+
+        for parameter in path_params | query_params:
+            location = 'path' if parameter in path_params else 'query'
             if parameter in parameter_details:
                 param_type = cls.get_type_parameter(parameter_details[parameter])['type']
 
                 route_parameters[parameter] = {
                     'name': parameter,
-                    'in': 'path',
+                    'in': location,
                     'schema': {
                         'type': param_type['type'],
                         'format': param_type['format']
@@ -126,7 +134,7 @@ class OpenApiProcessor:
             else:
                 route_parameters[parameter] = {
                     'name': parameter,
-                    'in': 'path',
+                    'in': location,
                     'required': True,
                     'schema': {
                         'type': 'string',
@@ -134,9 +142,9 @@ class OpenApiProcessor:
                     },
                     'example': cls.get_format_example('string')
                 }
-        
+
         return route_parameters
-    
+
     @classmethod
     def get_body_spec(cls, route: str, callback: Callable):
         assert isinstance(route, str) and callable(callback)
@@ -160,6 +168,8 @@ class OpenApiProcessor:
                     }
                     master_required.append(parameter.name)
                     has_binary = True
+                elif parameter_solved == 'request':
+                    pass
 
                 elif parameter_solved == 'pydantic':
                     pydantic_scheme = annotation.model_json_schema()
@@ -174,21 +184,33 @@ class OpenApiProcessor:
                     if sys.version_info >= (3, 14):
                         import annotationlib
                         field_annotations = annotationlib.get_annotations(annotation)
+
+                        for name, field_type in field_annotations.items():
+                            properities[name] = {
+                                'title': name.capitalize(),
+                                'type': cls.get_swagger_type(field_type)['type']['type'],
+                            }
+
+                            if name in annotation.__dict__.keys():
+                                properities[name]['default'] = annotation.__dict__.get(name)
+                                continue
+
+                            required.append(name)
                     else:
                         field_annotations = getattr(annotation, '__dataclass_fields__', {})
 
-                    for p in field_annotations.values():
-                        properities[p.name] = {
-                            'title': str(p.name).capitalize(),
-                            'type': cls.get_swagger_type(p.type)['type']['type'],
-                        }
+                        for p in field_annotations.values():
+                            properities[p.name] = {
+                                'title': str(p.name).capitalize(),
+                                'type': cls.get_swagger_type(p.type)['type']['type'],
+                            }
 
-                        if not isinstance(p.default, dataclasses._MISSING_TYPE):
-                            properities[p.name]['default'] = p.default
-                            continue
+                            if not isinstance(p.default, dataclasses._MISSING_TYPE):
+                                properities[p.name]['default'] = p.default
+                                continue
 
-                        required.append(p.name)
-                    
+                            required.append(p.name)
+
                     master_props = {**master_props, **properities}
                     master_required.extend(required)
                 elif parameter_solved == 'normal_class':
@@ -209,10 +231,10 @@ class OpenApiProcessor:
                                     continue
 
                                 required.append(p)
-                        
+
                         master_props = {**master_props, **properities}
                         master_required.extend(required)
-                
+
                 else:
                     if annotation.__name__ not in cls.mapping_swagger_types():
                         properities = {}
@@ -235,7 +257,7 @@ class OpenApiProcessor:
                                 continue
 
                             required.append(p)
-                        
+
                         master_props = {**master_props, **properities}
                         master_required.extend(required)
 
@@ -252,7 +274,7 @@ class OpenApiProcessor:
                             properities[title]['default'] = parameter.default
                         else:
                             master_required.append(title)
-                        
+
                         master_props = {**master_props, **properities}
 
         if len(master_props.keys()) > 0:
@@ -268,13 +290,16 @@ class OpenApiProcessor:
 
             if has_binary:
                 request_body['content'][ContentTypes.form_data.value] = schema
+                request_body['content'][ContentTypes.unkown.value] = schema
 
             else:
                 request_body['content'][ContentTypes.json.value] = schema
                 request_body['content'][ContentTypes.form_encode.value] = schema
+                request_body['content'][ContentTypes.unkown.value] = schema
+                request_body['content'][ContentTypes.txt.value] = schema
 
         return request_body
-    
+
     @classmethod
     def prepare_callback_kwargs(cls, callback: Callable, **kwargs):
         assert callable(callback)
@@ -287,19 +312,23 @@ class OpenApiProcessor:
             annotation = parameter.annotation
 
             if class_resolved == 'file':
-                kwd[name] = kwargs.pop(name)[0]
+                if name in kwargs:
+                    kwd[name] = kwargs.pop(name)[0]
 
             elif class_resolved in ['pydantic', 'dataclass', 'normal_class']:
                 parameters = {}
 
                 for key in cls.get_callback_parameters(annotation).keys():
                     parameters[key] = kwargs.pop(key)
-                
+
                 kwd[name] = annotation(**parameters)
+
+            elif class_resolved == 'request':
+                kwd[name] = kwargs.pop('request')
 
             else:
                 if annotation.__name__ not in cls.mapping_swagger_types() and annotation != inspect._empty:
-                    
+
                     if sys.version_info < (3, 14):
                         instance = annotation()
                         for key in instance.__annotations__.keys():
@@ -315,8 +344,30 @@ class OpenApiProcessor:
                 else:
                     if parameter.kind not in [inspect.Parameter.VAR_KEYWORD, inspect.Parameter.VAR_POSITIONAL]:
                         kwd[name] = kwargs.pop(name)
-        
+
         if kwargs:
-            kwd['kwargs'] = kwargs
-        
+            has_var_keyword = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD
+                for p in all_callback_parameters.values()
+            )
+
+            has_var_positional = any(
+                p.kind == inspect.Parameter.VAR_POSITIONAL
+                for p in all_callback_parameters.values()
+            )
+
+            if has_var_keyword:
+                var_kw_name = next(
+                    name for name, p in all_callback_parameters.items()
+                    if p.kind == inspect.Parameter.VAR_KEYWORD
+                )
+                kwd[var_kw_name] = kwargs
+
+            elif has_var_positional:
+                var_pos_name = next(
+                    name for name, p in all_callback_parameters.items()
+                    if p.kind == inspect.Parameter.VAR_POSITIONAL
+                )
+                kwd[var_pos_name] = list(kwargs.values())
+
         return kwd

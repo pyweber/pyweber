@@ -31,6 +31,15 @@ from .models.file import File
 from .models.field_storage import FieldStorage
 from .models.headers import Headers
 
+from .models.file_stream import (
+    file_chunk_manager,
+    FileResult
+)
+from .models.strem_stats import (
+    AdaptiveController,
+    StreamStats
+)
+
 # pyweber events
 from .core.events import (
     EventHandler,
@@ -133,6 +142,10 @@ __all__ = [
     'FieldStorage',
     'Field',
     'Request',
+    'file_chunk_manager',
+    'FileResult',
+    'AdaptiveController',
+    'StreamStats',
     'Response',
     'TemplateEvents',
     'WindowEvents',

@@ -4,11 +4,60 @@
 
 ### Added
 - Element has new methods to get childs. We added this methods: `next_childs`, `previous_childs`, `index`, `last_child`, `first_child`
-- Added support for `multipart/form-data` in swegger documentation for API tests purpose
+- Added support for `multipart/form-data` and `application/octet-stream` in swegger documentation for API tests purpose
 - Added `include_uuid` attribute to include or ignore uuid when converting pyweber Element to Html tree.
 - Added `mobile` argument in `run` and `Pywber CLI` if need include QrCode when starting run project
-- Added `stream` attribute in Element classes to get file content.
 - Added suport to query parameters in pywber routes.
+- Added support to create routes with query_parameters. Now you can create route with query parameters and placeholder to user as attributes in template handler.
+```python
+import pyweber as pw
+app = pw.Pyweber()
+
+@app.route('/login?session={session}')
+def login(session: str):
+  pass
+```
+- Added support to stream files withou blocking server using websocket server protocol do request chunks and http server to receive chunks.
+```python
+import pyweber as pw
+import asyncio
+
+app = pw.Pyweber()
+
+class Form(pw.Element):
+    def __init__(self):
+        super().__init__(tag='div', classes=['container'])
+        self.childs = [
+            pw.InputFile(name='files', accept='*/*', multiple=True),
+            pw.InputButton(name='submit', onclick=self.get_file)
+        ]
+
+    async def save_file(self, e: pw.EventHandler, file: pw.File):
+        chunks = app.stream(file=file,session_id=e.session.session_id,max_size=1024*1024*50)
+        content = b''
+        async for chunk in chunks:
+            content += chunk
+
+        if len(content) != file.size:
+            raise ValueError(f'File Incomplete {len(content)}/{file.size}')
+
+        with open(f'assets/{file.filename}', 'wb') as f:
+            f.write(content)
+
+    async def get_file(self, e: pw.EventHandler):
+        inputs = [input_file for input_file in e.template.querySelectorAll('input') if input_file.files]
+
+        for inpt in inputs:
+            for file in inpt.files:
+                asyncio.create_task(self.save_file(e, file))
+
+@app.route('/')
+def upload():
+    return Form()
+
+if __name__ == '__main__':
+    app.run()
+```
 
 ### Changed
 - Now, only can acess assets project of directory specified when the Pyweber App is created. To specify the directory assets, you can do as show bellow:
@@ -31,10 +80,12 @@ import pyweber as pw
 app = Pyweber('assets', 'static', 'images')
 ```
 
+
 ## Fixed
 - Fixed `Recursion Error` when you use uvicorn to run server.
 - Fixed ignored server `route` then specify in CLI (`pyweber run --route=...`) or defined in pyweber config file.
 - Fixed value as None when the input is File Type
+- Fixed query parameters placeholder considered as path placeholders in swegger.
 
 ## Removed
 - Removed `code` properity has been removed from the Response class. If you want to acess the integer http status_code, use `status_code` instead
@@ -202,7 +253,7 @@ def get_selection_values(self, e: pw.EventHandler):
 ## [0.9.95] - 2025-07-04
 ---
 ### New features
-- Allowed `ValueError` when create route with empty template value 
+- Allowed `ValueError` when create route with empty template value
 - Added `remove_before_middleware` and `remove_after_middleware` methods in MiddlewareManager instance do allow remove specific middleware.
 - Added `behavior` parameter in scroll window methods. Now, you can choose one of options: `auto`, `smooth` or `instant`
 - Changed return type from tuple to `MiddlewareResult` for process_middleware method in MiddlewareManager.

@@ -29,8 +29,8 @@ class InvalidTemplateError(RouterError):
 
 class InvalidRouteFormatError(RouterError):
     """Exception for invalid route format."""
-    def __init__(self):
-        super().__init__("The route must start with /")
+    def __init__(self, error: str = None):
+        super().__init__(error or "The route must start with /")
 
 class InvalidCallableError(RouterError):
     """Exception for invalid callable format"""

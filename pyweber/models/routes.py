@@ -23,7 +23,7 @@ class RedirectRoute: # pragma: no cover
         self.route = route
         self.status_code = status_code
         self.kwargs = kwargs
-    
+
     @property
     def route(self): return self.__route
     @property
@@ -35,27 +35,27 @@ class RedirectRoute: # pragma: no cover
     def route(self, value: 'Route'):
         if not isinstance(value, Route):
             raise TypeError(f'{value}, must be a Route instances, but got {type(value).__name__}')
-        
+
         self.__route = value
-    
+
     @status_code.setter
     def status_code(self, value: int):
         if value not in self.redirected_status_code():
             raise ValueError(f'{value} must be an Redirect HttpStatusCode valid')
-        
+
         self.__status_code = value
-    
+
     @kwargs.setter
     def kwargs(self, value: dict[str, str]):
         if value and not isinstance(value, dict):
             raise TypeError(f'{value} must be a dict instances, but got {type(value).__name__}')
-        
+
         self.__kwargs = value
-    
+
     @staticmethod
     def redirected_status_code():
         return [code for code in HTTPStatusCode.code_list() if str(code).startswith('3')]
-    
+
     def __repr__(self):
         return (
             f'RedirectRoute('
@@ -77,12 +77,10 @@ class Route: # pragma: no cover
         title: str = '',
         process_response: bool = True,
         callback: Callable[..., Any] = None,
-        query_paramns: list[str] = None,
         **kwargs
     ):
         self.group = group
         self.route = route
-        self.query_params = query_paramns
         self.template = template
         self.methods = methods or self.default_method()
         self.name = name
@@ -93,18 +91,13 @@ class Route: # pragma: no cover
         self.process_response = process_response
         self.callback = callback
         self.kwargs = kwargs
-    
+
     @property
-    def query_params(self):
-        return self.__query_params
-    
-    @query_params.setter
-    def query_params(self, value: list[str]):
-        if value and not isinstance(value, list):
-            raise ValueError("Query Paraments isn't not valid")
-        
-        self.__query_params = value
-        
+    def route_with_params(self): return self.__route_with_params
+
+    @property
+    def query_params(self): return self.__query_params
+
     @property
     def callback(self): return self.__callback
 
@@ -112,12 +105,12 @@ class Route: # pragma: no cover
     def callback(self, callback: Callable[..., Any]):
         if callback:
             assert callable(callback)
-        
+
         self.__callback = callback or self.template if callable(self.template) else lambda **kwargs: self.template
-    
+
     @property
     def full_route(self): return f"/{self.group.removeprefix('__')}{self.route}" if self.group != self.default_group() else self.route
-    
+
     @property
     def middlewares(self): return self.__middlewares
 
@@ -125,12 +118,12 @@ class Route: # pragma: no cover
     def middlewares(self, middlewares: list[Callable]):
         if not isinstance(middlewares, list):
             raise TypeError(f'middlewares must be a list instances, but got {type(middlewares).__name__}')
-        
+
         if middlewares and not all(callable(middleware) for middleware in middlewares):
             raise ValueError('All middlewares must but be a Callable functions')
 
         self.__middlewares = middlewares
-    
+
     @property
     def methods(self): return self.__methods
 
@@ -138,12 +131,12 @@ class Route: # pragma: no cover
     def methods(self, methods: list[str]):
         if not isinstance(methods, list):
             raise TypeError(f'methods must be a list instances, but got {type(methods).__name__}')
-        
+
         if methods and not all(str(method).upper() in self.allowed_methods() for method in methods):
             raise ValueError(f'All methods must be inclued in {self.allowed_methods()}')
 
         self.__methods = [method.upper() for method in methods]
-    
+
     @property
     def status_code(self): return self.__status_code
 
@@ -151,12 +144,12 @@ class Route: # pragma: no cover
     def status_code(self, value: int):
         if not value:
             value = 200
-        
+
         if value not in HTTPStatusCode.code_list():
             raise ValueError('The status must be a HttpStatusCode valid')
-        
+
         self.__status_code = value
-    
+
     @property
     def content_type(self): return self.__content_type
 
@@ -164,12 +157,12 @@ class Route: # pragma: no cover
     def content_type(self, value: ContentTypes):
         if not value:
             raise ValueError('content_type does not be a non empty')
-        
+
         if not isinstance(value, ContentTypes):
             raise TypeError(f'content type must be a ContentTypes instances, but got {type(value).__name__}')
-        
+
         self.__content_type = value
-    
+
     @property
     def group(self): return self.__group
 
@@ -179,9 +172,9 @@ class Route: # pragma: no cover
 
         if any(symb in str(group) for symb in str(punctuation).replace('_', '')):
             raise ValueError('Symbols is not alloweds in the group name')
-        
+
         self.__group = value
-    
+
     @property
     def route(self): return self.__route
 
@@ -191,13 +184,52 @@ class Route: # pragma: no cover
 
         if not value.startswith('/'):
             raise InvalidRouteFormatError()
-        
-        self.__route = value
-    
+
+        path, _, query_str = value.partition('?')
+        self.__query_params = self.__parse_and_validate_query(query_str) if query_str else []
+        self.__route = path.removesuffix('/') if len(path) > 1 else path
+        self.__route_with_params = value
+
+    @staticmethod
+    def __parse_and_validate_query(query_str: str) -> list[str]:
+        """Valida e extrai os nomes dos query params"""
+        pairs = query_str.split('&')
+        keys = []
+
+        for pair in pairs:
+            if '=' not in pair:
+                raise InvalidRouteFormatError(f'Query params must follow the format ?key={key}&key={key}')
+
+            key, _, placeholder = pair.partition('=')
+
+            # key e placeholder não podem ser vazios
+            if not key or not placeholder:
+                raise InvalidRouteFormatError('Query param key or placeholder cannot be empty')
+
+            # placeholder deve estar no formato {key}
+            if not (placeholder.startswith('{') and placeholder.endswith('}')):
+                raise InvalidRouteFormatError(f"Query param '{key}' value must be a placeholder like {{{key}}}, got '{placeholder}'")
+
+            # nome dentro do placeholder deve ser igual à key
+            param_name = placeholder[1:-1]
+            if param_name != key:
+                raise InvalidRouteFormatError(f"Query param key and placeholder must match: '{key}' != '{param_name}'")
+
+            # key não pode ter caracteres especiais
+            if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', key):
+                raise InvalidRouteFormatError(f"Query param key '{key}' contains invalid characters")
+
+            if key in keys:
+                raise InvalidRouteFormatError(f"Duplicate query param key '{key}'")
+
+            keys.append(key)
+
+        return keys
+
     @staticmethod
     def paramaters_types():
         return {'int': 'integer', 'str': 'string', 'float': 'number'}
-    
+
     @staticmethod
     def argument_types():
         return {
@@ -207,7 +239,7 @@ class Route: # pragma: no cover
             'set': 'array',
             'tuple': 'array'
         }
-    
+
     @classmethod
     def get_callback_parameters(cls, callback: Callable[..., Any]):
         sign = inspect.signature(obj=callback)
@@ -217,7 +249,7 @@ class Route: # pragma: no cover
                     "default": param.default,
                     "types": param.annotation,
                 } for _, param in params.items()}
-    
+
     @classmethod
     def get_query_parameters(cls, route: str, callback: Callable):
         assert isinstance(route, str)
@@ -243,7 +275,7 @@ class Route: # pragma: no cover
                     'default': inspect._empty,
                     'required': True
                 }
-        
+
         if callback.__name__ != '<lambda>':
             parameters = {key: value for key, value in callback_parameters.items() if key not in params_list}
 
@@ -279,19 +311,19 @@ class Route: # pragma: no cover
     @staticmethod
     def get_group(group: str):
         return group or Route.default_group()
-    
+
     @staticmethod
     def default_group():
         return '__pyweber'
-    
+
     @staticmethod
     def default_method():
         return ['GET']
-    
+
     @staticmethod
     def allowed_methods():
         return ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'HEAD', 'OPTIONS']
-    
+
     def __repr__(self):
         return (
             f'Route('
@@ -309,29 +341,21 @@ class RouteManager: # pragma: no cover
         self.__redirects: dict[str, RedirectRoute] = {}
         self.__route_names: dict[str, str] = {}
         self.groups: list[str] = []
-    
 
-    def __partition__(self, route: str, spliter: str):
-        p, _, q = route.partition(spliter)
-        return p, q
-    
-    def __get_query_params__(self, params_str: str):
-        return [val.split('=',1)[0] for val in params_str.split('&')] if params_str else []
-    
     def is_redirected(self, route: str) -> bool:
         return self.get_redirected_route(route=route) is not None
-    
+
     @property
     def default_group(self): return Route.default_group()
-    
+
     @property
     def list_routes(self) -> list[str]:
         return [route.full_route for route in self.__routes.values() if '_pyweber' not in str(route.route)]
-    
+
     @property
     def list_redirected_routes(self) -> list[str]:
         return list(self.__redirects.keys())
-    
+
     def route_info(self, target: str):
         return self.get_route_by_name(name=target) or self.get_route_by_path(route=target)
 
@@ -347,7 +371,7 @@ class RouteManager: # pragma: no cover
     def to_route(self, target: str, status_code: int = 302, **kwargs):
         if not self.is_redirect_status_code(status_code=status_code):
             raise ValueError(f'status code {status_code} is invalid Redirect HttpStatusCode')
-        
+
         route = self.get_route_by_name(target)
 
         if not route:
@@ -360,7 +384,7 @@ class RouteManager: # pragma: no cover
 
         if route:
             return RedirectRoute(route=route, status_code=status_code, **kwargs)
-        
+
         raise RouteNotFoundError(route=target)
 
     def redirect(
@@ -374,10 +398,10 @@ class RouteManager: # pragma: no cover
 
         if not route:
             raise RouteNotFoundError(route=target)
-        
+
         if not self.is_redirect_status_code(status_code=status_code):
             raise ValueError(f'status code {status_code} is invalid Redirect HttpStatusCode')
-        
+
         self.__redirects[from_route] = RedirectRoute(route=route, status_code=status_code, **kwargs)
 
     def route(
@@ -401,7 +425,7 @@ class RouteManager: # pragma: no cover
                 else:
                     response = handler(**kwargs)
                 return response
-            
+
             self.add_route(
                 route=route,
                 methods=methods,
@@ -417,7 +441,7 @@ class RouteManager: # pragma: no cover
             )
             return wrapper
         return decorator
-    
+
     def add_route(
         self,
         route: str,
@@ -432,20 +456,19 @@ class RouteManager: # pragma: no cover
         process_response: bool = True,
         **kwargs
     ):
-        route, query_params = self.__partition__(route, '/?')
 
         group = self.get_group(group=group)
         if self.full_route(route=route, group=group) in self.__routes:
             raise RouteAlreadyExistError(route=route)
-        
+
         if self.get_route_by_name(name=name):
             raise RouteNameAlreadyExistError(name=name)
-        
+
         if not callable(template):
             template = lambda **kwargs: template
-        
+
         handler = kwargs.get('callback', None) or template
-        
+
         _route = Route(
             route=route,
             group=group,
@@ -458,22 +481,21 @@ class RouteManager: # pragma: no cover
             title=title,
             process_response=process_response,
             callback=handler,
-            query_paramns=self.__get_query_params__(query_params)
         )
 
         self.__routes[_route.full_route] = _route
         if name: self.__route_names[name] = _route.full_route
-    
+
     def add_group_routes(self, routes: list[Route], group: str = None):
         group = self.get_group(group=group)
 
         if not all(isinstance(route, Route) for route in routes):
             raise TypeError(f'All routes must be Route instances')
-        
+
         for route in routes:
             route.group = group
             self.__routes[route.full_route] = route
-    
+
     def update_route(self, route: str, group: str=None, **kwargs):
         full_route = self.full_route(route=route, group=group)
         _route = self.get_route_by_path(route=full_route)
@@ -486,17 +508,17 @@ class RouteManager: # pragma: no cover
 
         if route_by_name and route_by_name != _route:
             raise ValueError(f'Already exists a route with name {route_by_name.name}')
-        
+
         for key, value in kwargs.items():
             if not hasattr(_route, key):
                 _kwargs[key] = value
-            
+
             if value:
                 setattr(_route, key, value)
-        
+
         if _kwargs:
             setattr(_route, kwargs, _kwargs)
-    
+
     def remove_route(self, route: str, group: str = None):
         group = self.get_group(group=group)
 
@@ -504,16 +526,16 @@ class RouteManager: # pragma: no cover
 
         if _r and '_pyweber' not in str(_r.route):
             del self.__routes[self.full_route(route=route, group=group)]
-    
+
     def remove_group(self, group: str):
         for key, value in self.__routes.items():
             if group != self.default_group and group == value.group:
                 del self.__routes[key]
-    
+
     def remove_redirected_route(self, route: str):
         if route in self.__redirects:
             del self.__redirects[route]
-    
+
     def get_route_by_path(self, route: str, follow_redirect: bool = True):
         path, _ = self.resolve_path(route=route)
 
@@ -521,40 +543,40 @@ class RouteManager: # pragma: no cover
             redirect_route = self.get_redirected_route(route=path)
             return redirect_route.route
         return self.__routes.get(path)
-    
+
     def get_route_by_name(self, name: str):
         return self.__routes[self.__route_names[name]] if name in self.__route_names else None
-    
+
     def get_group_routes(self, group: str = None):
         group = self.get_group(group=group)
         return [value for _, value in self.__routes.items() if group == value.group]
-    
+
     def get_group_by_route(self, route: str):
         if route in self.__routes:
             for key, value in self.__routes.items():
                 if key == route:
                     return value.group
-    
+
     def get_redirected_route(self, route: str):
         path, _ = self.resolve_path(route=route)
         return self.__redirects.get(path)
-    
+
     def full_route(self, route: str, group: str):
         group = str(group).removeprefix('__') if group and group != self.default_group else ""
         return f'/{group}{route}' if group else route
-    
+
     def get_group(self, group: str):
         return Route.get_group(group=group)
-    
+
     def get_group_and_route(self, route: str):
         group = self.get_group_by_route(route=route)
         net_route = route.removeprefix(f'/{group}')
         return group, net_route
-    
+
     def exists(self, route: str) -> bool:
         path, _ = self.resolve_path(route=route)
         return path in self.__routes or path in self.__redirects
-    
+
     def resolve_path(self, route: str) -> tuple[str, dict[str, str]]:
         path, kwargs = self.__resolve_path__(route=route, list_routes=self.__redirects)
 
@@ -562,7 +584,7 @@ class RouteManager: # pragma: no cover
             path, kwargs = self.__resolve_path__(route=route, list_routes=self.__routes)
 
         return path, kwargs
-    
+
     @staticmethod
     def __resolve_path__(route: str, list_routes: dict[str, Route | RedirectRoute]):
         kwargs: dict[str, str] = {}
@@ -582,7 +604,7 @@ class RouteManager: # pragma: no cover
             for key, value in zip(l_route, r_route):
                 if key.startswith('{') and key.endswith('}'):
                     kwargs[key[1:-1]] = value
-                
+
                 elif key != value:
                     match = False
                     kwargs.clear()
@@ -590,9 +612,9 @@ class RouteManager: # pragma: no cover
 
             if match:
                 return path, kwargs
-        
+
         return route, kwargs
-    
+
     @staticmethod
     def inspect_function(callback: Callable):
         sign = inspect.signature(obj=callback)
@@ -605,14 +627,14 @@ class RouteManager: # pragma: no cover
             'kind': value.kind}
             } for _, value in params.items()
         ]
-    
+
     @staticmethod
     def build_route(route: str, **kwargs):
         for name in kwargs:
             pattern = "{" + name + "}"
             route = route.replace(pattern, str(kwargs[name]))
         return route
-    
+
     @staticmethod
     def validate_callable_args(callback: Callable, **kwargs):
         sig = inspect.signature(callback)
@@ -635,16 +657,16 @@ class RouteManager: # pragma: no cover
                         raise TypeError(f'Argument for {name} must be a list ou tuple instances')
                 else:
                     extra_args = []
-                
+
                 name_args = name
-            
+
             elif param.kind == inspect.Parameter.VAR_KEYWORD:
                 for k, v in kwargs.items():
                     if k not in normal_params and k != name:
                         extra_kwargs[k] = v
-                
+
                 name_kwargs = name
-            
+
             else:
                 if name in kwargs:
                     bound_args[name] = kwargs[name]
@@ -652,10 +674,10 @@ class RouteManager: # pragma: no cover
                     bound_args[name] = param.default
                 else:
                     raise TypeError(f"{callback.__name__}() missing required positional argument: {name}")
-        
+
         if extra_args:
             bound_args[name_args] = extra_args
-        
+
         if extra_kwargs:
             bound_args[name_kwargs] = extra_kwargs
 

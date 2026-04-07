@@ -109,7 +109,7 @@ def test_get_route_spec(openapi):
 
     assert openapi.get_route_spec('/example/{id}/{name}/{topic}', example_func) == response
 
-def test_get_get_body_spec(openapi):
+def test_get_body_spec(openapi):
     def example_func(
         id: str,
         name: str,
@@ -142,6 +142,6 @@ def test_prepare_callback_kwargs(openapi):
         user_4: MockEmptyClass
     ): pass
 
-    response_user_keys = ['id', 'user_1', 'user_2', 'user_3', 'user_4', 'kwargs']
+    response_user_keys = ['id', 'user_1', 'user_2', 'user_3', 'user_4']
 
     assert list(openapi.prepare_callback_kwargs(example_func, **kwargs).keys()) == response_user_keys

@@ -4,21 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyweber"
-version = "1.2.0.dev20260405"
+version = "1.2.0.dev20260407"
 description = "A lightweight Python framework for building and managing web applications."
 readme = "README.md"
-authors = [
-    { name = "DevPythonMZ", email = "pypi.dev@gmail.com" }
-]
+authors = [{ name = "DevPythonMZ", email = "pypi.dev@gmail.com" }]
 license = "MIT"
 requires-python = ">=3.10"
-dependencies = [
-    "watchdog",
-    "lxml",
-    "toml",
-    "questionary",
-    "qrcode[pil]"
-]
+dependencies = ["watchdog", "lxml", "toml", "questionary", "qrcode[pil]"]
 
 [project.urls]
 Documentation = "https://pyweber.dev/"

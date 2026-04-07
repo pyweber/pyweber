@@ -24,17 +24,17 @@ class HttpServer: # pragma: no cover
         self.ssl_context: ssl.SSLContext = None
         self.__app: Pyweber = None
         self._pool = ThreadPoolExecutor(max_workers=200)
-    
+
     @property
     def app(self): return self.__app
 
     @app.setter
     def app(self, value):
         self.__app = value
-    
+
     async def send_data(self, client: Union[socket.socket, ssl.SSLSocket], data: bytes):
         client.sendall(data)
-    
+
     def setup_ssl(self, cert_file: str, key_file: str):
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         context.load_cert_chain(certfile=cert_file, keyfile=key_file)
@@ -43,11 +43,11 @@ class HttpServer: # pragma: no cover
         PrintLine(
             text=f"{Colors.GREEN}SSL configuration successful{Colors.RESET}"
         )
-    
+
     async def read_data(self, client, length: int):
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, client.recv, length)
-    
+
     async def process_request(self, client: Union[socket.socket, ssl.SSLSocket]):
         try:
             request_data = bytearray()
@@ -56,7 +56,7 @@ class HttpServer: # pragma: no cover
                     chunk = await self.read_data(client, 4096)
                     if not chunk: break
                     request_data.extend(chunk)
-            
+
             header_bytes, _, body_start = request_data.partition(b'\r\n\r\n')
             header_text = header_bytes.decode('iso-8859-1')
 
@@ -64,7 +64,7 @@ class HttpServer: # pragma: no cover
             content_match = re.search(r"Content-Length: (\d+)", header_text, re.IGNORECASE)
             if content_match:
                 content_length = int(content_match.group(1))
-            
+
 
             body = bytearray(body_start)
             async with asyncio.timeout(self.timeout):
@@ -77,11 +77,11 @@ class HttpServer: # pragma: no cover
                     body.extend(chunk)
 
             return header_bytes, bytes(body)
-        
+
         except (asyncio.TimeoutError, TimeoutError):
             PrintLine(text="Request timeout — client too slow or connection hung", level="WARNING")
             return b'', b''
-    
+
     async def handle_client(self, client: Union[socket.socket, ssl.SSLSocket]):
         try:
             headers, body = await self.process_request(client)
@@ -95,7 +95,7 @@ class HttpServer: # pragma: no cover
             if not headers:
                 client.close()
                 return
-            
+
             request = Request(
                 headers=headers.decode('iso-8859-1'),
                 body=body,
@@ -106,24 +106,25 @@ class HttpServer: # pragma: no cover
                 upgrade = WebsocketUpgrade(headers=headers)
                 upgrade_response = upgrade.upgrade_response.encode('utf-8')
 
+                client.setblocking(False)
                 ws_connection = WebsocketServer(client)
 
                 await self.send_data(client, upgrade_response)
                 await self.app.ws_server.connect_wsgi(ws_connection=ws_connection)
-            
+
             else:
                 response = await self.app.get_response(request)
                 await self.send_data(client, response.build_response)
-        
+
         except TypeError:
             pass
         except Exception as e:
             PrintLine(f'Server Error: {e}', level='ERROR')
             raise e
-        
+
         finally:
             client.close()
-    
+
     def start_server(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_server:
             client_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -141,13 +142,13 @@ class HttpServer: # pragma: no cover
                     PrintLine(f"{public_url} or {local_url}")
                 else:
                     PrintLine(public_url)
-                
+
                 if self.mobile:
                     self.generate_qrcode(local_url)
-                
+
                 selector = IOSelector()
                 selector.register(client_server)
-                
+
                 try:
                     while True:
                         try:
@@ -168,9 +169,9 @@ class HttpServer: # pragma: no cover
                                             PrintLine(f"SSL configuration failed {error}", level='ERROR')
                                             client.close()
                                             continue
-                                    
+
                                     self._pool.submit(asyncio.run, self.handle_client(client))
-                            
+
                         except KeyboardInterrupt:
                             self.clear_cache(path='.')
                             PrintLine(text='Server offline')
@@ -190,7 +191,7 @@ class HttpServer: # pragma: no cover
                 raise e
             finally:
                 client_server.close()
-            
+
     def run(
         self,
         host: str = 'localhost',
@@ -215,12 +216,12 @@ class HttpServer: # pragma: no cover
         except KeyboardInterrupt:
             self.clear_cache()
             PrintLine('Server offline')
-    
+
     def clear_cache(self, path: str = '.'):
         for root, folders, files in os.walk(path):
             if any(p in root for p in ['__pycache__', 'tests/config', '.pyweber']):
                 shutil.rmtree(root, ignore_errors=True)
-    
+
     def get_local_ip(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -229,9 +230,9 @@ class HttpServer: # pragma: no cover
             local_ip = s.getsockname()[0]
         finally:
             s.close()
-        
+
         return local_ip
-    
+
     def generate_qrcode(self, text: str):
         import qrcode
 

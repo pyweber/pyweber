@@ -1,6 +1,5 @@
-from uuid import uuid4
 import re
-import inspect
+from uuid import uuid4
 
 from typing import (
     TYPE_CHECKING,
@@ -21,38 +20,37 @@ from pyweber.models.file import File
 if TYPE_CHECKING: # pragma: no cover
     from pyweber.core.template import Template
     from pyweber.core.element import Element
-    from pyweber.connection.websocket import WebsocketManager
 
 class ChildElements(list['Element']): # pragma: no cover
     def __init__(self, parent: 'Element'):
         super().__init__()
         self.parent = parent
-    
+
     def append(self, element: 'Element'):
         super().append(element)
         element.parent = self.parent
 
         return self
-    
+
     def remove(self, element: 'Element'):
         super().remove(element)
 
         return self
-    
+
     def pop(self, index: int = -1):
         return super().pop(index)
-    
+
     def insert(self, index: int, element: 'Element'):
         super().insert(index, element)
         element.parent = self.parent
 
         return self
-    
+
     def extend(self, elements):
         for element in elements:
             if not isinstance(element, ElementConstrutor):
                 raise TypeError(f'element must be Element istances, but got {type(element).__name__}')
-            
+
             self.append(element=element)
         return self
 
@@ -86,7 +84,7 @@ class ElementConstrutor: # pragma: no cover
         self.files = files or []
         self.events = events or TemplateEvents()
         self.childs = childs or ChildElements(self)
-    
+
     @property
     def selection_start(self): return self.__selection_start
 
@@ -100,7 +98,7 @@ class ElementConstrutor: # pragma: no cover
     @selection_end.setter
     def selection_end(self, value: Union[int, None]):
         self.__selection_end = value
-    
+
     @property
     def sanitize(self): return self.__sanitize
 
@@ -108,56 +106,22 @@ class ElementConstrutor: # pragma: no cover
     def sanitize(self, value: bool):
         if not isinstance(value, bool):
             raise TypeError(f'sanitize value must be a boolean value, but got {type(value).__name__}')
-        
+
         self.__sanitize = value
-    
+
     @property
     def template(self):
         return self.__template
-    
+
     @template.setter
     def template(self, value: 'Template'):
         self.__template = value
-    
-    async def stream(
-        self,
-        file: File,
-        ws_server: 'WebsocketManager',
-        session_id: str,
-        speed_max: int = 8192,
-        timeout: float = 5,
-        updater_event: Callable[..., Any] = None
-    ):
-        parts = file.size // speed_max + 1
-        content = b''
 
-        for part in range(parts):
-            await ws_server.send_message(
-                data={'read_file': file.file_id, 'start': speed_max * part, 'end': speed_max * (part+1)},
-                session_id=session_id
-            )
-
-            response = await ws_server.get_file_content(timeout=timeout, file_id=file.file_id)
-
-            if isinstance(updater_event, Callable):
-                if inspect.iscoroutinefunction(updater_event):
-                    await updater_event(**response)
-                else:
-                    updater_event(**response)
-            
-            if response.get('status') == 'sucess':
-                content += bytes(response.get('data').values())
-        
-        if file.size == len(content):
-            return content
-        
-        raise ValueError('File content incomplete.')
-        
     @property
     def files(self):
-        if self.tag == 'input' and self.attrs.get('type', None) == 'file': 
+        if self.tag == 'input' and self.attrs.get('type', None) == 'file':
             return self.__files
-        
+
         return None
 
     @files.setter
@@ -165,52 +129,52 @@ class ElementConstrutor: # pragma: no cover
         if self.tag == 'input' and self.attrs.get('type', None) == 'file':
             if not files:
                 self.__files = []
-            
+
             if not isinstance(files, (list, set, tuple)):
                 raise TypeError(f'file must be an interable intances, but got {type(files).__name__}')
-            
+
             if not all(isinstance(file, File) for file in files):
                 raise TypeError(f'all file elements must be a File instances')
-            
+
             self.__files = files
 
         else:
             self.__files = None
-    
+
     @property
     def uuid(self):
         return self.__uuid
-    
+
     @uuid.setter
     def uuid(self, value: str):
         if not value:
             self.__uuid = str(uuid4())
             return
-        
+
         self.__uuid = value.strip()
-    
+
     @property
     def tag(self):
         return self.__tag
-    
+
     @tag.setter
     def tag(self, value: HTMLTag | str):
         if isinstance(value, HTMLTag):
             self.__tag = value.value
             return
-        
+
         if not isinstance(value, str):
             raise TypeError('Element tag must be an HtmlTag ou string')
-        
+
         if not value.strip():
             raise ValueError('Element tag name not be an empty value')
-        
+
         self.__tag = value
-    
+
     @property
     def id(self):
         return self.__id
-    
+
     @id.setter
     def id(self, value: str):
         if not value:
@@ -219,13 +183,13 @@ class ElementConstrutor: # pragma: no cover
 
         if not isinstance(value, str):
             raise TypeError('Element id must be a string')
-        
+
         self.__id = value.strip()
-    
+
     @property
     def classes(self):
         return self.__classes
-    
+
     @classes.setter
     def classes(self, class_name: list[str]):
         if class_name is None:
@@ -234,31 +198,31 @@ class ElementConstrutor: # pragma: no cover
         elif isinstance(class_name, list):
             if not all(isinstance(val, str) for val in class_name):
                 raise TypeError('All element classes must to be a string')
-        
+
         else:
             raise TypeError('Element classes must to be a string list')
-        
+
         self.__classes = class_name
-    
+
     def add_class(self, class_name: str):
         if not isinstance(class_name, str):
             raise TypeError('Class element must be a string')
-        
+
         if class_name and any(val not in self.__classes for val in class_name.split(' ')):
             self.__classes.extend(class_name.split(' '))
-    
+
     def remove_class(self, class_name: str):
         if isinstance(class_name, str):
             for cls in class_name.split(' '):
                 if cls in self.__classes:
                     self.__classes.remove(cls)
-    
+
     def has_class(self, class_name: str):
         if isinstance(class_name, str):
             return all(cls in self.__classes for cls in class_name.split(' '))
-        
+
         return False
-    
+
     def toogle_class(self, class_name: str):
         if isinstance(class_name, str):
             for cls in class_name.split(' '):
@@ -266,74 +230,74 @@ class ElementConstrutor: # pragma: no cover
                     self.__classes.remove(cls)
                 else:
                     self.__classes.append(cls.strip())
-    
+
     @property
     def style(self):
         return self.__style
-    
+
     @style.setter
     def style(self, value: dict[str, str]):
         if not isinstance(value, dict):
             raise TypeError('Style value must be a dict of strings')
-        
+
         if not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
             raise TypeError('All keys and values must be a string')
-        
+
         self.__style = value
-    
+
     def set_style(self, key: str, value: str):
         if not key or not value:
             raise ValueError('key and value cannot be empty or null')
-        
+
         if not isinstance(key, str) or not isinstance(value, str):
             raise TypeError('Key or value must be a string')
-        
+
         self.__style[key] = str(value).lower
-    
+
     def get_style(self, key: str, default= None):
         return self.__style.get(key, default)
-    
+
     def remove_style(self, key: str):
         if key in self.__style:
             del self.__style[key]
-    
+
     @property
     def attrs(self):
         return self.__attrs
-    
+
     @attrs.setter
     def attrs(self, value: dict[str]):
         if not isinstance(value, dict):
             raise TypeError('attrs value must be a dict of strings')
-        
+
         if not all(isinstance(key, str) for key in value.keys()):
             raise TypeError('All keys and values must be a string')
-        
+
         self.__attrs = value
-    
+
     def set_attr(self, key: str, value: str):
         if not key:
             raise ValueError('key and value cannot be empty or null')
-        
+
         if not isinstance(key, str):
             raise TypeError('Key or value must be a string')
-        
+
         self.__attrs[key] = value
-    
-    def get_attr(self, key: str, default=None) -> str | None:        
+
+    def get_attr(self, key: str, default=None) -> str | None:
         return self.__attrs.get(key, default)
-    
+
     def has_attr(self, attribute: str, /):
         return attribute in self.__attrs.keys()
-    
+
     def remove_attr(self, key: str):
         if key in self.__attrs:
             del self.__attrs[key]
-    
+
     @property
     def content(self):
         return self.__content
-    
+
     @content.setter
     def content(self, value: str):
         if value is None:
@@ -344,7 +308,7 @@ class ElementConstrutor: # pragma: no cover
 
             except Exception as e:
                 raise ValueError(f"Could not convert value to string: {e}")
-    
+
     @property
     def value(self):
         if self.tag == 'select':
@@ -359,9 +323,9 @@ class ElementConstrutor: # pragma: no cover
                             return child.value
 
             return self.childs[index].value if index >= 0 else None
-            
+
         return self.__value
-    
+
     @value.setter
     def value(self, value: str):
         if value is not None:
@@ -369,12 +333,12 @@ class ElementConstrutor: # pragma: no cover
                 value = str(value) if not self.sanitize else self.sanitize_values(str(value))
             except Exception as e:
                 raise ValueError(f"Could not convert value to string: {e}")
-        
+
         self.__value = value
 
         if self.tag == 'textarea':
             self.content = value
-        
+
         if self.tag == 'select':
             self.__value = None
             if hasattr(self, 'childs') and self.childs:
@@ -384,40 +348,40 @@ class ElementConstrutor: # pragma: no cover
                             child.set_attr('selected', '')
                         else:
                             child.remove_attr('selected')
-    
+
     @property
     def events(self):
         return self.__events
-    
+
     @events.setter
     def events(self, event_handler: 'TemplateEvents'):
         if not isinstance(event_handler, TemplateEvents):
             raise TypeError('Event_handler must a be Events instance')
-        
+
         self.__events = event_handler
-    
+
     def add_event(self, event_type: EventType, event_handler: callable):
         if not isinstance(event_type, EventType):
             raise TypeError('Event_type must a be EventType instance')
-        
+
         if not callable(event_handler):
             raise TypeError('Event_handler must a be callable function')
-        
+
         setattr(self.__events, event_type.value, event_handler)
-    
+
     def remove_event(self, event_type: EventType):
         if not isinstance(event_type, EventType):
             raise TypeError('Event_type must a be EventType instance')
-        
+
         setattr(self.__events, event_type.value, None)
-    
+
     def to_html(self, element: 'ElementConstrutor' = None, indent: int = 0, include_uuid: bool = True):
         if not element:
             element = self
-        
+
         if not isinstance(element, ElementConstrutor):
             raise TypeError(f'element must be an Element instances, but got {type(element).__name__}')
-        
+
         indentation = ' ' * indent
         uuid_attribute = f' uuid="{element.uuid}"' if include_uuid else ""
         html = f'{indentation}<{element.tag}{uuid_attribute}' if element.tag != 'comment' else f'{indentation}<!--'
@@ -432,7 +396,7 @@ class ElementConstrutor: # pragma: no cover
         if element.style and len(element.style) > 0:
             style_str = '; '.join([f"{key}: {value}" for key, value in element.style.items()])
             html += f' style="{style_str}"'
-            
+
         for key, value in element.attrs.items():
             if value is not None:
                 if value and value not in [True, False]:
@@ -443,41 +407,41 @@ class ElementConstrutor: # pragma: no cover
         for key, value in element.events.__dict__.items():
             if value is not None:
                 html += f' _{key}="{self.create_event_id(value, key, element.uuid)}"'
-            
+
         if not element.content and not element.childs and element.tag not in NonSelfClosingHTMLTags.non_autoclosing_tags():
             if element.tag == 'comment':
                 return html + '-->'
             else:
                 return html + '>'
-        
+
         if element.tag != 'comment':
             html += '>'
-        
+
         final_content = str((self.__render_dynamic_values(content=element.content, include_uuid=include_uuid) or ''))
         has_children = bool(element.childs)
-        
+
         if has_children or '\n' in final_content:
             html += '\n'
-        
+
         for child in element.childs:
             child_html = self.to_html(child, indent + 4, include_uuid=include_uuid)
             uuid_placeholder = f'{{{child.uuid}}}'
-            
+
             if uuid_placeholder in final_content:
                 final_content: str = final_content.replace(uuid_placeholder, child_html)
             else:
                 final_content += '\n' + child_html
-        
+
         if final_content:
             if has_children or '\n' in final_content:
                 html += ' ' * (indent + 4) + final_content + '\n' + indentation
             else:
                 html += final_content
-        
+
         html += f'</{element.tag}>' if element.tag != 'comment' else '-->'
 
         return html
-    
+
     def __render_dynamic_values(self, content: str, include_uuid: bool = True):
 
         if content:
@@ -493,7 +457,7 @@ class ElementConstrutor: # pragma: no cover
                             value = self.to_html(element=value, include_uuid=include_uuid)
 
                         content = content.replace("{{" + r + "}}", str(value))
-        
+
         return content
 
 
@@ -519,23 +483,23 @@ class ElementConstrutor: # pragma: no cover
                     element_id: []
                 }
             }
-        
+
         EventBook.get(event_id).get('elements', {}).get(element_id, []).append(
             type.removeprefix('on')
         )
 
         return event_id
-    
+
     def sanitize_values(self, text: str):
         for key, value in self.__character_to_replace__().items():
             if key in text:
                 text = text.replace(key, value)
-        
+
         return text
-    
+
     def __character_to_replace__(self):
         return {"<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#x27;", "/": "&#x2F;", "&": "&amp;"}
-    
+
     def __repr__(self):
         return (
             f'Element('

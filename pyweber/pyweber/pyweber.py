@@ -5,8 +5,10 @@ import re
 import webbrowser
 import traceback
 import logging
-from typing import Union, Callable, Any
-from dataclasses import dataclass
+import asyncio
+from time import time
+from typing import Union, Callable, Any, AsyncGenerator
+from dataclasses import dataclass, field
 from pyweber.core.element import Element
 from pyweber.core.template import Template
 from pyweber.models.request import Request
@@ -28,7 +30,12 @@ from pyweber.models.routes import (
 from pyweber.models.openapi import OpenApiProcessor
 
 from pyweber.utils.utils import PrintLine
-    
+from pyweber.models.file import File
+from pyweber.models.strem_stats import AdaptiveController
+from pyweber.models.file_stream import (
+    FileResult,
+    file_chunk_manager
+)
 
 @dataclass
 class StateResult: # pragma: no cover
@@ -76,7 +83,7 @@ class ContentResult: # pragma: no cover
     def __post__init__(self):
         if not isinstance(self.content_type, ContentTypes):
             raise TypeError(f"content_type must be ContentTypes, got {type(self.content_type).__name__}")
-        
+
         if not isinstance(self.content, bytes):
             raise TypeError(f"content must be bytes, got {type(self.content).__name__}")
 
@@ -103,7 +110,7 @@ class Pyweber(
         self.__request: Request = None
         self.__cache_templates: dict[str, tuple[ContentResult, TemplateResult]] = {}
         self.__static_directories: set[str] = set(assets_directories)
-    
+
     # Request
     @property
     def request(self): return self.__request
@@ -113,10 +120,10 @@ class Pyweber(
     def run(self):
         from pyweber.models.run import run
         return run
-    
+
     def clear_cache_templates(self):
         self.__cache_templates.clear()
-    
+
     @property
     def ws_server(self): return self.__ws_server
 
@@ -124,18 +131,68 @@ class Pyweber(
     def ws_server(self, value: WebsocketManager):
         assert isinstance(value, WebsocketManager)
         self.__ws_server = value
-    
+
     def static(self, *directories: str):
         self.__static_directories.update(directories)
+
+    async def _receive_chunk(self, file_id: str, timeout: float) -> tuple[bytes, float]:
+        loop = asyncio.get_event_loop()
+        t_start = loop.time()
+
+        result: FileResult = await file_chunk_manager.get(file_id, timeout=timeout)
+
+        elapsed_ms = (loop.time() - t_start) * 1000
+
+        if result.code != 200 or result.status == 'error' or not result.data:
+            return b'', elapsed_ms
+        return result.data, elapsed_ms
+
+    async def stream(
+        self,
+        file: File,
+        session_id: str,
+        max_size: int = 1024 * 64,
+        timeout: float = 30.0,
+    ) -> AsyncGenerator[bytes, None]:
+
+        controller = AdaptiveController(max_size=max_size)
+        offset = 0
+        file_id = file.file_id
+
+        while offset < file.size:
+            file_chunk_manager.register(file_id=file.file_id)
+
+            await self.ws_server.send_message(
+                data={
+                    'request_file': file_id,
+                    'start': offset,
+                    'end': min(offset + controller.chunk_size, file.size)
+                },
+                session_id=session_id
+            )
+            chunk, elapsed_ms = await self._receive_chunk(file_id=file_id, timeout=timeout)
+
+            if not chunk: break
+
+            yield chunk
+
+            received = len(chunk)
+            offset += received
+            controller.update(received_bytes=received, elapsed_ms=elapsed_ms)
+
+            await asyncio.sleep(0)
+
+    def __special_routes(self):
+        return ['/_pyweber/file_chunk']
 
     # Response
     async def get_response(self, request: Request) -> Response:
         if not isinstance(request, Request):
             raise TypeError(f'request must be a Request instances, but got {type(request).__name__}')
-        
+
         if re.search(r'^/_pyweber/(?:\w{8}-\w{4}-\w{4}-\w{4}-\w{12})/openapi.json$', request.path):
             await self.__add_openapi_route()
-        
+
         _route, _ = self.resolve_path(route=request.path)
         title = None
         _route_method = f"{_route}_{request.method}"
@@ -144,16 +201,16 @@ class Pyweber(
             content_result, template_result = self.__cache_templates[_route_method]
 
         else:
-            if _route in self.list_routes:
+            if _route in self.list_routes + self.__special_routes():
                 title = self.get_route_by_path(route=_route).title
                 self.__request = request
-            
+
             # process before request middlewares
             before_request_response = await self.process_middleware(
                 resp=request,
                 middlewares=self.get_before_request_middlewares
             )
-            
+
             if before_request_response:
                 template_result = await self._process_templates(
                     state_result=StateResult(
@@ -166,7 +223,7 @@ class Pyweber(
                         kwargs=request.query_params
                     )
                 )
-            
+
             else:
                 template_result = await self.get_template(
                     route=request.path,
@@ -182,7 +239,7 @@ class Pyweber(
             )
 
             # self.__cache_templates[_route_method] = (content_result, template_result)
-        
+
         # process after request middlewares
         after_request_response = await self.process_middleware(
             resp=Response(
@@ -201,7 +258,7 @@ class Pyweber(
             self.__visited__.remove(template_result.redirect_path)
 
         return after_request_response.content
-    
+
     # Utils
     def template_to_bytes(
         self,
@@ -212,7 +269,7 @@ class Pyweber(
     ):
         if isinstance(template, Template):
             return self._process_template_object(template=template, title=title, content_type=content_type)
-        
+
         elif isinstance(template, Element):
             return self._process_element_object(
                 element=template,
@@ -220,13 +277,13 @@ class Pyweber(
                 content_type=content_type,
                 process_template=process_response
             )
-        
+
         elif isinstance(template, (dict, set, list)):
             return self._process_json_object(template=template)
 
         elif isinstance(template, bytes):
             return self._process_byte_object(data=template, content_type=content_type)
-        
+
         else:
             return self._process_string_object(
                 data=template,
@@ -234,32 +291,32 @@ class Pyweber(
                 content_type=content_type,
                 process_response=process_response
             )
-    
+
     def _process_byte_object(self, data: bytes, content_type: ContentTypes):
         return ContentResult(content=data, content_type=content_type)
-    
+
     def _process_json_object(self, template: Union[dict, list, set]):
         return ContentResult(content=json.dumps(template).encode(), content_type=ContentTypes.json)
-    
+
     def _process_template_object(self, template: Template, title: str, content_type: ContentTypes):
         template.title = title if title else template.title
         return ContentResult(content=template.build_html().encode(), content_type=content_type)
-    
+
     def _process_element_object(
         self,
         element: Element,
         title: str,
         content_type: ContentTypes,
         process_template: bool
-    ):        
+    ):
         if process_template:
             return ContentResult(
                 content=Template(template=element.to_html(), title=title).build_html().encode(),
                 content_type=content_type
             )
-        
+
         return ContentResult(content=element.to_html().encode(), content_type=content_type)
-    
+
     def _process_string_object(
         self,
         data: str,
@@ -269,13 +326,13 @@ class Pyweber(
     ):
         if not isinstance(data, str):
             data = str(data)
-        
+
         if process_response and content_type == ContentTypes.html:
             return ContentResult(
                 content=Template(template=data, title=title).build_html().encode(),
                 content_type=content_type
             )
-        
+
         return ContentResult(content=data.encode(), content_type=content_type)
 
     def get_content_type(self, route: str) -> ContentTypes:
@@ -328,7 +385,7 @@ class Pyweber(
                         callback=_route.callback,
                         kwargs=kwargs
                     )
-                
+
                 if _route.middlewares:
                     middleware_result = await self.process_route_middleware(
                         resp=self.request,
@@ -342,10 +399,10 @@ class Pyweber(
                             status_code=middleware_result.status_code,
                             process_response=middleware_result.process_response
                         )
-    
+
         if not state_result.template or isinstance(state_result.template, str):
             path = state_result.template or path
-            
+
             if self.is_static_file(route=path) or self.is_file_requested(route=path):
                 content_type = self.get_content_type(route=self.normaize_path(route=path))
                 if self.is_static_file(route=path):
@@ -375,14 +432,14 @@ class Pyweber(
                     content_type=self.get_content_type(route=route),
                     process_response=False if content_type.value != ContentTypes.html.value else True
                 )
-        
-        return await self._process_templates(state_result=state_result)   
+
+        return await self._process_templates(state_result=state_result)
 
     def _check_recursion(self, route: str):
         if route in self.__visited__:
             raise RecursionError(f'Recursion detected for route {route}')
         self.__visited__.add(route)
-    
+
     async def _process_redirect_route(
         self,
         state: StateResult,
@@ -403,7 +460,7 @@ class Pyweber(
                     process_response=middleware_result.process_response,
                     template=middleware_result.content
                 )
-        
+
         return state.update(
             template=redirect_route.route.template,
             status_code=redirect_route.status_code,
@@ -420,7 +477,7 @@ class Pyweber(
 
             while callable(template) or isinstance(template, RedirectRoute):
                 if callable(template):
-                    request_params = {**self.request.body, **self.request.query_params} if self.request else {}
+                    request_params = {**self.request.body, **self.request.query_params, 'request': self.request} if self.request else {}
                     kwargs = OpenApiProcessor.prepare_callback_kwargs(
                         callback=state_result.callback,
                         **{**state_result.kwargs, **request_params}
@@ -430,7 +487,7 @@ class Pyweber(
 
                 if isinstance(template, RedirectRoute):
                     redirect_path = self.build_route(route=template.route.full_route, **{**state_result.kwargs, **template.kwargs})
-                    
+
                     self._check_recursion(route=redirect_path)
                     state_result = await self._process_redirect_route(
                         state=state_result,
@@ -440,7 +497,15 @@ class Pyweber(
                     )
 
                     template = state_result.template
-        
+
+                if isinstance(template, FileResult):
+                    state_result.status_code = template.code
+                    template = {
+                        'file_id': template.file_id,
+                        'status': template.status,
+                        'message': template.data if template.code != 200 else 'OK'
+                    }
+
         except Exception as error:
             error_details = {
                 'type': type(error).__name__,
@@ -450,14 +515,14 @@ class Pyweber(
             }
 
             logging.error(traceback.format_exc())
-            
+
             template = Template(
                 template=self.page_server_error.build_html(),
                 error=f'{error_details["message"]}, line {error_details["line"]}'
             )
             state_result.status_code = HTTPStatusCode.INTERNAL_SERVER_ERROR.code
             state_result.content_type = ContentTypes.html
-            
+
         return TemplateResult(
             status_code=state_result.status_code,
             content_type=state_result.content_type,
@@ -465,7 +530,7 @@ class Pyweber(
             process_response=state_result.process_response,
             template=template
         )
-    
+
     async def process_route_middleware(self, resp: str, middlewares: list[Callable], status_code: int):
         return await self.process_middleware(
             resp=resp,
@@ -478,16 +543,16 @@ class Pyweber(
                 } for middleware in middlewares
             ]
         )
-    
+
     def is_file_requested(self, route: str):
         return re.match(r".*(\.[a-zA-Z0-9]+)+$", route.split('?')[0].split('/')[-1]) is not None
-    
+
     def is_static_file(self, route: str):
         return os.path.isfile(path=route) or os.path.isfile(self.normaize_path(route=route))
-    
+
     def normaize_path(self, route: str):
         return os.path.normpath(path=route.removeprefix('/'))
-    
+
     def load_static_files(self, path: str):
         return LoadStaticFiles(path=path).load
 
@@ -499,6 +564,14 @@ class Pyweber(
                     template=Template(
                         template=self.load_static_files(str(StaticFilePath.admin_page.value))
                     )
+                ),
+                Route(
+                    route='/_pyweber/file_chunk?file_id={file_id}&status={status}',
+                    template=file_chunk_manager.resolve,
+                    title='Get File Chunks',
+                    process_response=False,
+                    methods=['post'],
+                    content_type=ContentTypes.json
                 ),
                 Route(
                     route='/docs',
@@ -532,7 +605,7 @@ class Pyweber(
                 )
             ]
         )
-    
+
     async def __add_openapi_route(self):
         route = '/_pyweber/{uuid}/openapi.json'
 
@@ -544,7 +617,7 @@ class Pyweber(
                     content_type=ContentTypes.json
                 )
             ])
-    
+
     def __get_routes(self):
         list_routes = [self.get_route_by_path(route) for route in self.list_routes if route not in ['/docs']]
         schema = {
@@ -564,7 +637,7 @@ class Pyweber(
                     schema['paths'][route.route][method.lower()] = {
                         "summary": route.title or 'Pyweber Route',
                         "parameters": [
-                            v for _, v in OpenApiProcessor.get_route_spec(route.route, route.callback).items()
+                            v for _, v in OpenApiProcessor.get_route_spec(route.route_with_params, route.callback).items()
                         ],
                         "responses": {
                             str(route.status_code): {
@@ -576,34 +649,34 @@ class Pyweber(
                         }
                     }
 
-                    request_body = OpenApiProcessor.get_body_spec(route.route, route.callback)
+                    request_body = OpenApiProcessor.get_body_spec(route.route_with_params, route.callback)
 
                     if request_body.get('content') and route.callback.__name__ != '<lambda>':
                         schema['paths'][route.route][method.lower()]['requestBody'] = request_body
 
         return schema
-    
+
     async def clone_template(self, route: str):
         template_result = await self.get_template(route=route)
 
         if not isinstance(template_result.template, Template):
             template_result.template = Template(template=str(template_result.template))
-        
+
         return template_result.template.clone()
 
     def update(self, changed_file: str = None):
         return self.__update_handler(module=changed_file) if self.__update_handler else None
-    
+
     def launch_url(self, url: str, new_page: bool = False):
         return webbrowser.open(url=url, new=new_page)
-    
+
     def to_url(self, url: str, new_page: bool = False, message: str = None):
         window.open(url=url, new_page=new_page)
         return Element(
             tag='p',
             content=message or f"Redirected to {Element( tag='a', attrs={'href': url}, content=url).to_html()}"
         )
-    
+
     async def __call__(self, scope, receive, send):
         from pyweber.models.run import run_as_asgi
 
