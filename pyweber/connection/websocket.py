@@ -5,6 +5,7 @@ import hashlib
 import base64
 import socket
 import ssl
+import traceback
 from uuid import uuid4
 from typing import Callable, TYPE_CHECKING, Any, Literal, Union
 from time import sleep, time
@@ -135,7 +136,8 @@ class WebsocketServer:
                     raise ConnectionError(f'Connection {self.id} closed')
                 data += chunk
             except (ssl.SSLWantReadError, BlockingIOError):
-                return await self.read_exact(0)
+                await asyncio.sleep(1e-3)
+                continue
             except OSError as e:
                 raise ConnectionError(f'Connection {self.id} closed: {e}')
 
@@ -206,6 +208,7 @@ class WebsocketServer:
 
         except Exception as e:
             PrintLine(f'Unknown websocket error: {e}', level='ERROR')
+            traceback.print_exc()
             raise e
 
         finally:
@@ -239,6 +242,9 @@ class WebsocketServer:
         payload = await self.read_exact(payload_len)
 
         unmasked_payload = bytearray(payload_len)
+
+        if len(masking_key) != 4 or len(payload) != payload_len:
+            return None, None, None
 
         for i in range(payload_len):
             unmasked_payload[i] = payload[i] ^ masking_key[i % 4]
