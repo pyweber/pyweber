@@ -68,7 +68,6 @@ function connectWebSocket() {
         if (data.request_file) {
             const response = await get_file_content(data.request_file, data.start, data.end);
             await send_file_chunk(response.file_id, response.status, response.data);
-            console.log(response)
         }
 
         if (data.template) {

@@ -152,7 +152,7 @@ class WebsocketServer:
         try:
             while True:
                 try:
-                    await asyncio.sleep(0)
+                    await asyncio.sleep(0.01)
 
                     opcode, message, fin = await asyncio.wait_for(
                         self.receive_frame(), timeout=timeout
@@ -214,7 +214,6 @@ class WebsocketServer:
             PrintLine(text=f'Connection {self.id} closed.')
 
     async def receive_frame(self):
-
         header = await self.read_exact(2)
 
         if not header:
