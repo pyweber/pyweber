@@ -137,7 +137,6 @@ class WebsocketServer:
                 data += chunk
             except (ssl.SSLWantReadError, BlockingIOError):
                 await asyncio.sleep(1e-3)
-                continue
             except OSError as e:
                 raise ConnectionError(f'Connection {self.id} closed: {e}')
 
@@ -148,6 +147,7 @@ class WebsocketServer:
         ping_interval = 30.0
         current_opcode = None
         is_coro = inspect.iscoroutinefunction(message_handler)
+        timeout = 60 * 30
 
         try:
             while True:
@@ -155,7 +155,7 @@ class WebsocketServer:
                     await asyncio.sleep(0)
 
                     opcode, message, fin = await asyncio.wait_for(
-                        self.receive_frame(), timeout=60.0
+                        self.receive_frame(), timeout=timeout
                     )
 
                     if not opcode:
@@ -197,13 +197,11 @@ class WebsocketServer:
                         await self.send(b'', opcode=9)
                         last_ping = time()
 
-                    await asyncio.sleep(0)
-
                 except asyncio.TimeoutError:
                     PrintLine(f'Connection {self.id} timed out', level='WARNING')
                     break
 
-                except (ConnectionError, ConnectionResetError):
+                except (ConnectionError, ConnectionResetError, RuntimeError, KeyboardInterrupt):
                     break
 
         except Exception as e:
@@ -242,9 +240,6 @@ class WebsocketServer:
         payload = await self.read_exact(payload_len)
 
         unmasked_payload = bytearray(payload_len)
-
-        if len(masking_key) != 4 or len(payload) != payload_len:
-            return None, None, None
 
         for i in range(payload_len):
             unmasked_payload[i] = payload[i] ^ masking_key[i % 4]
