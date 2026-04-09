@@ -152,8 +152,6 @@ class WebsocketServer:
         try:
             while True:
                 try:
-                    await asyncio.sleep(0.01)
-
                     opcode, message, fin = await asyncio.wait_for(
                         self.receive_frame(), timeout=timeout
                     )
@@ -180,7 +178,7 @@ class WebsocketServer:
                                 self.__messages.append(decoded)
 
                             if is_coro:
-                                asyncio.create_task(message_handler(self))
+                                await message_handler(self)
                             else:
                                 message_handler(self)
 
@@ -566,7 +564,7 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
             return {}
 
     async def ws_handler_wsgi(self, ws_server: WebsocketServer):
-        async for message in ws_server:
+        for message in ws_server:
             raw_message = self.process_ws_message_handler(message=message)
 
             if not raw_message:
@@ -610,7 +608,8 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                     window=message.window,
                     route=message.route
                 )
-                asyncio.create_task(self.message_handler(message=message))
+
+                await self.message_handler(message=message)
 
     async def ws_handler_asgi(self, receive: Callable, send: Callable):
         ws_connection: str = None

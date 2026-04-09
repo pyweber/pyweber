@@ -106,7 +106,7 @@ class HttpServer: # pragma: no cover
                 upgrade = WebsocketUpgrade(headers=headers)
                 upgrade_response = upgrade.upgrade_response.encode('utf-8')
 
-                client.setblocking(False)
+                # client.setblocking(False)
                 ws_connection = WebsocketServer(client)
 
                 await self.send_data(client, upgrade_response)
