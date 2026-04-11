@@ -123,6 +123,7 @@ class WebsocketServer: # pragma: no cover
             return b''
 
         data = b''
+        self.client.setblocking(False)
         while len(data) < length:
             try:
                 chunk = self.client.recv(length - len(data))
@@ -140,12 +141,13 @@ class WebsocketServer: # pragma: no cover
         ping_interval = 30.0
         current_opcode = None
         is_coro = inspect.iscoroutinefunction(message_handler)
+        timeout = 60 * 60
 
         try:
             while True:
                 try:
                     opcode, message, fin = await asyncio.wait_for(
-                        self.receive_frame(), timeout=60.0
+                        self.receive_frame(), timeout=timeout
                     )
 
                     if opcode is None:

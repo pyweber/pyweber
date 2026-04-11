@@ -56,6 +56,7 @@ function connectWebSocket() {
             setTimeout(connectWebSocket, 1000);
         } else {
             console.warn('Número máximo de tentativas de reconexão atingido.');
+            location.reload();
         }
     };
 
@@ -69,7 +70,7 @@ function connectWebSocket() {
 
         const data = JSON.parse(raw);
 
-        if (data.windowEvents) {
+        if (data.windowEvents && data.windowEvents.length > 0) {
             Object.keys(sessionStorage).forEach(item => {
                 if (item !== '_pyweber_sessionId') sessionStorage.removeItem(item);
             });
@@ -85,7 +86,6 @@ function connectWebSocket() {
                 earlyEventsBuffer.forEach(item => sendEvent(item));
                 earlyEventsBuffer.length = 0;
             }
-            return;
         }
 
         if (data.request_file) {

@@ -162,16 +162,15 @@ class Pyweber(
         while offset < file.size:
             file_chunk_manager.register(file_id=file.file_id)
 
-            await self.ws_server.send_message(
-                data={
-                    'request_file': file_id,
-                    'start': offset,
-                    'end': min(offset + controller.chunk_size, file.size)
-                },
-                session_id=session_id
-            )
-            chunk, elapsed_ms = await self._receive_chunk(file_id=file_id, timeout=timeout)
+            data = {
+                'request_file': file_id,
+                'start': offset,
+                'end': min(offset + controller.chunk_size, file.size)
+            }
 
+            await self.ws_server.send_message(data=data, session_id=session_id)
+
+            chunk, elapsed_ms = await self._receive_chunk(file_id=file_id, timeout=timeout)
             if not chunk: break
 
             yield chunk
