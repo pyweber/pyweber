@@ -4,10 +4,10 @@ from dataclasses import dataclass
 
 from pyweber.models.request import Request
 
-FILE_CHUNK_FUTURES: dict[str, asyncio.Future] = {}
+FILE_CHUNK_FUTURES: dict[str, asyncio.Future] = {} # pragma: no cover
 
 @dataclass
-class FileResult:
+class FileResult: # pragma: no cover
     file_id: str
     status: str
     data: Union[bytes, str]

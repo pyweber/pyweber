@@ -16,3 +16,4 @@ setup.py
 upload_lib.py
 clear_cache.py
 testes.py
+.coverage

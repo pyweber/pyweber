@@ -1,250 +1,238 @@
 let socket;
 let socketReady = false;
 let window_event_received = false;
-const earyEventsBuffer = [];
+const earlyEventsBuffer = [];
 const activeListeners = [];
 const fileMap = {};
 const fileSignatureMap = {};
+
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 2;
 
 const EventRef = new Proxy(
     { DOCUMENT: 'document', WINDOW: 'window' },
     {
         set(target, prop, value) {
-            throw new Error(`Cannot modified constant ${prop}`);
+            throw new Error(`Cannot modify constant ${prop}`);
         }
     }
 );
 
+// ─── Compressão + envio centralizado ─────────────────────────────────────────
+async function compress(data) {
+    const json = typeof data === 'string' ? data : JSON.stringify(data);
+    const stream = new CompressionStream('gzip');
+    const writer = stream.writable.getWriter();
+    writer.write(new TextEncoder().encode(json));
+    writer.close();
+    return new Uint8Array(await new Response(stream.readable).arrayBuffer());
+}
+
+async function sendToServer(data) {
+    if (socket.readyState !== WebSocket.OPEN) return;
+    socket.send(await compress(data));
+}
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
 function connectWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const maxReconnectAttempts = 2
-    let reconnectAttemps = 0
     socket = new WebSocket(`${wsProtocol}//${window.location.host}`);
 
     socket.onopen = async function () {
         socketReady = true;
-        const event_data = await getEventData({})
-        socket.send(JSON.stringify(event_data));
+        reconnectAttempts = 0;
+        sendToServer(await getEventData({}));
     };
 
     socket.onerror = function (error) {
-        console.error('Erro with Websocket connection:', error);
+        console.error('Erro com a ligação WebSocket:', error);
     };
 
     socket.onclose = function () {
-        if (reconnectAttemps <= maxReconnectAttempts) {
-            reconnectAttemps++;
-            console.log('Websocket connection closed. Trying again in 1 second...');
+        socketReady = false;
+        if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log(`WebSocket fechado. Nova tentativa em 1s... (${reconnectAttempts}/${maxReconnectAttempts})`);
             setTimeout(connectWebSocket, 1000);
-            location.reload();
-        };
+        } else {
+            console.warn('Número máximo de tentativas de reconexão atingido.');
+        }
     };
 
     socket.onmessage = async function (event) {
-        const data = JSON.parse(event.data);
+        // Suporta resposta do servidor em bytes ou string
+        const raw = event.data instanceof ArrayBuffer
+            ? new TextDecoder().decode(event.data)
+            : (event.data instanceof Blob
+                ? new TextDecoder().decode(await event.data.arrayBuffer())
+                : event.data);
+
+        const data = JSON.parse(raw);
 
         if (data.windowEvents) {
             Object.keys(sessionStorage).forEach(item => {
-                if (item !== '_pyweber_sessionId') {
-                    sessionStorage.removeItem(item)
-                };
+                if (item !== '_pyweber_sessionId') sessionStorage.removeItem(item);
             });
 
-            for (let i = 0; i < data.windowEvents.length; i++) {
-                palavra = data.windowEvents[i].replace(/^_on/, "");
-                evt = palavra.split("_")[0];
-                sessionStorage.setItem(evt, data.windowEvents[i]);
-            };
+            for (const eventName of data.windowEvents) {
+                const palavra = eventName.replace(/^_on/, '');
+                const evt = palavra.split('_')[0];
+                sessionStorage.setItem(evt, eventName);
+            }
 
             if (!window_event_received) {
                 window_event_received = true;
-                earyEventsBuffer.forEach(item => {
-                    sendEvent(item);
-                });
-                earyEventsBuffer.length = 0;
+                earlyEventsBuffer.forEach(item => sendEvent(item));
+                earlyEventsBuffer.length = 0;
             }
-        };
+            return;
+        }
 
         if (data.request_file) {
             const response = await get_file_content(data.request_file, data.start, data.end);
             await send_file_chunk(response.file_id, response.status, response.data);
+            return;
         }
 
         if (data.template) {
             applyDifferences(data.template);
             return;
-        };
+        }
 
         if (data.reload) {
             location.reload();
             return;
-        };
+        }
 
         if (data.setSessionId) {
             setSessionId(data.setSessionId);
             return;
-        };
+        }
 
-        // Window methods
+        // ── Métodos de janela ──────────────────────────────────────────────────
+
         if (data.alert) {
             window.alert(data.alert);
             return;
-        };
+        }
 
         if (data.open) {
-            if (data.open.new_page) {
-                window.open(data.open.path, '_blank');
-            } else {
-                window.location.href = data.open.path;
-            }
+            data.open.new_page
+                ? window.open(data.open.path, '_blank')
+                : (window.location.href = data.open.path);
             return;
-        };
+        }
 
         if (data.confirm) {
             const result = window.confirm(data.confirm);
-            const event_data = await getEventData({ window_response: { confirm_result: result, confirm_id: data.confirm_id } });
-            socket.send(
-                JSON.stringify(event_data)
-            );
+            sendToServer(await getEventData({
+                window_response: { confirm_result: result, confirm_id: data.confirm_id }
+            }));
             return;
-        };
+        }
 
         if (data.prompt) {
-            const result = window.prompt(data.prompt.message, data.prompt.default || "");
-            const event_data = await getEventData({ window_response: { prompt_result: result, prompt_id: data.prompt_id } });
-
-            socket.send(
-                JSON.stringify(event_data)
-            );
+            const result = window.prompt(data.prompt.message, data.prompt.default || '');
+            sendToServer(await getEventData({
+                window_response: { prompt_result: result, prompt_id: data.prompt_id }
+            }));
             return;
-        };
+        }
 
         if (data.close) {
             window.close();
             return;
-        };
+        }
 
         if (data.scroll_to) {
             window.scrollTo({ left: data.scroll_to.x, top: data.scroll_to.y, behavior: data.scroll_to.behavior });
             return;
-        };
+        }
 
         if (data.scroll_by) {
             window.scrollBy({ left: data.scroll_by.x, top: data.scroll_by.y, behavior: data.scroll_by.behavior });
             return;
-        };
+        }
 
         if (data.set_timeout) {
-            const timerId = setTimeout(async () => {
-                // Notificar o Python que o timeout foi concluído
-                const event_data = await getEventData({ window_response: { timeout_completed: true, timeout_id: data.set_timeout.id } });
-                socket.send(
-                    JSON.stringify(event_data)
-                );
-            }, data.set_timeout.delay);
-
-            // Armazenar o ID do timer para poder cancelá-lo mais tarde
             window.pyTimers = window.pyTimers || {};
-            window.pyTimers[data.set_timeout.id] = timerId;
+            window.pyTimers[data.set_timeout.id] = setTimeout(async () => {
+                sendToServer(await getEventData({
+                    window_response: { timeout_completed: true, timeout_id: data.set_timeout.id }
+                }));
+            }, data.set_timeout.delay);
             return;
-        };
+        }
 
         if (data.set_interval) {
-            const intervalId = setInterval(async () => {
-                // Notificar o Python que o intervalo foi executado
-                const event_data = await getEventData({ window_response: { interval_executed: true, interval_id: data.set_interval.id } });
-
-                socket.send(
-                    JSON.stringify(event_data)
-                );
-            }, data.set_interval.interval);
-
-            // Armazenar o ID do intervalo para poder cancelá-lo mais tarde
             window.pyIntervals = window.pyIntervals || {};
-            window.pyIntervals[data.set_interval.id] = intervalId;
+            window.pyIntervals[data.set_interval.id] = setInterval(async () => {
+                sendToServer(await getEventData({
+                    window_response: { interval_executed: true, interval_id: data.set_interval.id }
+                }));
+            }, data.set_interval.interval);
             return;
-        };
+        }
 
         if (data.clear_timeout) {
-            if (window.pyTimers && window.pyTimers[data.clear_timeout.id]) {
+            if (window.pyTimers?.[data.clear_timeout.id]) {
                 clearTimeout(window.pyTimers[data.clear_timeout.id]);
                 delete window.pyTimers[data.clear_timeout.id];
             }
             return;
-        };
-
+        }
 
         if (data.clear_interval) {
-            if (window.pyIntervals && window.pyIntervals[data.clear_interval.id]) {
+            if (window.pyIntervals?.[data.clear_interval.id]) {
                 clearInterval(window.pyIntervals[data.clear_interval.id]);
                 delete window.pyIntervals[data.clear_interval.id];
             }
             return;
-        };
+        }
 
-        // request_animation_frame
         if (data.request_animation_frame) {
-            const frameId = requestAnimationFrame(async () => {
-                // Notificar o Python que o frame foi processado
-                const event_data = await getEventData({
+            window.pyAnimationFrames = window.pyAnimationFrames || {};
+            window.pyAnimationFrames[data.request_animation_frame.id] = requestAnimationFrame(async () => {
+                sendToServer(await getEventData({
                     window_response: {
                         animation_frame_executed: true,
                         frame_id: data.request_animation_frame.id
                     }
-                })
-                socket.send(
-                    JSON.stringify(event_data)
-                );
+                }));
             });
-
-            // Armazenar o ID do frame para poder cancelá-lo mais tarde
-            window.pyAnimationFrames = window.pyAnimationFrames || {};
-            window.pyAnimationFrames[data.request_animation_frame.id] = frameId;
             return;
-        };
+        }
 
-        // cancel_animation_frame
         if (data.cancel_animation_frame) {
-            if (window.pyAnimationFrames && window.pyAnimationFrames[data.cancel_animation_frame.id]) {
+            if (window.pyAnimationFrames?.[data.cancel_animation_frame.id]) {
                 cancelAnimationFrame(window.pyAnimationFrames[data.cancel_animation_frame.id]);
                 delete window.pyAnimationFrames[data.cancel_animation_frame.id];
             }
             return;
-        };
+        }
 
         if (data.localstorage) {
-            const values = Object.entries(data.localstorage);
             localStorage.clear();
-
-            values.forEach(([key, value]) => {
-                localStorage.setItem(key, value);
-            })
-        };
+            Object.entries(data.localstorage).forEach(([key, value]) => localStorage.setItem(key, value));
+        }
 
         if (data.sessionstorage) {
-            const values = Object.entries(data.sessionstorage);
             const sessionId = getsessionId();
             sessionStorage.clear();
-
-            values.forEach(([key, value]) => {
-                if (key !== '_pyweber_sessionId') {
-                    sessionStorage.setItem(key, value);
-                } else {
-                    sessionStorage.setItem(key, sessionId);
-                };
-            })
-        };
-
+            Object.entries(data.sessionstorage).forEach(([key, value]) => {
+                sessionStorage.setItem(key, key === '_pyweber_sessionId' ? sessionId : value);
+            });
+        }
 
         if (data.Error) {
-            console.log(data)
-        };
-
+            console.error('[PyWeber Error]', data);
+        }
     };
 
-    return socket
+    return socket;
 }
 
+// ─── Envio de ficheiro via HTTP (mantém binário puro, sem compressão JSON) ────
 async function send_file_chunk(file_id, status, data) {
     await fetch(`/_pyweber/file_chunk?file_id=${file_id}&status=${status}`, {
         method: 'POST',
@@ -253,70 +241,62 @@ async function send_file_chunk(file_id, status, data) {
     });
 }
 
+// ─── DOM ──────────────────────────────────────────────────────────────────────
 function applyDifferences(differences) {
     Object.keys(differences).forEach(key => {
         const diff = differences[key];
 
-        // Se não tem parent, só pode ser uma mudança no elemento raiz
         if (!diff.parent) {
             if (diff.status === 'Changed') {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(diff.element, 'text/html');
+                const doc = new DOMParser().parseFromString(diff.element, 'text/html');
                 document.documentElement.innerHTML = doc.documentElement.innerHTML;
             }
             return;
         }
 
-        // Para elementos com parent
         const parentElement = document.querySelector(`[uuid="${diff.parent}"]`);
         if (!parentElement) return;
 
         switch (diff.status) {
             case 'Added':
-                const temp = createElementFromHTML(diff.element);
-                parentElement.appendChild(temp);
+                parentElement.appendChild(createElementFromHTML(diff.element));
                 break;
 
-            case 'Removed':
+            case 'Removed': {
                 const toRemove = parentElement.querySelector(`[uuid="${diff.element}"]`);
-                if (toRemove) toRemove.remove();
+                toRemove?.remove();
                 break;
+            }
 
-            case 'Changed':
-                let uuid;
-                if (typeof diff.element === 'string' && diff.element.startsWith('<')) {
-                    const match = diff.element.match(/uuid=['"]([^'"]+)['"]/);
-                    uuid = match ? match[1] : null;
-                } else {
-                    uuid = diff.element;
-                }
+            case 'Changed': {
+                const uuid = typeof diff.element === 'string' && diff.element.startsWith('<')
+                    ? (diff.element.match(/uuid=['"]([^'"]+)['"]/) || [])[1] ?? null
+                    : diff.element;
 
                 if (uuid) {
                     const toChange = parentElement.querySelector(`[uuid="${uuid}"]`);
                     if (toChange) {
-                        const temp = createElementFromHTML(diff.element);
-                        toChange.parentNode.replaceChild(temp, toChange);
+                        toChange.parentNode.replaceChild(createElementFromHTML(diff.element), toChange);
                     }
                 }
                 break;
+            }
         }
 
         if (diff.methods) {
             const target_element = parentElement.querySelector(`[uuid="${key}"]`);
             execute_event_handlers(target_element, diff.methods);
-        };
+        }
     });
 }
 
 function execute_event_handlers(element, methods) {
-    if (element instanceof HTMLElement) {
-        Object.entries(methods).forEach(([method, params]) => {
-            if (typeof element[method] === 'function') {
-                const args = Object.values(params);
-                element[method](...args);
-            };
-        });
-    };
+    if (!(element instanceof HTMLElement)) return;
+    Object.entries(methods).forEach(([method, params]) => {
+        if (typeof element[method] === 'function') {
+            element[method](...Object.values(params));
+        }
+    });
 }
 
 function createElementFromHTML(html) {
@@ -330,10 +310,9 @@ function createElementFromHTML(html) {
 
     const match = html.trim().match(/^<([a-z0-9-]+)/i);
     const tag = match ? match[1].toLowerCase() : null;
-
     let container = document.createElement('div');
 
-    if (tag in containerMap) {
+    if (tag && tag in containerMap) {
         for (const tagName of containerMap[tag]) {
             const el = document.createElement(tagName);
             container.appendChild(el);
@@ -345,7 +324,7 @@ function createElementFromHTML(html) {
     return container.firstElementChild;
 }
 
-
+// ─── Sessão ───────────────────────────────────────────────────────────────────
 function getsessionId() {
     return sessionStorage.getItem('_pyweber_sessionId') || null;
 }
@@ -356,57 +335,49 @@ function setSessionId(sessionId) {
     }
 }
 
+// ─── Envio de eventos ─────────────────────────────────────────────────────────
 async function sendEvent({ type, event, event_ref, window_response }) {
-
     if (event_ref === EventRef.WINDOW && !window_event_received) {
-        earyEventsBuffer.push({ type, event, event_ref, window_response });
+        earlyEventsBuffer.push({ type, event, event_ref, window_response });
         return;
-    };
+    }
 
     const eventData = await getEventData({ type, event, event_ref, window_response });
 
-    if (socket.readyState === WebSocket.OPEN) {
-        if (eventData.current_target_uuid && event_ref == EventRef.DOCUMENT) {
-            socket.send(JSON.stringify(eventData));
-        };
+    if (socket.readyState !== WebSocket.OPEN) return;
 
-        if (event_ref === EventRef.WINDOW) {
-            if (sessionStorage.getItem(type)) {
-                socket.send(JSON.stringify(eventData));
-            };
-        };
-    };
+    if (event_ref === EventRef.DOCUMENT && eventData.current_target_uuid) {
+        sendToServer(eventData);
+    } else if (event_ref === EventRef.WINDOW && sessionStorage.getItem(type)) {
+        sendToServer(eventData);
+    }
 }
 
+// ─── Utilitários Base64 ───────────────────────────────────────────────────────
 function toBase64(string) {
-    const encoder = new TextEncoder();
-    const encoded = encoder.encode(string);
+    const encoded = new TextEncoder().encode(string);
     let binary = '';
-    encoded.forEach(byte => binary += String.fromCharCode(byte));
+    encoded.forEach(byte => (binary += String.fromCharCode(byte)));
     return btoa(binary);
-};
+}
 
 function fromBase64(base64) {
     return new TextDecoder().decode(Uint8Array.from(atob(base64), c => c.charCodeAt(0)));
-};
+}
 
+// ─── Construção do payload ────────────────────────────────────────────────────
 async function getEventData({ type = null, event = null, event_ref = null, window_response = null, file_content = null }) {
-    let target;
+    const target = event?.target instanceof HTMLElement ? event.target : null;
+    const values = await getFormValues();
 
-    if (event) {
-        target = event.target instanceof HTMLElement ? event.target : null;
-    };
-
-    values = await getFormValues();
-
-    const eventData = {
-        type: type,
-        event_ref: event_ref,
+    return {
+        type,
+        event_ref,
         route: window.location.pathname,
-        target_uuid: target?.getAttribute("uuid") ?? null,
-        current_target_uuid: target?.closest(`[_on${type}]`)?.getAttribute("uuid") ?? null,
+        target_uuid: target?.getAttribute('uuid') ?? null,
+        current_target_uuid: target?.closest(`[_on${type}]`)?.getAttribute('uuid') ?? null,
         template: document.documentElement.outerHTML,
-        values: JSON.stringify(values),
+        values,                         // ← sem JSON.stringify desnecessário
         event_data: {
             clientX: event?.clientX ?? null,
             clientY: event?.clientY ?? null,
@@ -431,24 +402,20 @@ async function getEventData({ type = null, event = null, event_ref = null, windo
             touches: event?.touches?.length ?? null,
             changedTouches: event?.changedTouches?.length ?? null,
             targetTouches: event?.targetTouches?.length ?? null,
-
             dataTransfer: event?.dataTransfer ? {
                 dropEffect: event.dataTransfer.dropEffect,
                 effectAllowed: event.dataTransfer.effectAllowed,
                 files: event.dataTransfer.files?.length ?? 0,
                 types: Array.from(event.dataTransfer.types ?? [])
             } : null,
-
             clipboardData: event?.clipboardData ? {
                 types: Array.from(event.clipboardData.types ?? []),
                 text: event.clipboardData.getData?.('text/plain') ?? null
             } : null,
-
             animationName: event?.animationName ?? null,
             elapsedTime: event?.elapsedTime ?? null,
             propertyName: event?.propertyName ?? null,
             pseudoElement: event?.pseudoElement ?? null,
-
             isTrusted: event?.isTrusted ?? null,
             bubbles: event?.bubbles ?? null,
             cancelable: event?.cancelable ?? null,
@@ -456,28 +423,23 @@ async function getEventData({ type = null, event = null, event_ref = null, windo
             eventPhase: event?.eventPhase ?? null,
             timestamp: Date.now()
         },
-        window_data: JSON.stringify(getWindowData()),
-        window_response: window_response ? window_response : {},
+        window_data: getWindowData(),   // ← sem JSON.stringify desnecessário
+        window_response: window_response ?? {},
         window_event: event_ref === EventRef.WINDOW ? sessionStorage.getItem(type) : null,
-        file_content: file_content ? file_content : {},
+        file_content: file_content ?? {},
         sessionId: getsessionId()
     };
-
-    return eventData;
 }
 
+// ─── Dados da janela ──────────────────────────────────────────────────────────
 function getWindowData() {
-    // Captura as informações da janela
-    const windowData = {
-        // Dimensões da janela
+    return {
         width: window.outerWidth,
         height: window.outerHeight,
         innerWidth: window.innerWidth,
         innerHeight: window.innerHeight,
         scrollX: window.scrollX,
         scrollY: window.scrollY,
-
-        // Informações de localização (URL)
         location: {
             href: window.location.href,
             protocol: window.location.protocol,
@@ -486,12 +448,8 @@ function getWindowData() {
             pathname: window.location.pathname,
             origin: window.location.origin
         },
-
-        // Informações de armazenamento
-        localStorage: JSON.stringify(localStorage),
-        sessionStorage: JSON.stringify(sessionStorage),
-
-        // Informações de tela
+        localStorage: { ...localStorage },       // ← sem JSON.stringify
+        sessionStorage: { ...sessionStorage },   // ← sem JSON.stringify
         screen: {
             width: window.screen.width,
             height: window.screen.height,
@@ -506,10 +464,9 @@ function getWindowData() {
             }
         }
     };
-
-    return windowData;
 }
 
+// ─── Leitura de ficheiros ─────────────────────────────────────────────────────
 async function get_file_content(file_id, start, end) {
     const file = fileMap[file_id];
 
@@ -525,209 +482,133 @@ async function get_file_content(file_id, start, end) {
     }
 
     const buffer = await file.slice(safeStart, safeEnd).arrayBuffer();
-
-    return {
-        file_id,
-        status: 'success',
-        data: buffer
-    };
+    return { file_id, status: 'success', data: buffer };
 }
 
 function getOrCreateFileId(file) {
-    // 1. tenta por referência
     for (const [id, existingFile] of Object.entries(fileMap)) {
         if (existingFile === file) return id;
     }
 
-    // 2. tenta por assinatura
     const signature = `${file.name}_${file.size}_${file.lastModified}`;
+    if (fileSignatureMap[signature]) return fileSignatureMap[signature];
 
-    if (fileSignatureMap[signature]) {
-        return fileSignatureMap[signature];
-    }
-
-    // 3. cria novo
     const file_id = crypto.randomUUID();
-
     fileMap[file_id] = file;
     fileSignatureMap[signature] = file_id;
-
     return file_id;
 }
 
+// ─── Valores de formulário ────────────────────────────────────────────────────
 async function getFormValues() {
     const values = {};
     const inputs = document.querySelectorAll('input, textarea, select, option');
 
     for (const input of inputs) {
         const id = input.getAttribute('uuid');
-        if (id) {
-            values[id] = {}
+        if (!id) continue;
 
-            if (input.type === 'radio') {
-                if (input.checked) {
-                    input.setAttribute('checked', '');
-                    values[id]['value'] = input.value;
-                } else {
-                    input.removeAttribute('checked');
-                }
-            } else if (input.type === 'checkbox') {
-                if (input.checked) {
-                    values[id]['value'] = input.value;
-                    input.setAttribute('checked', '');
-                } else {
-                    input.removeAttribute('checked');
-                };
-            } else if (input.type == 'file') {
+        values[id] = {};
 
-                if (input.files) {
-                    const files = Array.from(input.files);
-
-                    const arquivos = files.map(file => {
-                        const file_id = getOrCreateFileId(file);
-
-                        return {
-                            size: file.size,
-                            name: file.name,
-                            file_id: file_id,
-                            content_type: file.type || "application/octet-stream",
-                        }
-                    });
-
-                    values[id]['value'] = arquivos;
-                }
-            } else if (input.tagName === 'SELECT') {
-                values[id]['value'] = input.value;
-
-                const options = input.querySelectorAll('option');
-                options.forEach(option => {
-                    if (option.value === input.value) {
-                        option.setAttribute('selected', '');
-                        values[id]['value'] = option.value;
-                    } else {
-                        option.removeAttribute('selected');
-                    }
-                });
+        if (input.type === 'radio') {
+            if (input.checked) {
+                input.setAttribute('checked', '');
+                values[id].value = input.value;
             } else {
-                values[id]['value'] = input.value;
+                input.removeAttribute('checked');
             }
-
-            values[id]['selection_start'] = input.selectionStart
-            values[id]['selection_end'] = input.selectionEnd
+        } else if (input.type === 'checkbox') {
+            if (input.checked) {
+                input.setAttribute('checked', '');
+                values[id].value = input.value;
+            } else {
+                input.removeAttribute('checked');
+            }
+        } else if (input.type === 'file') {
+            if (input.files) {
+                values[id].value = Array.from(input.files).map(file => ({
+                    size: file.size,
+                    name: file.name,
+                    file_id: getOrCreateFileId(file),
+                    content_type: file.type || 'application/octet-stream',
+                }));
+            }
+        } else if (input.tagName === 'SELECT') {
+            input.querySelectorAll('option').forEach(option => {
+                option.value === input.value
+                    ? option.setAttribute('selected', '')
+                    : option.removeAttribute('selected');
+            });
+            values[id].value = input.value;
+        } else {
+            values[id].value = input.value;
         }
-    };
+
+        values[id].selection_start = input.selectionStart;
+        values[id].selection_end = input.selectionEnd;
+    }
 
     return values;
 }
 
+// ─── Rastreio de eventos ──────────────────────────────────────────────────────
 function trackEvents() {
     const documentEvents = [
-        // Eventos de Mouse
-        "click", "dblclick", "mousedown", "mouseup", "mousemove", "mouseover", "mouseout",
-        "mouseenter", "mouseleave", "contextmenu", "wheel",
-
-        // Eventos de Teclado
-        "keydown", "keyup", "keypress",
-
-        // Eventos de Formulário
-        "focus", "blur", "change", "input", "submit", "reset", "select",
-
-        // Eventos de Drag & Drop
-        "drag", "dragstart", "dragend", "dragover", "dragenter", "dragleave", "drop",
-
-        // Eventos de Scroll e Resize
-        "scroll", "resize",
-
-        // Eventos de Mídia
-        "play", "pause", "ended", "volumechange", "seeked", "seeking", "timeupdate",
-
-        // Eventos de Toque (Mobile)
-        "touchstart", "touchmove", "touchend", "touchcancel"
+        'click', 'dblclick', 'mousedown', 'mouseup', 'mousemove', 'mouseover', 'mouseout',
+        'mouseenter', 'mouseleave', 'contextmenu', 'wheel',
+        'keydown', 'keyup', 'keypress',
+        'focus', 'blur', 'change', 'input', 'submit', 'reset', 'select',
+        'drag', 'dragstart', 'dragend', 'dragover', 'dragenter', 'dragleave', 'drop',
+        'scroll', 'resize',
+        'play', 'pause', 'ended', 'volumechange', 'seeked', 'seeking', 'timeupdate',
+        'touchstart', 'touchmove', 'touchend', 'touchcancel'
     ];
 
     const windowEvents = [
-        // Eventos de Janela e Navegação
-        "afterprint", "beforeprint", "beforeunload", "hashchange", "load", "pageshow", "pagehide", "popstate", "resize", "scroll", "DOMContentLoaded",
-
-        // Eventos de Foco e Blur
-        "focus", "blur",
-
-        // Eventos de Rede
-        "online", "offline",
-
-        // Eventos de Armazenamento
-        "storage",
-
-        // Eventos de Mensagens e Comunicação
-        "message", "messageerror",
-
-        // Eventos de Mídia e Recursos
-        "error", "abort", "loadstart", "progress", "loadend", "timeout",
-
-        // Eventos de Animação e Transição
-        "animationstart", "animationend", "animationiteration", "transitionstart", "transitionend", "transitioncancel",
-
-        // Eventos de Fullscreen e Pointer Lock
-        "fullscreenchange", "fullscreenerror", "pointerlockchange", "pointerlockerror",
-
-        // Eventos de Dispositivo
-        "devicemotion", "deviceorientation", "deviceorientationabsolute",
-
-        // Eventos de Gamepad
-        "gamepadconnected", "gamepaddisconnected",
-
-        // Eventos de Service Worker e Cache
-        "install", "activate", "fetch", "message", "messageerror", "notificationclick", "notificationclose", "push", "pushsubscriptionchange", "sync", "periodicsync", "backgroundfetchsuccess", "backgroundfetchfailure", "backgroundfetchabort", "backgroundfetchclick", "contentdelete",
-
-        // Eventos de Clipboard
-        "cut", "copy", "paste",
-
-        // Eventos de Seleção de Texto
-        "select", "selectionchange",
-
-        // Eventos de Formulário
-        "submit", "reset", "input", "change", "invalid", "search", "toggle", "formdata",
-
-        // Eventos de Mídia (Áudio/Video)
-        "play", "pause", "ended", "volumechange", "seeked", "seeking", "timeupdate", "canplay", "canplaythrough", "cuechange", "durationchange", "emptied", "loadeddata", "loadedmetadata", "loadstart", "stalled", "suspend", "waiting",
-
-        // Eventos de Toque (Mobile)
-        "touchstart", "touchend", "touchmove", "touchcancel",
-
-        // Eventos de Pointer (Mouse/Touch)
-        "pointerover", "pointerenter", "pointerdown", "pointermove", "pointerup", "pointercancel", "pointerout", "pointerleave", "gotpointercapture", "lostpointercapture",
-
-        // Eventos de Drag & Drop
-        "drag", "dragstart", "dragend", "dragover", "dragenter", "dragleave", "drop",
-
-        // Eventos de Teclado
-        "keydown", "keyup",
-
-        // Eventos de Composição (IME)
-        "compositionstart", "compositionupdate", "compositionend",
-
-        // Eventos de Visibilidade
-        "visibilitychange",
-
-        // Eventos de Rejeição de Promises
-        "rejectionhandled", "unhandledrejection",
-
-        // Eventos de Segurança
-        "securitypolicyviolation"
+        'afterprint', 'beforeprint', 'beforeunload', 'hashchange', 'load', 'pageshow', 'pagehide',
+        'popstate', 'resize', 'scroll', 'DOMContentLoaded',
+        'focus', 'blur', 'online', 'offline', 'storage',
+        'message', 'messageerror',
+        'error', 'abort', 'loadstart', 'progress', 'loadend', 'timeout',
+        'animationstart', 'animationend', 'animationiteration',
+        'transitionstart', 'transitionend', 'transitioncancel',
+        'fullscreenchange', 'fullscreenerror', 'pointerlockchange', 'pointerlockerror',
+        'devicemotion', 'deviceorientation', 'deviceorientationabsolute',
+        'gamepadconnected', 'gamepaddisconnected',
+        'install', 'activate', 'fetch', 'notificationclick', 'notificationclose',
+        'push', 'pushsubscriptionchange', 'sync', 'periodicsync',
+        'backgroundfetchsuccess', 'backgroundfetchfailure', 'backgroundfetchabort',
+        'backgroundfetchclick', 'contentdelete',
+        'cut', 'copy', 'paste',
+        'select', 'selectionchange',
+        'submit', 'reset', 'input', 'change', 'invalid', 'search', 'toggle', 'formdata',
+        'play', 'pause', 'ended', 'volumechange', 'seeked', 'seeking', 'timeupdate',
+        'canplay', 'canplaythrough', 'cuechange', 'durationchange', 'emptied',
+        'loadeddata', 'loadedmetadata', 'stalled', 'suspend', 'waiting',
+        'touchstart', 'touchend', 'touchmove', 'touchcancel',
+        'pointerover', 'pointerenter', 'pointerdown', 'pointermove', 'pointerup',
+        'pointercancel', 'pointerout', 'pointerleave', 'gotpointercapture', 'lostpointercapture',
+        'drag', 'dragstart', 'dragend', 'dragover', 'dragenter', 'dragleave', 'drop',
+        'keydown', 'keyup',
+        'compositionstart', 'compositionupdate', 'compositionend',
+        'visibilitychange',
+        'rejectionhandled', 'unhandledrejection',
+        'securitypolicyviolation'
     ];
 
-    for (const eventType of documentEvents) {
-        document.addEventListener(eventType, (event) => {
-            sendEvent({ type: eventType, event: event, event_ref: EventRef.DOCUMENT });
-        });
-    };
+    documentEvents.forEach(eventType => {
+        document.addEventListener(eventType, event =>
+            sendEvent({ type: eventType, event, event_ref: EventRef.DOCUMENT })
+        );
+    });
 
     windowEvents.forEach(eventType => {
-        window.addEventListener(eventType, (event) => {
-            sendEvent({ type: eventType, event: event, event_ref: EventRef.WINDOW });
-        });
+        window.addEventListener(eventType, event =>
+            sendEvent({ type: eventType, event, event_ref: EventRef.WINDOW })
+        );
     });
 }
 
+// ─── Init ─────────────────────────────────────────────────────────────────────
 connectWebSocket();
 trackEvents();

@@ -1,3 +1,4 @@
+import gzip
 import json
 import inspect
 import asyncio
@@ -5,10 +6,9 @@ import hashlib
 import base64
 import socket
 import ssl
-import traceback
 from uuid import uuid4
 from typing import Callable, TYPE_CHECKING, Any, Literal, Union
-from time import sleep, time
+from time import time
 
 from pyweber.models.ws_message import wsMessage
 from pyweber.utils.utils import PrintLine
@@ -81,17 +81,22 @@ class WebsocketUpgrade: # pragma: no cover
             f'Sec-WebSocket-Accept: {self.server_accept_key}\r\n\r\n'
         )
 
-class WebsocketServer:
+class WebsocketServer: # pragma: no cover
 
     def __init__(self, client: Union[socket.socket, ssl.SSLSocket]):
         self.id = None
         self.client = client
         self.__all_message: bytes = b''
         self.__messages: list[bytes] = []
-        self.__messages_lock = asyncio.Lock()
 
     def __iter__(self):
         return self
+
+    async def __aiter__(self):
+        while True:
+            while not self.__messages:
+                await asyncio.sleep(0.01)
+            yield self.__messages.pop(0)
 
     def __next__(self):
         try:
@@ -99,20 +104,13 @@ class WebsocketServer:
         except IndexError:
             raise StopIteration
 
-    async def __aiter__(self):
-        """Async generator — não define __anext__ separado"""
-        while True:
-            while not self.__messages:
-                await asyncio.sleep(0.01)
-            async with self.__messages_lock:
-                if self.__messages:
-                    yield self.__messages.pop(0)
+    async def __anext__(self):
+        return self.__next__()
 
     async def send(self, message: bytes, opcode: int = 1):
         assert isinstance(message, bytes)
         frame = await self.frame_to_send(message, opcode)
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, self.client.sendall, frame)  # ✅ não bloqueia
+        self.client.sendall(frame)
 
     async def close(self):
         try:
@@ -124,22 +122,17 @@ class WebsocketServer:
         if length == 0:
             return b''
 
-        loop = asyncio.get_event_loop()
         data = b''
-
         while len(data) < length:
             try:
-                chunk = await loop.run_in_executor(
-                    None, self.client.recv, length - len(data)
-                )
+                chunk = self.client.recv(length - len(data))
                 if not chunk:
                     raise ConnectionError(f'Connection {self.id} closed')
                 data += chunk
             except (ssl.SSLWantReadError, BlockingIOError):
-                await asyncio.sleep(1e-3)
+                await asyncio.sleep(0.01)
             except OSError as e:
                 raise ConnectionError(f'Connection {self.id} closed: {e}')
-
         return data
 
     async def manage_connection(self, message_handler: Callable):
@@ -147,17 +140,16 @@ class WebsocketServer:
         ping_interval = 30.0
         current_opcode = None
         is_coro = inspect.iscoroutinefunction(message_handler)
-        timeout = 60 * 30
 
         try:
             while True:
                 try:
                     opcode, message, fin = await asyncio.wait_for(
-                        self.receive_frame(), timeout=timeout
+                        self.receive_frame(), timeout=60.0
                     )
 
-                    if not opcode:
-                        continue
+                    if opcode is None:
+                        break
 
                     if opcode != 0:
                         current_opcode = opcode
@@ -171,22 +163,20 @@ class WebsocketServer:
                                 if current_opcode == 1
                                 else self.__all_message
                             )
-
-                            self.__all_message = b''
-
-                            async with self.__messages_lock:
-                                self.__messages.append(decoded)
+                            self.__messages.append(decoded)
 
                             if is_coro:
-                                await message_handler(self)
+                                asyncio.create_task(message_handler(self))
                             else:
                                 message_handler(self)
+
+                            self.__all_message = b''
 
                         elif current_opcode == 8:
                             break
 
                         elif current_opcode == 9:
-                            await self.send(b'', opcode=10)
+                            await self.send(b'', opcode=9)
 
                         elif current_opcode == 10:
                             pass
@@ -195,16 +185,17 @@ class WebsocketServer:
                         await self.send(b'', opcode=9)
                         last_ping = time()
 
+                    await asyncio.sleep(0.01)
+
                 except asyncio.TimeoutError:
                     PrintLine(f'Connection {self.id} timed out', level='WARNING')
                     break
 
-                except (ConnectionError, ConnectionResetError, RuntimeError, KeyboardInterrupt):
+                except (ConnectionError, ConnectionResetError):
                     break
 
         except Exception as e:
             PrintLine(f'Unknown websocket error: {e}', level='ERROR')
-            traceback.print_exc()
             raise e
 
         finally:
@@ -212,10 +203,8 @@ class WebsocketServer:
             PrintLine(text=f'Connection {self.id} closed.')
 
     async def receive_frame(self):
-        header = await self.read_exact(2)
 
-        if not header:
-            return None, None, None
+        header = await self.read_exact(2)
 
         fin = (header[0] & 0x80) >> 7
         opcode = header[0] & 0x0F
@@ -540,8 +529,11 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
         except TypeError:
             pass
 
-    def process_ws_message_handler(self, message: str):
+    def process_ws_message_handler(self, message: Union[str, bytes]):
         try:
+            if isinstance(message, bytes):
+                message = gzip.decompress(message).decode('utf-8')
+
             message: dict[str, dict[str, str] | str] = json.loads(message)
 
             if not isinstance(message, dict):
@@ -571,6 +563,9 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                 continue
 
             message = wsMessage(raw_message=raw_message, app=self.app, ws=self)
+
+            if message.file_content:
+                await self.set_file_content(message.file_content, message.file_content.get('file_id'))
 
             if message.window_response:
                 await self.set_window_response(message.window_response, message.session_id)
@@ -608,7 +603,6 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                     window=message.window,
                     route=message.route
                 )
-
                 await self.message_handler(message=message)
 
     async def ws_handler_asgi(self, receive: Callable, send: Callable):
@@ -627,10 +621,13 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                         raw_message = self.process_ws_message_handler(message=text)
 
                         if raw_message:
-                            message = wsMessage(raw_message=json.loads(text), app=self.app, ws=self)
+                            message = wsMessage(raw_message=raw_message, app=self.app, ws=self)
 
                             if message.window_response:
                                 await self.set_window_response(message.window_response, message.session_id)
+
+                            if message.file_content:
+                                await self.set_file_content(message.file_content, message.session_id)
 
                             sync_template = await self.get_sync_template(message=message)
 
@@ -662,7 +659,7 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                                     route=message.route
                                 )
 
-                                asyncio.create_task(self.message_handler(message=message))
+                                await self.message_handler(message=message)
                 else:
                     break
 

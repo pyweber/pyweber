@@ -26,7 +26,7 @@ class wsMessage: # pragma: no cover
         self.window_event: str = self.get_value(key='window_event')
         self.template = self.get_template()
         self.window = self.get_window()
-        
+
     @property
     def window_response(self) -> dict[str, (str, int)]:
         return self.__raw_message.get('window_response', {})
@@ -34,10 +34,10 @@ class wsMessage: # pragma: no cover
     @property
     def file_content(self) -> dict[str, Any]:
         return self.__raw_message.get('file_content', {})
-    
+
     def get_value(self, key: str):
         return self.__raw_message.get(key, None)
-    
+
     async def get_template(self):
         self.__app: 'Pyweber' = self.__app
         if self.session_id in sessions.all_sessions:
@@ -48,9 +48,9 @@ class wsMessage: # pragma: no cover
         if self.get_value(key='template'):
             session_template.root = session_template.parse_html(html=self.get_value('template'))
             self.insert_values(element=session_template.root)
-        
+
         return session_template
-    
+
     def get_window(self):
         from pyweber.core.window import Screen, Location, Orientation, LocalStorage, SessionStorage
         from pyweber.core.window import window
@@ -84,30 +84,30 @@ class wsMessage: # pragma: no cover
             origin=self.get_window_values(key='location').get('origin', None),
         )
         window.session_storage = SessionStorage(
-            data=json.loads(self.get_window_values(key='sessionStorage') or "{}"),
+            data=self.get_window_values(key='sessionStorage') or {},
             session_id=self.session_id,
             ws=self.ws
         )
         window.local_storage = LocalStorage(
-            data=json.loads(self.get_window_values(key='localStorage') or "{}"),
+            data=self.get_window_values(key='localStorage') or {},
             session_id=self.session_id,
             ws=self.ws
         )
 
         return window
-    
+
     def get_form_values(self) -> dict[str, dict[str, Any]]:
-        return json.loads(self.get_value(key='values') or "{}") or {}
-    
+        return self.get_value(key='values') or {}
+
     def get_raw_window(self):
-        return json.loads(self.get_value(key='window_data') or "{}")
+        return self.get_value(key='window_data') or {}
 
     def get_window_values(self, key: str):
         return self.__raw_window.get(key, {})
-    
+
     def insert_values(self, element: Element):
         values: dict[str, Union[List[dict[str, Union[str, List[int]]]], str]] = self.__values.get(element.uuid, None)
-        
+
         if values:
             if element.tag == 'input' and element.attrs.get('type') == 'file':
 
@@ -124,10 +124,10 @@ class wsMessage: # pragma: no cover
                 ])
 
                 element.value = ';'.join([value.get('name') for value in values.get('value', []) if isinstance(value, dict)]) or None
-                
+
             else:
                 element.value = values.get('value', None)
-            
+
             element.selection_start = values.get('selection_start', None)
             element.selection_end = values.get('selection_end', None)
 

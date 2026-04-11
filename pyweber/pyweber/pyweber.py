@@ -560,12 +560,6 @@ class Pyweber(
         self.add_group_routes(
             routes=[
                 Route(
-                    route='/admin',
-                    template=Template(
-                        template=self.load_static_files(str(StaticFilePath.admin_page.value))
-                    )
-                ),
-                Route(
                     route='/_pyweber/file_chunk?file_id={file_id}&status={status}',
                     template=file_chunk_manager.resolve,
                     title='Get File Chunks',
@@ -577,16 +571,6 @@ class Pyweber(
                     route='/docs',
                     template=StaticFilePath.pyweber_docs.value,
                     title='Pyweber Documentation'
-                ),
-                Route(
-                    route='/_pyweber/admin/{uuid}/.css',
-                    template=StaticFilePath.admin_css_file.value,
-                    content_type=ContentTypes.css
-                ),
-                Route(
-                    route='/_pyweber/admin/{uuid}/.js',
-                    template=StaticFilePath.admin_js_file.value,
-                    content_type=ContentTypes.js
                 ),
                 Route(
                     route='/_pyweber/static/favicon.ico',
