@@ -6,9 +6,8 @@ import webbrowser
 import traceback
 import logging
 import asyncio
-from time import time
 from typing import Union, Callable, Any, AsyncGenerator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pyweber.core.element import Element
 from pyweber.core.template import Template
 from pyweber.models.request import Request
@@ -179,7 +178,7 @@ class Pyweber(
             offset += received
             controller.update(received_bytes=received, elapsed_ms=elapsed_ms)
 
-            await asyncio.sleep(0)
+            await asyncio.sleep(1e-2)
 
     def __special_routes(self):
         return ['/_pyweber/file_chunk']

@@ -4,6 +4,7 @@ import os
 import shutil
 import re
 import asyncio
+import threading
 
 from typing import Union, Any
 from concurrent.futures import ThreadPoolExecutor
@@ -23,7 +24,7 @@ class HttpServer: # pragma: no cover
         self.timeout: float = None
         self.ssl_context: ssl.SSLContext = None
         self.__app: Pyweber = None
-        self._pool = ThreadPoolExecutor(max_workers=200)
+        self._pool = ThreadPoolExecutor(max_workers=100)  # só para HTTP
 
     @property
     def app(self): return self.__app
@@ -39,10 +40,7 @@ class HttpServer: # pragma: no cover
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         context.load_cert_chain(certfile=cert_file, keyfile=key_file)
         self.ssl_context = context
-
-        PrintLine(
-            text=f"{Colors.GREEN}SSL configuration successful{Colors.RESET}"
-        )
+        PrintLine(text=f"{Colors.GREEN}SSL configuration successful{Colors.RESET}")
 
     async def read_data(self, client, length: int):
         loop = asyncio.get_event_loop()
@@ -65,12 +63,10 @@ class HttpServer: # pragma: no cover
             if content_match:
                 content_length = int(content_match.group(1))
 
-
             body = bytearray(body_start)
             async with asyncio.timeout(self.timeout):
                 while len(body) < content_length:
                     remaining = content_length - len(body)
-
                     chunk = await self.read_data(client, remaining)
                     if not chunk:
                         break
@@ -82,9 +78,13 @@ class HttpServer: # pragma: no cover
             PrintLine(text="Request timeout — client too slow or connection hung", level="WARNING")
             return b'', b''
 
-    async def handle_client(self, client: Union[socket.socket, ssl.SSLSocket]):
+    async def handle_http(self, client: Union[socket.socket, ssl.SSLSocket]):
+        """Requisições HTTP normais — curta duração, corre no pool."""
         try:
             headers, body = await self.process_request(client)
+
+            if not headers:
+                return
 
             client_details = client.getpeername()
             client_info = ClientInfo(
@@ -92,35 +92,144 @@ class HttpServer: # pragma: no cover
                 port=client_details[-1] or 0
             )
 
-            if not headers:
-                client.close()
-                return
-
             request = Request(
                 headers=headers.decode('iso-8859-1'),
                 body=body,
                 client_info=client_info
             )
 
-            if 'Connection: Upgrade' in request.raw_headers:
-                upgrade = WebsocketUpgrade(headers=headers)
-                upgrade_response = upgrade.upgrade_response.encode('utf-8')
-
-                ws_connection = WebsocketServer(client)
-
-                await self.send_data(client, upgrade_response)
-                await self.app.ws_server.connect_wsgi(ws_connection=ws_connection)
-
-            else:
-                response = await self.app.get_response(request)
-                await self.send_data(client, response.build_response)
+            response = await self.app.get_response(request)
+            await self.send_data(client, response.build_response)
 
         except TypeError:
             pass
         except Exception as e:
-            PrintLine(f'Server Error: {e}', level='ERROR')
-            raise e
+            PrintLine(f'HTTP Error: {e}', level='ERROR')
+        finally:
+            client.close()
 
+    async def handle_websocket(self, client: Union[socket.socket, ssl.SSLSocket]):
+        """WebSocket — longa duração, corre em thread dedicada fora do pool."""
+        try:
+            headers, body = await self.process_request(client)
+
+            if not headers:
+                return
+
+            request = Request(
+                headers=headers.decode('iso-8859-1'),
+                body=body,
+                client_info=ClientInfo(host='unknown', port=0)
+            )
+
+            upgrade = WebsocketUpgrade(headers=headers)
+            await self.send_data(client, upgrade.upgrade_response.encode('utf-8'))
+
+            ws_connection = WebsocketServer(client)
+            await self.app.ws_server.connect_wsgi(ws_connection=ws_connection)
+
+        except TypeError:
+            pass
+        except Exception as e:
+            PrintLine(f'WebSocket Error: {e}', level='ERROR')
+        finally:
+            client.close()
+
+    def _peek_is_websocket(self, client: Union[socket.socket, ssl.SSLSocket]) -> tuple[bool, bytes]:
+        """Lê os headers sem consumir — detecta se é WS ou HTTP."""
+        try:
+            client.settimeout(self.timeout)
+            request_data = bytearray()
+
+            while b'\r\n\r\n' not in request_data:
+                chunk = client.recv(4096)
+                if not chunk:
+                    break
+                request_data.extend(chunk)
+
+            return b'Connection: Upgrade' in request_data, bytes(request_data)
+
+        except Exception:
+            return False, b''
+
+    def _dispatch_client(self, client: Union[socket.socket, ssl.SSLSocket]):
+        """Decide se é WS ou HTTP e despacha para o sítio certo."""
+        try:
+            is_ws, raw = self._peek_is_websocket(client)
+
+            if is_ws:
+                # Thread dedicada — não ocupa o pool HTTP
+                threading.Thread(
+                    target=asyncio.run,
+                    args=(self._handle_websocket_raw(client, raw),),
+                    daemon=True
+                ).start()
+            else:
+                # Pool HTTP — conexões curtas
+                self._pool.submit(asyncio.run, self._handle_http_raw(client, raw))
+
+        except Exception as e:
+            PrintLine(f'Dispatch Error: {e}', level='ERROR')
+            client.close()
+
+    async def _handle_http_raw(self, client, raw: bytes):
+        """HTTP com dados já lidos."""
+        try:
+            header_bytes, _, body_start = raw.partition(b'\r\n\r\n')
+            header_text = header_bytes.decode('iso-8859-1')
+
+            content_length = 0
+            match = re.search(r"Content-Length: (\d+)", header_text, re.IGNORECASE)
+            if match:
+                content_length = int(match.group(1))
+
+            body = bytearray(body_start)
+            async with asyncio.timeout(self.timeout):
+                while len(body) < content_length:
+                    chunk = await asyncio.get_event_loop().run_in_executor(
+                        None, client.recv, content_length - len(body)
+                    )
+                    if not chunk:
+                        break
+                    body.extend(chunk)
+
+            client_details = client.getpeername()
+            client_info = ClientInfo(
+                host=client_details[0] or 'unknown',
+                port=client_details[-1] or 0
+            )
+
+            request = Request(
+                headers=header_bytes.decode('iso-8859-1'),
+                body=bytes(body),
+                client_info=client_info
+            )
+
+            response = await self.app.get_response(request)
+            client.sendall(response.build_response)
+
+        except TypeError:
+            pass
+        except Exception as e:
+            PrintLine(f'HTTP Error: {e}', level='ERROR')
+        finally:
+            client.close()
+
+    async def _handle_websocket_raw(self, client, raw: bytes):
+        """WebSocket com headers já lidos."""
+        try:
+            header_bytes = raw.partition(b'\r\n\r\n')[0]
+
+            upgrade = WebsocketUpgrade(headers=header_bytes)
+            client.sendall(upgrade.upgrade_response.encode('utf-8'))
+
+            ws_connection = WebsocketServer(client)
+            await self.app.ws_server.connect_wsgi(ws_connection=ws_connection)
+
+        except TypeError:
+            pass
+        except Exception as e:
+            PrintLine(f'WebSocket Error: {e}', level='ERROR')
         finally:
             client.close()
 
@@ -135,10 +244,10 @@ class HttpServer: # pragma: no cover
                 protocol = 'https' if self.ssl_context else 'http'
 
                 public_url = f"Server online in {Colors.GREEN}{protocol}://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}{Colors.RESET}"
-                local_url = f"{Colors.GREEN}{protocol}://{self.get_local_ip()}:{self.port}{self.route}{Colors.RESET}"
+                local_url = f"{protocol}://{self.get_local_ip()}:{self.port}{self.route}"
 
                 if self.host not in ['localhost', '127.0.0.1']:
-                    PrintLine(f"{public_url} or {local_url}")
+                    PrintLine(f"{public_url} or {Colors.GREEN}{local_url}{Colors.RESET}")
                 else:
                     PrintLine(public_url)
 
@@ -160,30 +269,26 @@ class HttpServer: # pragma: no cover
                                     if self.ssl_context:
                                         try:
                                             client = self.ssl_context.wrap_socket(
-                                                client,
-                                                server_side=True
+                                                client, server_side=True
                                             )
-
                                         except Exception as error:
                                             PrintLine(f"SSL configuration failed {error}", level='ERROR')
                                             client.close()
                                             continue
 
-                                    self._pool.submit(asyncio.run, self.handle_client(client))
+                                    # ← única mudança no loop principal
+                                    self._pool.submit(self._dispatch_client, client)
 
                         except KeyboardInterrupt:
                             self.clear_cache(path='.')
                             PrintLine(text='Server offline')
                             break
-
                         except OSError:
                             continue
 
-                except KeyboardInterrupt:
-                    pass
-
                 finally:
                     selector.close()
+                    self._pool.shutdown(wait=False)
 
             except OSError as e:
                 PrintLine(text=f'Error to running server: {e}', level='ERROR')
@@ -194,7 +299,7 @@ class HttpServer: # pragma: no cover
     def run(
         self,
         host: str = 'localhost',
-        port: int = '8800',
+        port: int = 8800,
         route: str = '/',
         cert_file: str = None,
         key_file: str = None,
@@ -223,27 +328,22 @@ class HttpServer: # pragma: no cover
 
     def get_local_ip(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
         try:
             s.connect(('8.8.8.8', 80))
             local_ip = s.getsockname()[0]
         finally:
             s.close()
-
         return local_ip
 
     def generate_qrcode(self, text: str):
         import qrcode
-
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
             box_size=10,
             border=4
         )
-
         qr.add_data(data=text)
         qr.make(fit=True)
-
         PrintLine(text='Or connect using qrcode bellow:', level='INFO')
         qr.print_ascii()
