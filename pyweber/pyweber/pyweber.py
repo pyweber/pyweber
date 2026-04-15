@@ -178,7 +178,7 @@ class Pyweber(
             offset += received
             controller.update(received_bytes=received, elapsed_ms=elapsed_ms)
 
-            await asyncio.sleep(1e-2)
+            await asyncio.sleep(0)
 
     def __special_routes(self):
         return ['/_pyweber/file_chunk']
@@ -247,7 +247,7 @@ class Pyweber(
                 code=template_result.status_code,
                 cookies=self.cookies,
                 route=template_result.redirect_path
-            ),
+            ) if not isinstance(content_result, Response) else content_result,
             middlewares=self.get_after_request_middlewares
         )
 
@@ -281,6 +281,9 @@ class Pyweber(
 
         elif isinstance(template, bytes):
             return self._process_byte_object(data=template, content_type=content_type)
+
+        elif isinstance(template, Response):
+            return template
 
         else:
             return self._process_string_object(
