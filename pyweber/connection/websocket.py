@@ -617,7 +617,7 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                 if raw_message.get('type') == 'websocket.connect':
                     await send({'type': 'websocket.accept'})
                 elif raw_message.get('type') == 'websocket.receive':
-                    text = raw_message.get('text', None)
+                    text = raw_message.get('text', raw_message.get('bytes', None))
 
                     if text:
                         raw_message = self.process_ws_message_handler(message=text)
