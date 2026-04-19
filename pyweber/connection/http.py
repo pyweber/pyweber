@@ -138,7 +138,7 @@ class HttpServer: # pragma: no cover
     def _peek_is_websocket(self, client: Union[socket.socket, ssl.SSLSocket]) -> tuple[bool, bytes]:
         """Lê os headers sem consumir — detecta se é WS ou HTTP."""
         try:
-            client.settimeout(self.timeout)
+            client.settimeout(5)  # 5s é mais que suficiente para headers chegarem
             request_data = bytearray()
 
             while b'\r\n\r\n' not in request_data:
@@ -153,19 +153,20 @@ class HttpServer: # pragma: no cover
             return False, b''
 
     def _dispatch_client(self, client: Union[socket.socket, ssl.SSLSocket]):
-        """Decide se é WS ou HTTP e despacha para o sítio certo."""
+        """Decide se é WS ou HTTP e despacha para o sítio certo.
+        Corre numa thread dedicada — NÃO ocupa o pool HTTP durante o peek."""
         try:
             is_ws, raw = self._peek_is_websocket(client)
 
             if is_ws:
-                # Thread dedicada — não ocupa o pool HTTP
+                # Thread dedicada para WS — longa duração
                 threading.Thread(
                     target=asyncio.run,
                     args=(self._handle_websocket_raw(client, raw),),
                     daemon=True
                 ).start()
             else:
-                # Pool HTTP — conexões curtas
+                # Só submete ao pool DEPOIS do peek — pool livre para processar
                 self._pool.submit(asyncio.run, self._handle_http_raw(client, raw))
 
         except Exception as e:
@@ -276,8 +277,12 @@ class HttpServer: # pragma: no cover
                                             client.close()
                                             continue
 
-                                    # ← única mudança no loop principal
-                                    self._pool.submit(self._dispatch_client, client)
+                                    # Thread dedicada para dispatch — não bloqueia o pool HTTP
+                                    threading.Thread(
+                                        target=self._dispatch_client,
+                                        args=(client,),
+                                        daemon=True
+                                    ).start()
 
                         except KeyboardInterrupt:
                             self.clear_cache(path='.')
