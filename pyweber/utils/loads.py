@@ -26,18 +26,19 @@ class LoadStaticFiles:
 
         try:
             if ContentTypes.content_list().index(extension) >= ContentTypes.content_list().index('png'):
-                mode, encoding='rb', None
+                mode, encoding = 'rb', None
         except ValueError:
             pass
 
-        if os.path.exists(self.__path):
-            return self.__read_file(path=self.__path, mode=mode, encoding=encoding)
+        candidates = [
+            self.__path,
+            self.__path.removeprefix('/'),
+            getattr(self, '_LoadStaticFiles__path_2', None)
+        ]
 
-        try:
-            if os.path.exists(self.__path_2):
-                return self.__read_file(path=self.__path_2, mode=mode, encoding=encoding)
-        except AttributeError:
-            pass
+        for candidate in candidates:
+            if candidate and os.path.exists(candidate):
+                return self.__read_file(path=candidate, mode=mode, encoding=encoding)
 
         raise FileNotFoundError('File not found, please ensure that path is correct')
 
