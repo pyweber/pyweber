@@ -193,9 +193,11 @@ class ElementConstrutor: # pragma: no cover
     @classes.setter
     def classes(self, class_name: list[str]):
         if class_name is None:
-            self.__classes = []
+            class_name = []
+        elif isinstance(class_name, str):
+            class_name = class_name.strip().split(' ')
 
-        elif isinstance(class_name, list):
+        if isinstance(class_name, list):
             if not all(isinstance(val, str) for val in class_name):
                 raise TypeError('All element classes must to be a string')
 
@@ -273,6 +275,9 @@ class ElementConstrutor: # pragma: no cover
         if not all(isinstance(key, str) for key in value.keys()):
             raise TypeError('All keys and values must be a string')
 
+        for k in {**value}:
+            if hasattr(self, k): setattr(self, k, value.pop(k))
+
         self.__attrs = value
 
     def set_attr(self, key: str, value: str):
@@ -282,7 +287,10 @@ class ElementConstrutor: # pragma: no cover
         if not isinstance(key, str):
             raise TypeError('Key or value must be a string')
 
-        self.__attrs[key] = value
+        if hasattr(self, key):
+            setattr(self, key, value)
+        else:
+            self.__attrs[key] = value
 
     def get_attr(self, key: str, default=None) -> str | None:
         return self.__attrs.get(key, default)
