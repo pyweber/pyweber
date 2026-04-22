@@ -452,6 +452,7 @@ class ElementConstrutor: # pragma: no cover
 
     def __render_dynamic_values(self, content: str, include_uuid: bool = True):
 
+
         if content:
             pattern = r'\{\{(.*?)\}\}'
             result = re.findall(pattern, content)
@@ -459,8 +460,7 @@ class ElementConstrutor: # pragma: no cover
             if result:
                 for r in result:
                     value = self.kwargs.get(r.strip(), None)
-                    if value:
-
+                    if value is not None:
                         if isinstance(value, ElementConstrutor):
                             value = self.to_html(element=value, include_uuid=include_uuid)
 
