@@ -1,4 +1,6 @@
 from uuid import uuid4
+import lxml.html as HTMLPARSER
+from lxml.html import fromstring, tostring
 from typing import Union, Any, Literal
 from pyweber.utils.types import HTMLTag, GetBy
 from pyweber.models.file import File
@@ -23,6 +25,7 @@ class Element(ElementConstrutor): # pragma: no cover
         data: Any = None,
         sanitize: bool = False,
         files: list[File] = None,
+        include_uuid: bool = True,
         **kwargs: str
     ):
         super().__init__(
@@ -37,72 +40,73 @@ class Element(ElementConstrutor): # pragma: no cover
             events=events,
             sanitize=sanitize,
             files=files,
+            include_uuid=include_uuid,
             **kwargs
         )
         self.uuid = getattr(self, 'uuid', None) or str(uuid4())
         self.data = data
         self.__element_methods: dict[str, dict[str, Any]] = {}
-    
+
     @property
     def parent(self):
         return self.__parent
-    
+
     @parent.setter
     def parent(self, value: 'Element'):
         if value is None:
             self.__parent = None
             return
-        
+
         if not isinstance(value, Element):
             raise TypeError("Parent must be an Element instance")
 
         self.__parent = value
-    
+
     @property
     def childs(self):
         return self.__childs
-    
+
     @childs.setter
     def childs(self, value: ChildElements):
         if not isinstance(value, (list, ChildElements)):
             raise TypeError(f"Children must be a ChildElements instances, but got {type(value).__name__}")
-        
+
         if isinstance(value, list):
             value = ChildElements(self).extend(value)
 
         value = self.__render_dynamic_elements(childs=value)
-        
+
         self.__childs = value
-    
+
     @property
     def index(self) -> Union[int, None]:
         return self.parent.childs.index(self) if self.parent else None
-    
+
     def first_child(self) -> Union['Element', None]:
         return self.childs[0] if self.childs else None
-    
+
     def last_child(self) -> Union['Element', None]:
         return self.childs[-1] if self.childs else None
-    
+
     def previous_child(self) -> Union['Element', None]:
         if self.parent:
             return self.parent.childs[self.index-1] if len(self.parent.childs) > 0 else None
-    
+
     def next_child(self) ->Union['Element', None]:
         if self.parent:
             return self.parent.childs[self.index+1] if len(self.parent.childs) >= self.index+1 else None
-    
+
     def add_child(self, child: 'Element'):
         if not isinstance(child,  Element):
             raise TypeError("Child must be Element instances")
-        
+
         self.__childs.append(child)
         child.parent = self
-    
+
     def remove_child(self, child: 'Element'):
         if child not in self.__childs:
             raise IndexError('Child not defined for this parent Element')
-        
+
         self.__childs.remove(child)
         child.parent = None
 
@@ -111,11 +115,11 @@ class Element(ElementConstrutor): # pragma: no cover
             raise TypeError(f'Index must be a integer, but you got {type(index).__name__}')
 
         return self.__childs.pop(index)
-    
+
     def remove(self):
         if self.parent:
             self.parent.remove_child(self)
-    
+
     def focus(self):
         self.set_selection_range(self.selection_end, self.selection_end)
         self.__set_element_methods(method='focus')
@@ -125,36 +129,36 @@ class Element(ElementConstrutor): # pragma: no cover
 
     def select(self):
         self.__set_element_methods(method='select')
-    
+
     def click(self):
         self.__set_element_methods(method='click')
-    
+
     def scroll_into_view(
         self,
         behavior: Literal['instant', 'smooth'] = 'instant',
         block: Literal['start', 'center', 'end'] = 'start'
     ):
         self.__set_element_methods(method='scrollIntoView', behavior=behavior, block=block)
-    
+
     def set_selection_range(self, start: int, end: str):
         self.__set_element_methods(method='setSelectionRange', start=start, end=end)
-    
+
     def getElement(self, by: GetBy, value: str, element: 'Element' = None) -> 'Element':
         results = self.getElements(by=by, value=value, element=element)
 
         return results[0] if results else None
-    
+
     def getElements(self, by: GetBy, value: str, element: 'Element' = None) -> list['Element']:
         element = element or self
         results: list['Element'] = []
 
         if isinstance(by, GetBy):
             by: str = by.value
-        
+
         if by == 'classes':
             if set(value.split()) <= set(element.classes):
                 results.append(element)
-        
+
         elif by in ['attrs', 'style']:
             conditions: list[str] = [pair.strip() for pair in value.split(';') if pair.strip()]
             has = False
@@ -171,24 +175,24 @@ class Element(ElementConstrutor): # pragma: no cover
 
                 elif key.strip() in el and el.get(key.strip(), None) == val.strip():
                     has = True
-            
+
             if has:
                 results.append(element)
-        
+
         elif getattr(element, by, None) == value:
             results.append(element)
-        
+
         if element.childs:
             for child in element.childs:
                 results.extend(self.getElements(by=by, value=value, element=child))
-        
+
         return results
-    
+
     def querySelector(self, selector: str, element: 'Element' = None) -> 'Element':
         results = self.querySelectorAll(selector=selector, element=element)
 
         return results[0] if results else None
-    
+
     def querySelectorAll(self, selector: str, element: 'Element' = None) -> list['Element']:
         element = element or self
         results: list['Element'] = []
@@ -196,28 +200,28 @@ class Element(ElementConstrutor): # pragma: no cover
         if selector.startswith('.'):
             classes = ' '.join(selector.split('.')).strip()
             return self.getElements(by=GetBy.classes, value=classes)
-        
+
         elif selector.startswith('#'):
             if selector[1:].strip() == element.id:
                 results.append(element)
-        
+
         elif selector.startswith('['):
             sel = selector.removeprefix('[').removesuffix(']')
             return self.getElements(by=GetBy.attrs, value=sel)
-        
+
         else:
             if selector.strip() == element.tag:
                 results.append(element)
-        
+
         for child in element.childs:
             results.extend(self.querySelectorAll(selector=selector, element=child))
 
         return results
-    
+
     @property
     def clone(self):
         from pyweber.core.events import TemplateEvents
-        
+
         element = self
 
         cln = Element(
@@ -240,20 +244,20 @@ class Element(ElementConstrutor): # pragma: no cover
             cln.childs.append(child.clone)
 
         return cln
-    
+
     def get_element_methods(self):
         return self.__element_methods
-    
+
     def __set_element_methods(self, method: str, **kwargs):
         self.__element_methods[method] = kwargs
-    
+
     def remove_element_methods(self, method: Any = None):
         if not method:
             self.__element_methods.clear()
             return
-        
+
         self.__element_methods.pop(method, None)
-    
+
     def __render_dynamic_elements(self, childs: ChildElements):
         new_childs: ChildElements = ChildElements(self)
         if childs:
@@ -261,7 +265,7 @@ class Element(ElementConstrutor): # pragma: no cover
                 if isinstance(child, str):
                     if not child.startswith('{{') or not child.endswith('}}'):
                         raise ValueError("{} must be starts with '{{' and ends with '}}'".format(child))
-                    
+
                     key = child.removeprefix('{{').removesuffix('}}').strip()
                     element = self.kwargs.get(key, None)
 
@@ -270,18 +274,88 @@ class Element(ElementConstrutor): # pragma: no cover
 
                     elif isinstance(element, ElementConstrutor):
                         new_childs.append(element)
-                
+
                 elif isinstance(child, ElementConstrutor):
                     new_childs.append(child)
-                
+
                 else:
                     raise TypeError(f'all childs must be str or Element instances, but got {type(child).__name__}')
-        
+
         return new_childs
+
+    @classmethod
+    def from_html(cls, html: str, include_uuid: bool = True, **kwargs):
+        HtmlElement = fromstring(html.strip())
+        return cls._create_element(HTMLElement=HtmlElement, parent=None, include_uuid=include_uuid, **kwargs)
+
+    @classmethod
+    def _create_element(cls, HTMLElement, parent=None, include_uuid: bool = True, **kwargs):
+
+        def gettail(val):
+            try: return val.strip()
+            except: return val
+
+        name = 'comment' if isinstance(HTMLElement, HTMLPARSER.HtmlComment) else HTMLElement.tag
+        attrib = HTMLElement.attrib
+
+        id_ = cls.render_dynamic_values(attrib.pop('id', None), **kwargs)
+        class_str = cls.render_dynamic_values(attrib.pop('class', None), **kwargs)
+        classes = class_str.split() if class_str else []
+
+        style_str = cls.render_dynamic_values(attrib.pop('style', None), **kwargs)
+        style_dict = {}
+        if style_str:
+            for pair in [s.strip() for s in style_str.split(';') if s.strip()]:
+                if ':' in pair:
+                    k, v = pair.split(':', 1)
+                    style_dict[k.strip()] = v.strip()
+
+        uuid = attrib.pop('uuid', None)
+        value = cls.render_dynamic_values(attrib.pop('value', None), **kwargs)
+        content = cls.render_dynamic_values(HTMLElement.text or None, **kwargs)
+
+        events_dict = {k[1:]: attrib.pop(k) for k in list(attrib) if k.startswith('_on')}
+        event_obj = TemplateEvents()
+        for key, event in events_dict.items():
+            if hasattr(event_obj, key): setattr(event_obj, key, event)
+
+        element = cls(
+            tag=name,
+            id=id_,
+            classes=classes,
+            value=value,
+            content=content,
+            events=event_obj,
+            style=style_dict,
+            attrs=dict(attrib),
+            childs=None,
+            sanitize=False,
+            files=[],
+            include_uuid=include_uuid,
+            **kwargs
+        )
+        element.parent = parent
+        element.uuid = uuid
+
+        for child in HTMLElement.getchildren():
+            child_el = cls._create_element(
+                HTMLElement=child,
+                parent=element,
+                include_uuid=include_uuid,
+                **kwargs
+            )
+            element.childs.append(child_el)
+            get_tail = gettail(child.tail)
+
+            if get_tail:
+                uuid_child = "{{" + child_el.uuid + "}}"
+                element.content = (element.content or '') + f"{uuid_child} {get_tail}"
+
+        return element
 
     def update(self):
         raise NotImplementedError
-    
+
     def __deepy_clone(self, obj):
         if isinstance(obj, list):
             return [self.__deepy_clone(item) for item in obj]
@@ -289,6 +363,6 @@ class Element(ElementConstrutor): # pragma: no cover
             return {chave: self.__deepy_clone(valor) for chave, valor in obj.items()}
         else:
             return obj
-    
+
     def __str__(self):
         return self.to_html()

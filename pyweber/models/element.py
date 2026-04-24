@@ -68,8 +68,10 @@ class ElementConstrutor: # pragma: no cover
         events: TemplateEvents,
         sanitize: bool,
         files: list[File],
+        include_uuid: bool,
         **kwargs: str
     ):
+        self.include_uuid = include_uuid
         self.sanitize = sanitize
         self.kwargs = kwargs
         self.tag = tag
@@ -147,9 +149,7 @@ class ElementConstrutor: # pragma: no cover
 
     @uuid.setter
     def uuid(self, value: str):
-        if not value:
-            self.__uuid = str(uuid4())
-            return
+        if not value: value = str(uuid4())
 
         self.__uuid = value.strip()
 
@@ -352,7 +352,7 @@ class ElementConstrutor: # pragma: no cover
             if hasattr(self, 'childs') and self.childs:
                 for child in self.childs:
                     if child.tag == 'option':
-                        if child.value == value:
+                        if child.value == value or child.content == value:
                             child.set_attr('selected', '')
                         else:
                             child.remove_attr('selected')
@@ -383,7 +383,7 @@ class ElementConstrutor: # pragma: no cover
 
         setattr(self.__events, event_type.value, None)
 
-    def to_html(self, element: 'ElementConstrutor' = None, indent: int = 0, include_uuid: bool = True):
+    def to_html(self, element: 'Element' = None, indent: int = 0):
         if not element:
             element = self
 
@@ -391,7 +391,7 @@ class ElementConstrutor: # pragma: no cover
             raise TypeError(f'element must be an Element instances, but got {type(element).__name__}')
 
         indentation = ' ' * indent
-        uuid_attribute = f' uuid="{element.uuid}"' if include_uuid else ""
+        uuid_attribute = f' uuid="{element.uuid}"' if self.include_uuid else ""
         html = f'{indentation}<{element.tag}{uuid_attribute}' if element.tag != 'comment' else f'{indentation}<!--'
 
         if element.id:
@@ -425,15 +425,15 @@ class ElementConstrutor: # pragma: no cover
         if element.tag != 'comment':
             html += '>'
 
-        final_content = str((self.__render_dynamic_values(content=element.content, include_uuid=include_uuid) or ''))
+        final_content = str((self.render_dynamic_values(content=element.content, **self.kwargs) or ''))
         has_children = bool(element.childs)
 
         if has_children or '\n' in final_content:
             html += '\n'
 
         for child in element.childs:
-            child_html = self.to_html(child, indent + 4, include_uuid=include_uuid)
-            uuid_placeholder = f'{{{child.uuid}}}'
+            child_html = self.to_html(child, indent + 4)
+            uuid_placeholder = "{{" + child.uuid + "}}"
 
             if uuid_placeholder in final_content:
                 final_content: str = final_content.replace(uuid_placeholder, child_html)
@@ -450,8 +450,8 @@ class ElementConstrutor: # pragma: no cover
 
         return html
 
-    def __render_dynamic_values(self, content: str, include_uuid: bool = True):
-
+    @classmethod
+    def render_dynamic_values(self, content: str, **kwargs):
 
         if content:
             pattern = r'\{\{(.*?)\}\}'
@@ -459,15 +459,14 @@ class ElementConstrutor: # pragma: no cover
 
             if result:
                 for r in result:
-                    value = self.kwargs.get(r.strip(), None)
+                    value = kwargs.get(r.strip(), None)
                     if value is not None:
                         if isinstance(value, ElementConstrutor):
-                            value = self.to_html(element=value, include_uuid=include_uuid)
+                            value = self.to_html(element=value)
 
                         content = content.replace("{{" + r + "}}", str(value))
 
         return content
-
 
     def create_event_id(self, event: Union[Callable, str], type: str, element_id: str = None):
         from pyweber.core.events import EventBook

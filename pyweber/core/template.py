@@ -1,9 +1,5 @@
 import os
-import re
 from uuid import uuid4
-import lxml.html as HTMLPARSER
-from lxml.etree import Element as LXML_Element
-from pyweber.core.events import TemplateEvents
 from pyweber.core.element import Element
 from pyweber.utils.loads import LoadStaticFiles
 from pyweber.config.config import config
@@ -77,13 +73,11 @@ class Template: # pragma: no cover
         return str(config['app'].get('icon'))
 
     def parse_html(self, html: str = None):
-        if not html:
-            html = self.__template
-
+        if not html: html = self.__template
         return self.__inject_default_elements(root=self.__parse_html(html=html))
 
     def build_html(self, include_doctype: bool = True):
-        html = self.root.to_html(include_uuid=self.__include_uuid)
+        html = self.root.to_html()
 
         if include_doctype:
             html = f'<!DOCTYPE html>\n{html}'
@@ -112,93 +106,12 @@ class Template: # pragma: no cover
                 html = f'<body>{html}</body>'
             html = f'<html>{html}</html>'
 
-        root: HTMLPARSER.HtmlElement = HTMLPARSER.fromstring(html=html)
+        element = Element.from_html(html=html, include_uuid=self.__include_uuid, **self.kwargs)
 
-        if root.find(path='head') is None:
-            root.insert(0, LXML_Element('head'))
-
-        return self.__create_element(HTMLElement=root)
-
-    def __create_element(self, HTMLElement: HTMLPARSER.HtmlElement, parent: Element = None):
-        def gettail(html_element: str | None):
-            try:
-                return html_element.strip()
-            except:
-                return html_element
-
-        if isinstance(HTMLElement, HTMLPARSER.HtmlComment):
-            name = 'comment'
-        else:
-            name = HTMLElement.tag
-
-        id = self.__render_dynamic_values(content=HTMLElement.attrib.pop('id', None), include_uuid=self.__include_uuid)
-
-        class_str = self.__render_dynamic_values(content=HTMLElement.attrib.pop('class', None), include_uuid=self.__include_uuid)
-        classes = class_str.split() if class_str else []
-
-        style_str: str = self.__render_dynamic_values(content=HTMLElement.attrib.pop('style', None), include_uuid=self.__include_uuid)
-        style_dict = {}
-
-        if style_str:
-            style_pair = [s.strip() for s in style_str.split(';') if s.strip()]
-
-            for pair in style_pair:
-                if ':' in pair:
-                    key, value = pair.split(':', 1)
-                    style_dict[key.strip()] = value.strip()
-
-        parent = parent
-        uuid = HTMLElement.attrib.pop('uuid', None)
-        value = self.__render_dynamic_values(content=HTMLElement.attrib.pop('value', None), include_uuid=self.__include_uuid)
-        content: str = self.__render_dynamic_values(content=HTMLElement.text if HTMLElement.text else None, include_uuid=self.__include_uuid)
-        events_dict = {key[1:]: HTMLElement.attrib.pop(key) for key in HTMLElement.attrib if key.startswith('_on')}
-        childrens: list[HTMLPARSER.HtmlElement] = HTMLElement.getchildren()
-
-        event_obj = TemplateEvents()
-        for key, event in events_dict.items():
-            if hasattr(event_obj, key):
-                setattr(event_obj, key, event)
-
-        element = Element(
-            tag=name,
-            id=id,
-            classes=classes,
-            value=value,
-            content=content,
-            events=event_obj,
-            style=style_dict,
-            attrs=dict(HTMLElement.attrib),
-            **self.kwargs
-        )
-        element.parent = parent
-        element.template = self
-        element.uuid = uuid
-
-        if parent:
-            if gettail(HTMLElement.tail):
-                parent.content = parent.content or ''
-                parent.content += f"{{{element.uuid}}} {gettail(HTMLElement.tail)}"
-
-        for child in childrens:
-            element.childs.append(self.__create_element(child, element))
+        if element.tag == 'html':
+            if not element.querySelector('head'): element.childs.insert(0, Element('head'))
 
         return element
-
-    def __render_dynamic_values(self, content: str, include_uuid: bool = True):
-        if content:
-            pattern = r'\{\{(.*?)\}\}'
-            result = re.findall(pattern, content)
-
-            if result:
-                for r in result:
-                    value = self.kwargs.get(r.strip(), None)
-                    if value is not None:
-                        if isinstance(value, Element):
-                            value = self.to_html(element=value, include_uuid=include_uuid)
-
-                        content = content.replace("{{" + r + "}}", str(value))
-
-        return content
 
     def __read_file(self, file_path: str) -> str:
         from pyweber.models.error_pages import ErrorPages
