@@ -1,6 +1,6 @@
 from uuid import uuid4
 import lxml.html as HTMLPARSER
-from lxml.html import fromstring, tostring
+from lxml.html import fromstring
 from typing import Union, Any, Literal
 from pyweber.utils.types import HTMLTag, GetBy
 from pyweber.models.file import File
@@ -312,6 +312,7 @@ class Element(ElementConstrutor): # pragma: no cover
 
         uuid = attrib.pop('uuid', None)
         value = cls.render_dynamic_values(attrib.pop('value', None), **kwargs)
+
         content = cls.render_dynamic_values(HTMLElement.text or None, **kwargs)
 
         events_dict = {k[1:]: attrib.pop(k) for k in list(attrib) if k.startswith('_on')}
@@ -337,6 +338,9 @@ class Element(ElementConstrutor): # pragma: no cover
         element.parent = parent
         element.uuid = uuid
 
+        if element.tag == 'select' and value:
+            __xyza = value
+
         for child in HTMLElement.getchildren():
             child_el = cls._create_element(
                 HTMLElement=child,
@@ -351,6 +355,9 @@ class Element(ElementConstrutor): # pragma: no cover
                 uuid_child = "{{" + child_el.uuid + "}}"
                 element.content = (element.content or '') + f"{uuid_child} {get_tail}"
 
+        if element.tag == 'select' and element.childs:
+            try: element.value = __xyza
+            except: pass
         return element
 
     def update(self):

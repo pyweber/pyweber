@@ -16,6 +16,7 @@ from pyweber.utils.types import (
 )
 
 from pyweber.models.file import File
+from questionary import checkbox
 
 if TYPE_CHECKING: # pragma: no cover
     from pyweber.core.template import Template
@@ -347,7 +348,7 @@ class ElementConstrutor: # pragma: no cover
         if self.tag == 'textarea':
             self.content = value
 
-        if self.tag == 'select':
+        elif self.tag == 'select':
             self.__value = None
             if hasattr(self, 'childs') and self.childs:
                 for child in self.childs:
@@ -356,6 +357,11 @@ class ElementConstrutor: # pragma: no cover
                             child.set_attr('selected', '')
                         else:
                             child.remove_attr('selected')
+
+        elif self.get_attr('type', None) == 'checkbox':
+            self.__value = None
+            if value == 'on':
+                self.set_attr('checked', '')
 
     @property
     def events(self):
