@@ -117,6 +117,7 @@ function connectWebSocket() {
         }
 
         if (data.open) {
+            await update_cookies();
             data.open.new_page
                 ? window.open(data.open.path, '_blank')
                 : (window.location.href = data.open.path);
@@ -230,6 +231,13 @@ function connectWebSocket() {
     };
 
     return socket;
+}
+
+async function update_cookies() {
+    await fetch(`/_pyweber/check-cookies`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+    });
 }
 
 // ─── Envio de ficheiro via HTTP (mantém binário puro, sem compressão JSON) ────

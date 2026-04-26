@@ -30,7 +30,7 @@ class Response:
             "Server": 'Pyweber/1.0',
             "Date": datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT"),
             "Set-Cookie": cookies,
-            "Request-Path": request.path,
+            "Request-Path": request.full_path,
             "Response-Path": route,
             "Access-Control-Allow-Origin": request.origin,
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",

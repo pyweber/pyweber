@@ -476,19 +476,20 @@ class Pyweber(
         try:
             template = state_result.template
 
+            kwargs = {**self.request.body, **self.request.query_params, 'request': self.request} if self.request else {}
             while callable(template) or isinstance(template, RedirectRoute):
-                request_params = {**self.request.body, **self.request.query_params, 'request': self.request} if self.request else {}
+                kwargs = {**kwargs, **state_result.kwargs}
 
                 if callable(template):
-                    kwargs = OpenApiProcessor.prepare_callback_kwargs(
-                        callback=state_result.callback,
-                        **{**state_result.kwargs, **request_params}
-                    )
+                    kwargs = {
+                        **kwargs,
+                        **OpenApiProcessor.prepare_callback_kwargs(callback=state_result.callback, **kwargs)
+                    }
 
                     template = await template(**kwargs) if inspect.iscoroutinefunction(template) else template(**kwargs)
 
                 if isinstance(template, RedirectRoute):
-                    kwargs = {**state_result.kwargs, **request_params, **template.kwargs}
+                    kwargs = {**kwargs, **template.kwargs}
                     redirect_path = self.build_route(route=template.route.full_route_with_params, **kwargs)
 
                     self._check_recursion(route=redirect_path)
@@ -568,6 +569,14 @@ class Pyweber(
                     title='Get File Chunks',
                     process_response=False,
                     methods=['post'],
+                    content_type=ContentTypes.json
+                ),
+                Route(
+                    route='/_pyweber/check-cookies',
+                    template={'message': 'OK'},
+                    methods=['get'],
+                    title='Get Cookies',
+                    process_response=False,
                     content_type=ContentTypes.json
                 ),
                 Route(

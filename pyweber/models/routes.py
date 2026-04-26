@@ -544,7 +544,6 @@ class RouteManager: # pragma: no cover
 
     def get_route_by_path(self, route: str, follow_redirect: bool = True):
         path, _ = self.resolve_path(route=route)
-        path = path.split('?', 1)[0]
 
         if follow_redirect in [True, 1] and self.is_redirected(route=path):
             redirect_route = self.get_redirected_route(route=path)
@@ -597,14 +596,25 @@ class RouteManager: # pragma: no cover
     def __resolve_path__(route: str, list_routes: dict[str, Route | RedirectRoute]):
         kwargs: dict[str, str] = {}
 
+        # Separa path dos query params antes de qualquer processamento
+        clean_route, _, query_string = route.partition('?')
+
+        # Parse dos query params
+        query_params: dict[str, str] = {}
+        if query_string:
+            for pair in query_string.split('&'):
+                key, _, val = pair.partition('=')
+                if key:
+                    query_params[key] = val
+
         for path in list_routes:
             l_route = path.strip('/').split('/')
-            r_route = route.strip('/').split('/')
+            r_route = clean_route.strip('/').split('/')  # usa o path limpo
 
             if len(l_route) != len(r_route):
                 continue
 
-            if '{' in path and len(route) == 1:
+            if '{' in path and len(clean_route) == 1:
                 continue
 
             match = True
@@ -619,9 +629,9 @@ class RouteManager: # pragma: no cover
                     break
 
             if match:
-                return path, kwargs
+                return path, {**kwargs, **query_params}  # merge kwargs + query_params
 
-        return route, kwargs
+        return clean_route, query_params
 
     @staticmethod
     def inspect_function(callback: Callable):
