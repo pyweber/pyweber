@@ -109,7 +109,12 @@ class Route: # pragma: no cover
         self.__callback = callback or self.template if callable(self.template) else lambda **kwargs: self.template
 
     @property
-    def full_route(self): return f"/{self.group.removeprefix('__')}{self.route}" if self.group != self.default_group() else self.route
+    def full_route(self):
+        return f"/{self.group.removeprefix('__')}{self.route}" if self.group != self.default_group() else self.route
+
+    @property
+    def full_route_with_params(self):
+        return f"{self.full_route}{('?' + self.route_with_params.split('?',1)[-1] if self.query_params else '')}"
 
     @property
     def middlewares(self): return self.__middlewares
@@ -330,6 +335,7 @@ class Route: # pragma: no cover
             f'group={self.group}, '
             f'route={self.route}, '
             f'full_route={self.full_route}, '
+            f'route_with_params={self.route_with_params}, '
             f'name={self.name}, '
             f'methods={self.methods}, '
             f'status_code={self.status_code})'
@@ -538,10 +544,12 @@ class RouteManager: # pragma: no cover
 
     def get_route_by_path(self, route: str, follow_redirect: bool = True):
         path, _ = self.resolve_path(route=route)
+        path = path.split('?', 1)[0]
 
         if follow_redirect in [True, 1] and self.is_redirected(route=path):
             redirect_route = self.get_redirected_route(route=path)
             return redirect_route.route
+
         return self.__routes.get(path)
 
     def get_route_by_name(self, name: str):

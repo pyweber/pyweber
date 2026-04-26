@@ -1,3 +1,4 @@
+import re
 from uuid import uuid4
 import lxml.html as HTMLPARSER
 from lxml.html import fromstring
@@ -9,6 +10,8 @@ from pyweber.models.element import (
     TemplateEvents,
     ChildElements
 )
+
+SEARCH_MODE = Literal['exact', 'regex', 'contains', 'startswith', 'endswith']
 
 class Element(ElementConstrutor): # pragma: no cover
     def __init__(
@@ -143,12 +146,79 @@ class Element(ElementConstrutor): # pragma: no cover
     def set_selection_range(self, start: int, end: str):
         self.__set_element_methods(method='setSelectionRange', start=start, end=end)
 
-    def getElement(self, by: GetBy, value: str, element: 'Element' = None) -> 'Element':
-        results = self.getElements(by=by, value=value, element=element)
+    def getElement(self, by: GetBy, value: str, element: 'Element' = None, search_mode: SEARCH_MODE = 'exact') -> 'Element':
+        results = self.getElements(by=by, value=value, element=element, search_mode=search_mode)
 
         return results[0] if results else None
 
-    def getElements(self, by: GetBy, value: str, element: 'Element' = None) -> list['Element']:
+    def getElements(
+        self,
+        by: GetBy,
+        value: str,
+        element: 'Element' = None,
+        search_mode: SEARCH_MODE = 'exact'
+    ) -> list['Element']:
+
+        def matches(target, val) -> bool:
+            if target is None: return False
+
+            # Lista (classes)
+            if isinstance(target, list):
+                search_classes = val.split()  # classes que o utilizador passou
+                match search_mode:
+                    case 'exact':      return set(search_classes) <= set(target)
+                    case 'regex':      return all(any(re.search(cls, t) for t in target) for cls in search_classes)
+                    case 'contains':   return all(any(cls in t for t in target) for cls in search_classes)
+                    case 'startswith': return all(any(t.startswith(cls) for t in target) for cls in search_classes)
+                    case 'endswith':   return all(any(t.endswith(cls) for t in target) for cls in search_classes)
+
+            # Dict (attrs, style)
+            if isinstance(target, dict):
+                conditions = [pair.strip() for pair in val.split(';') if pair.strip()]
+
+                match search_mode:
+                    case 'exact':
+                        for condition in conditions:
+                            key, _, v = condition.partition(':')
+                            if not v: key, _, v = condition.partition('=')
+                            if not v:
+                                if key.strip() not in target: return False
+                            elif target.get(key.strip()) != v.strip():
+                                return False
+                        return True
+
+                    case 'regex':
+                        return all(
+                            any(re.search(cond, k) or re.search(cond, str(v)) for k, v in target.items())
+                            for cond in conditions
+                        )
+                    case 'contains':
+                        return all(
+                            any(cond in k or cond in str(v) for k, v in target.items())
+                            for cond in conditions
+                        )
+                    case 'startswith':
+                        return all(
+                            any(k.startswith(cond) or str(v).startswith(cond) for k, v in target.items())
+                            for cond in conditions
+                        )
+                    case 'endswith':
+                        return all(
+                            any(k.endswith(cond) or str(v).endswith(cond) for k, v in target.items())
+                            for cond in conditions
+                        )
+
+            # String (id, tag, content, etc)
+            target = str(target)
+            match search_mode:
+                case 'exact':      return target == val
+                case 'regex':      return bool(re.search(val, target))
+                case 'contains':   return val in target
+                case 'startswith': return target.startswith(val)
+                case 'endswith':   return target.endswith(val)
+
+            return False
+
         element = element or self
         results: list['Element'] = []
 
@@ -156,50 +226,34 @@ class Element(ElementConstrutor): # pragma: no cover
             by: str = by.value
 
         if by == 'classes':
-            if set(value.split()) <= set(element.classes):
+            if matches(element.classes, value):
                 results.append(element)
 
         elif by in ['attrs', 'style']:
-            conditions: list[str] = [pair.strip() for pair in value.split(';') if pair.strip()]
-            has = False
-
-            el: dict[str, str] = getattr(element, by, {})
-            for condition in conditions:
-                key, _, val = condition.partition(':')
-
-                if not val: key, _, val = condition.partition('=')
-
-                if not val:
-                    if key.strip() in el:
-                        has = True
-
-                elif key.strip() in el and el.get(key.strip(), None) == val.strip():
-                    has = True
-
-            if has:
+            if matches(getattr(element, by, {}), value):
                 results.append(element)
 
-        elif getattr(element, by, None) == value:
+        elif matches(getattr(element, by, None), value):
             results.append(element)
 
         if element.childs:
             for child in element.childs:
-                results.extend(self.getElements(by=by, value=value, element=child))
+                results.extend(self.getElements(by=by, value=value, element=child, search_mode=search_mode))
 
         return results
 
-    def querySelector(self, selector: str, element: 'Element' = None) -> 'Element':
-        results = self.querySelectorAll(selector=selector, element=element)
+    def querySelector(self, selector: str, element: 'Element' = None, search_mode: SEARCH_MODE = 'exact') -> 'Element':
+        results = self.querySelectorAll(selector=selector, element=element, search_mode=search_mode)
 
         return results[0] if results else None
 
-    def querySelectorAll(self, selector: str, element: 'Element' = None) -> list['Element']:
+    def querySelectorAll(self, selector: str, element: 'Element' = None, search_mode: SEARCH_MODE = 'exact') -> list['Element']:
         element = element or self
         results: list['Element'] = []
 
         if selector.startswith('.'):
             classes = ' '.join(selector.split('.')).strip()
-            return self.getElements(by=GetBy.classes, value=classes)
+            return self.getElements(by=GetBy.classes, value=classes, search_mode=search_mode)
 
         elif selector.startswith('#'):
             if selector[1:].strip() == element.id:
@@ -207,14 +261,14 @@ class Element(ElementConstrutor): # pragma: no cover
 
         elif selector.startswith('['):
             sel = selector.removeprefix('[').removesuffix(']')
-            return self.getElements(by=GetBy.attrs, value=sel)
+            return self.getElements(by=GetBy.attrs, value=sel, search_mode=search_mode)
 
         else:
             if selector.strip() == element.tag:
                 results.append(element)
 
         for child in element.childs:
-            results.extend(self.querySelectorAll(selector=selector, element=child))
+            results.extend(self.querySelectorAll(selector=selector, element=child, search_mode=search_mode))
 
         return results
 
@@ -320,6 +374,11 @@ class Element(ElementConstrutor): # pragma: no cover
         for key, event in events_dict.items():
             if hasattr(event_obj, key): setattr(event_obj, key, event)
 
+        attrs = {
+            cls.render_dynamic_values(c, **kwargs): cls.render_dynamic_values(v, **kwargs)
+            for c, v in attrib.items()
+        }
+
         element = cls(
             tag=name,
             id=id_,
@@ -328,7 +387,7 @@ class Element(ElementConstrutor): # pragma: no cover
             content=content,
             events=event_obj,
             style=style_dict,
-            attrs=dict(attrib),
+            attrs=attrs,
             childs=None,
             sanitize=False,
             files=[],
@@ -353,7 +412,10 @@ class Element(ElementConstrutor): # pragma: no cover
 
             if get_tail:
                 uuid_child = "{{" + child_el.uuid + "}}"
-                element.content = (element.content or '') + f"{uuid_child} {get_tail}"
+                element.content = cls.render_dynamic_values(
+                    content=(element.content or '') + f"{uuid_child} {get_tail}",
+                    **kwargs
+                )
 
         if element.tag == 'select' and element.childs:
             try: element.value = __xyza

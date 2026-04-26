@@ -1,6 +1,6 @@
 import os
 from uuid import uuid4
-from pyweber.core.element import Element
+from pyweber.core.element import Element, SEARCH_MODE
 from pyweber.utils.loads import LoadStaticFiles
 from pyweber.config.config import config
 from pyweber.utils.types import HTTPStatusCode, GetBy
@@ -84,21 +84,43 @@ class Template: # pragma: no cover
 
         return html
 
-    def getElement(self, by: GetBy, value: str, element: Element = None):
+    def getElement(
+        self,
+        by: GetBy,
+        value: str,
+        element: Element = None,
+        search_mode: SEARCH_MODE='exact'
+    ):
         if not element: element = self.root
-        return element.getElement(by=by, value=value)
+        return element.getElement(by=by, value=value, search_mode=search_mode)
 
-    def getElements(self, by: GetBy, value: str, element: Element = None):
+    def getElements(
+        self,
+        by: GetBy,
+        value: str,
+        element: Element = None,
+        search_mode: SEARCH_MODE='exact'
+    ):
         if not element: element = self.root
-        return  element.getElements(by=by, value=value)
+        return  element.getElements(by=by, value=value, search_mode=search_mode)
 
-    def querySelector(self, selector: str, element: Element = None):
+    def querySelector(
+        self,
+        selector: str,
+        element: Element = None,
+        search_mode: SEARCH_MODE='exact'
+    ):
         if element is None: element = self.__root
-        return element.querySelector(selector=selector)
+        return element.querySelector(selector=selector, search_mode=search_mode)
 
-    def querySelectorAll(self, selector: str, element: Element = None) -> list[Element]:
+    def querySelectorAll(
+        self,
+        selector: str,
+        element: Element = None,
+        search_mode: SEARCH_MODE='exact'
+    ) -> list[Element]:
         if element is None: element = self.__root
-        return element.querySelectorAll(selector=selector)
+        return element.querySelectorAll(selector=selector, search_mode=search_mode)
 
     def __parse_html(self, html: str) -> Element:
         if not html.replace('<!DOCTYPE html>', '').strip().startswith('<html'):

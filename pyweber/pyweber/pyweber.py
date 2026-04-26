@@ -477,8 +477,9 @@ class Pyweber(
             template = state_result.template
 
             while callable(template) or isinstance(template, RedirectRoute):
+                request_params = {**self.request.body, **self.request.query_params, 'request': self.request} if self.request else {}
+
                 if callable(template):
-                    request_params = {**self.request.body, **self.request.query_params, 'request': self.request} if self.request else {}
                     kwargs = OpenApiProcessor.prepare_callback_kwargs(
                         callback=state_result.callback,
                         **{**state_result.kwargs, **request_params}
@@ -487,14 +488,15 @@ class Pyweber(
                     template = await template(**kwargs) if inspect.iscoroutinefunction(template) else template(**kwargs)
 
                 if isinstance(template, RedirectRoute):
-                    redirect_path = self.build_route(route=template.route.full_route, **{**state_result.kwargs, **template.kwargs})
+                    kwargs = {**state_result.kwargs, **request_params, **template.kwargs}
+                    redirect_path = self.build_route(route=template.route.full_route_with_params, **kwargs)
 
                     self._check_recursion(route=redirect_path)
                     state_result = await self._process_redirect_route(
                         state=state_result,
                         redirect_route=template,
                         redirect_path=redirect_path,
-                        **state_result.kwargs
+                        **kwargs
                     )
 
                     template = state_result.template

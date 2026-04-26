@@ -2,12 +2,12 @@ from datetime import datetime, timezone, timedelta
 
 class CookieManager:
     def __init__(self):
-        self.__cookies: list[str] = []
-    
+        self.__cookies: dict[str, str] = {}
+
     @property
     def cookies(self):
         return self.__cookies
-    
+
     def set_cookie(
         self,
         cookie_name: str,
@@ -25,10 +25,10 @@ class CookieManager:
 
         if httponly:
             cookie += ' HttpOnly;'
-        
+
         if secure:
             cookie += ' Secure;'
-        
+
         if samesite:
             if samesite not in ['Strict', 'Lax']:
                 raise ValueError("SameSite is not valid. Please use one of: ['Strict', 'Lax']")
@@ -54,9 +54,9 @@ class CookieManager:
 
             expires_str = expires.strftime("%a, %d %b %Y %H:%M:%S GMT")
             cookie += f' Expires={expires_str};'
-        
+
         if isinstance(max_age, (int, float)) and max_age > 0:
             cookie += f' Max-Age={max_age};'
-        
+
         if cookie not in self.__cookies:
-            self.__cookies.append(cookie)
+            self.__cookies[cookie_name] = cookie

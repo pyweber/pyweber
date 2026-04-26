@@ -307,6 +307,17 @@ class ElementConstrutor: # pragma: no cover
     def content(self):
         return self.__content
 
+    @property
+    def text_content(self):
+        uuids = re.findall(pattern=r'\{\{(.*?)\}\}', string=self.content or '')
+        child_uuids = {child.uuid for child in self.childs if child.uuid in uuids}
+        result = self.content or ''
+
+        for uuid in child_uuids:
+            u_ = "{{" + uuid + "}}"
+            result = result.replace(u_, '')
+        return result.strip()
+
     @content.setter
     def content(self, value: str):
         if value is None:
@@ -471,7 +482,6 @@ class ElementConstrutor: # pragma: no cover
                             value = self.to_html(element=value)
 
                         content = content.replace("{{" + r + "}}", str(value))
-
         return content
 
     def create_event_id(self, event: Union[Callable, str], type: str, element_id: str = None):

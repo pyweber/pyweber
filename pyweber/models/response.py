@@ -10,7 +10,7 @@ class Response:
         request: Request,
         response_content: bytes,
         code: int,
-        cookies: list[str],
+        cookies: dict[str, str],
         response_type: ContentTypes,
         route: str
     ):
@@ -153,7 +153,7 @@ class Response:
         for key, value in self.headers.items():
             if key == 'Set-Cookie':
                 for cookie in value:
-                    response += f'{key}: {cookie}\r\n'
+                    response += f'{key}: {value[cookie]}\r\n'
 
             elif key == 'Response':
                 pass
