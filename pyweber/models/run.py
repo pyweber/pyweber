@@ -48,7 +48,7 @@ def run(
     @route('/')
     def home():
         return pw.Template(template='Hello, world')
-    
+
     if __name__ == '__main__':
         app.run()
     ```
@@ -94,7 +94,7 @@ def encode_header(headers: dict[str, Any], /,*ignore_headers: str):
 
         if header not in set(map(lambda el: el.strip().lower(), ignore_headers)):
             byte_headers.append((header.encode(), str(value).encode()))
-    
+
     return byte_headers
 
 async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None): # pragma: no cover
@@ -108,7 +108,7 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
             message = await receive()
             body += message.get("body", b"")
             more_body = message.get("more_body", False)
-    
+
     client_info = scope.get('client', (None, 0))
     request = Request(
         headers=scope,
@@ -118,7 +118,7 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
             port=client_info[-1]
         )
     )
-    
+
     ws_server.protocol = 'uvicorn'
 
     if not WS_RUNNING:
@@ -126,7 +126,7 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
 
         ws_server.app = app
         app.ws_server = ws_server
-        
+
         if target and callable(target):
             target(app)
 
@@ -143,7 +143,7 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
         headers = encode_header(response['headers'], 'set-cookie', 'code')
 
         if app.cookies:
-            for cookie in app.cookies:
+            for cookie in app.cookies.values():
                 headers.append((b'set-cookie', cookie.encode()))
 
         await send({

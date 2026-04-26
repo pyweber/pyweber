@@ -126,7 +126,7 @@ class Request: # pragma: no cover
 
     @property
     def cookies(self):
-        return {cookie.split('=')[0]: cookie.split('=')[-1] for cookie in self.headers.get('cookie', '').split(';') if cookie}
+        return {cookie.split('=')[0].strip(): cookie.split('=')[-1].strip() for cookie in self.headers.get('cookie', '').split(';') if cookie}
 
     @property
     def accept_control_request_headers(self):
