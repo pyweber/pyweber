@@ -1,8 +1,10 @@
+import os
 import re
 from uuid import uuid4
 import lxml.html as HTMLPARSER
 from lxml.html import fromstring
 from typing import Union, Any, Literal
+from pyweber.utils.loads import LoadStaticFiles
 from pyweber.utils.types import HTMLTag, GetBy
 from pyweber.models.file import File
 from pyweber.models.element import (
@@ -339,7 +341,7 @@ class Element(ElementConstrutor): # pragma: no cover
 
     @classmethod
     def from_html(cls, html: str, include_uuid: bool = True, **kwargs):
-        HtmlElement = fromstring(html.strip())
+        HtmlElement = fromstring(cls.read_file(html).strip())
         return cls._create_element(HTMLElement=HtmlElement, parent=None, include_uuid=include_uuid, **kwargs)
 
     @classmethod
@@ -422,6 +424,16 @@ class Element(ElementConstrutor): # pragma: no cover
             except: pass
         return element
 
+    @classmethod
+    def read_file(cls, file_path: str) -> str:
+        if file_path.endswith('.html'):
+            path = os.path.join('templates', file_path) if not os.path.isfile(file_path) else file_path
+
+            try: return LoadStaticFiles(path=path).load
+            except FileNotFoundError: raise FileNotFoundError(f'{path} not found, please include on templates path')
+
+        return file_path
+
     def update(self):
         raise NotImplementedError
 
@@ -432,6 +444,7 @@ class Element(ElementConstrutor): # pragma: no cover
             return {chave: self.__deepy_clone(valor) for chave, valor in obj.items()}
         else:
             return obj
+
 
     def __str__(self):
         return self.to_html()

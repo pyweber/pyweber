@@ -6,10 +6,10 @@ class TemplateDiff: # pragma: no cover
     def __init__(self):
         self.__differences: dict[str, dict[str, str]] = {}
         self.__checked_elements: list[Element] = []
-    
+
     @property
     def differences(self): return self.__differences
-    
+
     def __raise_typr_error(self, *elements: Element):
         for element in elements:
             if not isinstance(element, Element):
@@ -18,49 +18,39 @@ class TemplateDiff: # pragma: no cover
     def track_differences(self, new_element: Union[Element, Template], old_element: Union[Element, Template]):
         if isinstance(old_element, Template):
             old_element = old_element.root
-        
+
         if isinstance(new_element, Template):
             new_element = new_element.root
-        
+
         self.__raise_typr_error(old_element, new_element)
-        
+
         status = None
         methods = new_element.get_element_methods()
-        
+
         if new_element.uuid != old_element.uuid:
             status = 'Added'
-
         else:
             if new_element.id != old_element.id:
                 status = 'Changed'
-            
             elif new_element.content != old_element.content:
                 status = 'Changed'
-            
             elif new_element.value != old_element.value:
                 status = 'Changed'
-            
             elif new_element.tag != old_element.tag:
                 status = 'Changed'
-            
             elif new_element.attrs != old_element.attrs:
                 status = 'Changed'
-            
             elif new_element.style != old_element.style:
                 status = 'Changed'
-            
             elif new_element.events.__dict__ != old_element.events.__dict__:
                 status = 'Changed'
-            
             elif [v for v in new_element.classes if v not in old_element.classes]:
                 status = 'Changed'
-            
             elif [v for v in old_element.classes if v not in new_element.classes]:
                 status = 'Changed'
-            
             elif methods:
                 status = 'Changed'
-            
+
         if status:
             self.add_element_on_diff(element=new_element, status=status, methods=methods)
 
@@ -68,22 +58,27 @@ class TemplateDiff: # pragma: no cover
                 self.add_element_on_diff(element=old_element, status='Removed', methods=methods)
 
             self.__checked_elements.append(new_element.uuid)
-        
+
         new_element_childs_map = {child.uuid: child for child in new_element.childs}
         old_element_childs_map = {child.uuid: child for child in old_element.childs}
-        
+
         for uuid, old_child in old_element_childs_map.items():
             if uuid in new_element_childs_map:
                 if old_child.parent and old_child.parent.uuid not in self.__checked_elements:
                     self.track_differences(new_element_childs_map[uuid], old_child)
-            
             else:
-                self.add_element_on_diff(element=old_child, status='Removed', methods=methods)
+                # ✅ só marca Removed se o pai NÃO está já no diff como Changed
+                parent_uuid = old_child.parent.uuid if old_child.parent else None
+                if parent_uuid not in self.__differences or self.__differences[parent_uuid]['status'] != 'Changed':
+                    self.add_element_on_diff(element=old_child, status='Removed', methods=methods)
 
         for uuid, new_child in new_element_childs_map.items():
             if uuid not in old_element_childs_map:
-                self.add_element_on_diff(element=new_child, status='Added', methods=methods)
-    
+                # ✅ só marca Added se o pai NÃO está já no diff como Changed
+                parent_uuid = new_child.parent.uuid if new_child.parent else None
+                if parent_uuid not in self.__differences or self.__differences[parent_uuid]['status'] != 'Changed':
+                    self.add_element_on_diff(element=new_child, status='Added', methods=methods)
+
     def add_element_on_diff(self, element: Element, status: Literal['Added', 'Changed', 'Removed'], methods: dict[str, dict[str, Any]]):
         self.differences[element.uuid] = {
             'parent': element.parent.uuid if element.parent else None,

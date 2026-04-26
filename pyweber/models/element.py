@@ -369,8 +369,7 @@ class ElementConstrutor: # pragma: no cover
                         else:
                             child.remove_attr('selected')
 
-        elif self.get_attr('type', None) == 'checkbox':
-            self.__value = None
+        elif self.attrs.get('type', None) == 'checkbox':
             if value == 'on':
                 self.set_attr('checked', '')
 
@@ -468,7 +467,7 @@ class ElementConstrutor: # pragma: no cover
         return html
 
     @classmethod
-    def render_dynamic_values(self, content: str, **kwargs):
+    def render_dynamic_values(cls, content: str, **kwargs):
 
         if content:
             pattern = r'\{\{(.*?)\}\}'
@@ -479,7 +478,7 @@ class ElementConstrutor: # pragma: no cover
                     value = kwargs.get(r.strip(), None)
                     if value is not None:
                         if isinstance(value, ElementConstrutor):
-                            value = self.to_html(element=value)
+                            value = value.to_html(element=value)
 
                         content = content.replace("{{" + r + "}}", str(value))
         return content

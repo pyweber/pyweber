@@ -1,14 +1,13 @@
 import os
 from uuid import uuid4
 from pyweber.core.element import Element, SEARCH_MODE
-from pyweber.utils.loads import LoadStaticFiles
 from pyweber.config.config import config
 from pyweber.utils.types import HTTPStatusCode, GetBy
 
 class Template: # pragma: no cover
     def __init__(self, template: str, status_code: int = 200, title: str = None, include_uuid: bool = True, **kwargs):
         self.__include_uuid = include_uuid
-        self.__template = self.__read_file(file_path=template)
+        self.__template = Element.read_file(file_path=template)
         self.kwargs = kwargs
         self.data = None
         self.__status_code = status_code
@@ -134,22 +133,6 @@ class Template: # pragma: no cover
             if not element.querySelector('head'): element.childs.insert(0, Element('head'))
 
         return element
-
-    def __read_file(self, file_path: str) -> str:
-        from pyweber.models.error_pages import ErrorPages
-        if file_path.endswith('.html'):
-            path = os.path.join('templates', file_path) if not os.path.isfile(file_path) else file_path
-
-            try:
-                return LoadStaticFiles(path=path).load
-
-            except FileNotFoundError:
-                return ErrorPages().page_server_error.build_html().replace(
-                    "{{error}}",
-                    f'{path} not found, please include on templates file'
-                )
-
-        return file_path
 
     def __create_default_element(self, *args, **kwargs):
         return Element(*args, **kwargs)
