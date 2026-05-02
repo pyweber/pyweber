@@ -246,33 +246,23 @@ class Element(ElementConstrutor): # pragma: no cover
 
     def querySelector(self, selector: str, element: 'Element' = None, search_mode: SEARCH_MODE = 'exact') -> 'Element':
         results = self.querySelectorAll(selector=selector, element=element, search_mode=search_mode)
-
         return results[0] if results else None
 
     def querySelectorAll(self, selector: str, element: 'Element' = None, search_mode: SEARCH_MODE = 'exact') -> list['Element']:
         element = element or self
-        results: list['Element'] = []
 
         if selector.startswith('.'):
             classes = ' '.join(selector.split('.')).strip()
-            return self.getElements(by=GetBy.classes, value=classes, search_mode=search_mode)
+            return self.getElements(by=GetBy.classes, value=classes, element=element, search_mode=search_mode)
 
         elif selector.startswith('#'):
-            if selector[1:].strip() == element.id:
-                results.append(element)
+            return self.getElements(by='id', value=selector[1:].strip(), element=element, search_mode=search_mode)
 
         elif selector.startswith('['):
             sel = selector.removeprefix('[').removesuffix(']')
-            return self.getElements(by=GetBy.attrs, value=sel, search_mode=search_mode)
+            return self.getElements(by='attrs', value=sel, element=element, search_mode=search_mode)
 
-        else:
-            if selector.strip() == element.tag:
-                results.append(element)
-
-        for child in element.childs:
-            results.extend(self.querySelectorAll(selector=selector, element=child, search_mode=search_mode))
-
-        return results
+        return self.getElements(by='tag', value=selector.strip(), element=element, search_mode=search_mode)
 
     @property
     def clone(self):
