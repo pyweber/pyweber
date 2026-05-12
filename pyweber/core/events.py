@@ -19,7 +19,7 @@ class EventData: # pragma: no cover
         self.pageY = event_data.get('pageY', None)
         self.button: int = event_data.get('button', None)
         self.buttons = event_data.get('buttons', None)
-        
+
         # Teclado
         self.key: str = event_data.get('key', None)
         self.code = event_data.get('code', None)
@@ -29,37 +29,37 @@ class EventData: # pragma: no cover
         self.alt_key: bool = event_data.get('altKey', False)
         self.meta_key: bool = event_data.get('metaKey', False)
         self.repeat: bool = event_data.get('repeat', False)
-        
+
         # Scroll/Wheel
         self.deltaX = event_data.get('deltaX', None)
         self.deltaY = event_data.get('deltaY', None)
         self.deltaZ = event_data.get('deltaZ', None)
         self.delta_mode = event_data.get('deltaMode', None)
-        
+
         # Touch
         self.touches = event_data.get('touches', None)
         self.changed_touches = event_data.get('changedTouches', None)
         self.target_touches = event_data.get('targetTouches', None)
-        
+
         # Drag & Drop
         self.data_transfer = event_data.get('dataTransfer', None)
-        
+
         # Clipboard
         self.clipboard_data = event_data.get('clipboardData', None)
-        
+
         # Animação/Transição
         self.animation_name = event_data.get('animationName', None)
         self.elapsed_time = event_data.get('elapsedTime', None)
         self.property_name = event_data.get('propertyName', None)
         self.pseudo_element = event_data.get('pseudoElement', None)
-        
+
         # Meta informações
         self.is_trusted = event_data.get('isTrusted', None)
         self.bubbles = event_data.get('bubbles', None)
         self.cancelable = event_data.get('cancelable', None)
         self.default_prevented: bool = event_data.get('defaultPrevented', False)
         self.event_phase = event_data.get('eventPhase', None)
-        
+
         self.timestamp = event_data.get('timestamp', None)
 
     def __repr__(self):
@@ -90,28 +90,28 @@ class EventHandler: # pragma: no cover
         self.event_data = event_data
         self.session = session
         self.__ws = ws
-    
+
     def update_all(self):
         self.__send__(data=self.__data_to_send__(), session_id=None)
-    
+
     def update(self):
         self.__send__(data=self.__data_to_send__(), session_id=self.session.session_id)
 
     def reload(self):
         self.__send__(data={'reload': True}, session_id=self.session.session_id)
-    
+
     def reload_all(self):
         self.__send__(data={'reload': True}, session_id=None)
-    
+
     def window_data(self):
         return self.__ws.window_response
-    
+
     def __data_to_send__(self):
         return {
             'template': self.template,
             'windowEvents': self.session.window.get_all_event_ids
         }
-    
+
     def __send__(self, data: dict[str, Any], session_id: str):
         try:
             asyncio.get_running_loop()
@@ -146,28 +146,28 @@ class EventConstrutor: # pragma: no cover
         self.__ws = ws
         self.__app = app
         self.__session = session
-    
+
     @property
     def __template(self) -> 'Template':
         return self.__session.template
-    
+
     @property
     def __window(self) -> 'Window':
         return self.__session.window
-    
+
     @property
     def __target_element(self) -> 'Element':
         return self.__template.getElement(
             by='uuid',
             value=self.__target_id
         )
-    
+
     @property
     def __current_target_element(self):
         if self.__target_id == self.__current_target_id:
             return self.__target_element
         return self.__template.getElement(by='uuid', value=self.__current_target_id)
-    
+
     def build_event(self):
         return EventHandler(
             event_type=self.event_type,
@@ -183,6 +183,7 @@ class EventConstrutor: # pragma: no cover
         )
 
 EventBook: dict[str, dict[str, Union[Callable, dict[str, list[str]]]]] = {}
+WindowBookEvents: dict[str, dict[str, Callable]] = {}
 
 class TemplateEvents: # pragma: no cover
     def __init__(
@@ -304,10 +305,10 @@ class TemplateEvents: # pragma: no cover
         self.ontouchmove = ontouchmove
         self.ontouchend = ontouchend
         self.ontouchcancel = ontouchcancel
-    
+
     def events(self):
         return [name.replace('on', '') for name, event in self.__dict__.items() if event]
-    
+
     def __repr__(self):
         """Representação legível dos eventos."""
         events = {k: v for k, v in self.__dict__.items() if v is not None}

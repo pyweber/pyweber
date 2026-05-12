@@ -8,6 +8,7 @@ import logging
 import asyncio
 from typing import Union, Callable, Any, AsyncGenerator
 from dataclasses import dataclass
+from pyweber.utils.types import WindowEventType
 from pyweber.core.element import Element
 from pyweber.core.template import Template
 from pyweber.models.request import Request
@@ -27,6 +28,7 @@ from pyweber.models.routes import (
 )
 
 from pyweber.models.openapi import OpenApiProcessor
+from pyweber.core.events import WindowBookEvents
 
 from pyweber.utils.utils import PrintLine
 from pyweber.models.file import File
@@ -130,6 +132,20 @@ class Pyweber(
     def ws_server(self, value: WebsocketManager):
         assert isinstance(value, WebsocketManager)
         self.__ws_server = value
+
+    def events(self, event_type: WindowEventType, route: str = None):
+        assert isinstance(event_type, WindowEventType)
+        def decorator(handler: Callable[..., Any]):
+            async def wrapper(e):
+                response = await handler(e) if inspect.iscoroutinefunction(handler) else handler(e)
+                return response
+
+            WindowBookEvents[f'event_{id(handler)}'] = {
+                'type': event_type.value
+            }
+
+            return wrapper
+        return decorator
 
     def static(self, *directories: str):
         self.__static_directories.update(directories)

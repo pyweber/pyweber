@@ -367,9 +367,12 @@ class RouteManager: # pragma: no cover
 
     def clear_routes(self):
         """Remove all public routes. Routes that starts with __ are not removed"""
-        for key, value  in self.__routes.items():
-            if value.group and not str(value.group).startswith('__'):
-                del self.__routes[key]
+        keys_to_remove = [
+            key for key, value in self.__routes.items()
+            if value.group and not str(value.group).startswith('__')
+        ]
+        for key in keys_to_remove:
+            del self.__routes[key]
 
     def is_redirect_status_code(self, status_code: int):
         return status_code in RedirectRoute.redirected_status_code()
@@ -534,9 +537,12 @@ class RouteManager: # pragma: no cover
             del self.__routes[self.full_route(route=route, group=group)]
 
     def remove_group(self, group: str):
-        for key, value in self.__routes.items():
-            if group != self.default_group and group == value.group:
-                del self.__routes[key]
+        keys_to_remove = [
+            key for key, value in self.__routes.items()
+            if group != self.default_group and group == value.group
+        ]
+        for key in keys_to_remove:
+            del self.__routes[key]
 
     def remove_redirected_route(self, route: str):
         if route in self.__redirects:
