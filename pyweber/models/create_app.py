@@ -98,9 +98,28 @@ class CreatApp:
         modules: dict[str, ModuleType] = {}
 
         for key, value in sys.modules.items():
-            if hasattr(value, '__file__') and str(self.project_path) in str(value.__file__):
+            if hasattr(value, '__file__') and value.__file__ and str(self.project_path) in str(value.__file__):
                 modules[key] = value
         return modules
+
+    def _ordered_project_modules(self):
+        return sorted(
+            self.project_modules().items(),
+            key=lambda item: item[0].count('.'),
+            reverse=True,
+        )
+
+    def _should_reload_module(self, module_name: str, module: ModuleType) -> bool:
+        if not self.is_reloadable_module(module_name):
+            return False
+
+        if module_name == '__main__':
+            main_file = getattr(module, '__file__', None)
+            if not main_file:
+                return False
+            return Path(main_file).resolve() == Path(sys.argv[0]).resolve()
+
+        return True
     
     def path_to_module(self, filepath: str):
         rel_path = Path(filepath).resolve().relative_to(self.project_path)
@@ -121,13 +140,24 @@ class CreatApp:
     def reload_modules(self, changed_file: str):
         try:
             if changed_file and str(changed_file).endswith('.py'):
-                module_name = self.path_to_module(filepath=changed_file)
+                try:
+                    module_name = self.path_to_module(filepath=changed_file)
+                except ValueError:
+                    module_name = None
 
-                if module_name in sys.modules:
-                    if self.is_reloadable_module(module_name):
-                        reload(sys.modules[module_name])
-                else:
+                if module_name and module_name not in sys.modules:
                     import_module(module_name)
+
+                for key, module in self._ordered_project_modules():
+                    if not self._should_reload_module(key, module):
+                        continue
+                    try:
+                        reload(module)
+                    except Exception as exc:
+                        PrintLine(
+                            text=f'Error reloading module {key}: {exc}',
+                            level='WARNING',
+                        )
 
                 self.reset_reload_globals()
 

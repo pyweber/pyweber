@@ -50,9 +50,11 @@ class TestCreatAppReload:
         with patch.object(CreatApp, 'project_path', tmp_path):
             assert creat_app.path_to_module(str(file_path)) == 'pkg.routes'
 
-    def test_reload_modules_only_reloads_changed_module(self, creat_app, tmp_path):
+    def test_reload_modules_reloads_all_project_modules(self, creat_app, tmp_path):
         mod_path = tmp_path / 'changed.py'
         mod_path.write_text('VALUE = 1\n', encoding='utf-8')
+        other_path = tmp_path / 'other.py'
+        other_path.write_text('VALUE = 2\n', encoding='utf-8')
 
         module = types.ModuleType('changed')
         module.VALUE = 1
@@ -60,7 +62,7 @@ class TestCreatAppReload:
         sys.modules['changed'] = module
 
         other = types.ModuleType('other')
-        other.__file__ = str(tmp_path / 'other.py')
+        other.__file__ = str(other_path)
         sys.modules['other'] = other
 
         with patch.object(CreatApp, 'project_path', tmp_path), \
@@ -69,8 +71,31 @@ class TestCreatAppReload:
              patch.object(creat_app, 'reset_reload_globals') as reset_mock, \
              patch('pyweber.models.create_app.reload') as reload_mock:
             creat_app.reload_modules(str(mod_path))
-            reload_mock.assert_called_once_with(module)
+            assert reload_mock.call_count == 2
+            reload_mock.assert_any_call(module)
+            reload_mock.assert_any_call(other)
             reset_mock.assert_called_once()
 
         sys.modules.pop('changed', None)
         sys.modules.pop('other', None)
+
+    def test_should_reload_module_skips_non_reloadable(self, creat_app):
+        module = types.ModuleType('myapp.database.models')
+        module.__file__ = str(creat_app.project_path / 'database' / 'models.py')
+        assert creat_app._should_reload_module('myapp.database.models', module) is False
+
+    def test_ordered_project_modules_deepest_first(self, creat_app, tmp_path):
+        shallow = types.ModuleType('pkg')
+        shallow.__file__ = str(tmp_path / 'pkg' / '__init__.py')
+        deep = types.ModuleType('pkg.views')
+        deep.__file__ = str(tmp_path / 'pkg' / 'views.py')
+        sys.modules['pkg'] = shallow
+        sys.modules['pkg.views'] = deep
+
+        with patch.object(CreatApp, 'project_path', tmp_path):
+            ordered = creat_app._ordered_project_modules()
+
+        assert [name for name, _ in ordered] == ['pkg.views', 'pkg']
+
+        sys.modules.pop('pkg', None)
+        sys.modules.pop('pkg.views', None)
