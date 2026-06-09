@@ -531,7 +531,7 @@ class CommandFunctions:
         config.save()
     
     def install_requirements(self, path: str):
-        if not Path.exists(path):
+        if not Path(path).exists():
             raise FileNotFoundError('This project does not have a config file')
         
         requires: list[str] = config.get('requirements', 'packages')
