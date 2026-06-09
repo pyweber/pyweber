@@ -11,6 +11,7 @@ from typing import Union, Any
 from concurrent.futures import ThreadPoolExecutor
 
 from pyweber.pyweber.pyweber import Pyweber
+from pyweber.utils.async_utils import async_timeout
 from pyweber.utils.utils import Colors, PrintLine
 from pyweber.models.request import Request, ClientInfo
 from pyweber.connection.websocket import WebsocketUpgrade, WebsocketServer
@@ -50,7 +51,7 @@ class HttpServer:
     async def process_request(self, client: Union[socket.socket, ssl.SSLSocket]):
         try:
             request_data = bytearray()
-            async with asyncio.timeout(self.timeout):
+            async with async_timeout(self.timeout):
                 while b'\r\n\r\n' not in request_data:
                     chunk = await self.read_data(client, 4096)
                     if not chunk: break
@@ -65,7 +66,7 @@ class HttpServer:
                 content_length = int(content_match.group(1))
 
             body = bytearray(body_start)
-            async with asyncio.timeout(self.timeout):
+            async with async_timeout(self.timeout):
                 while len(body) < content_length:
                     remaining = content_length - len(body)
                     chunk = await self.read_data(client, remaining)
@@ -186,7 +187,7 @@ class HttpServer:
                 content_length = int(match.group(1))
 
             body = bytearray(body_start)
-            async with asyncio.timeout(self.timeout):
+            async with async_timeout(self.timeout):
                 while len(body) < content_length:
                     chunk = await asyncio.get_event_loop().run_in_executor(
                         None, client.recv, content_length - len(body)

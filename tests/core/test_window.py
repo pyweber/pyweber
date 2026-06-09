@@ -56,14 +56,14 @@ class TestWindowProxy:
 
 
 class TestStorageClasses:
-    @patch('pyweber.core.window.asyncio.run')
+    @patch('asyncio.run')
     def test_local_storage_set(self, mock_run):
         ws = Mock()
         storage = LocalStorage(data={}, session_id='s1', ws=ws)
         storage.set('key', 'value')
         assert storage.data['key'] == 'value'
 
-    @patch('pyweber.core.window.asyncio.run')
+    @patch('asyncio.run')
     def test_session_storage_pop(self, mock_run):
         ws = Mock()
         storage = SessionStorage(data={'k': 'v'}, session_id='s1', ws=ws)
