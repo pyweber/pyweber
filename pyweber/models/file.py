@@ -1,6 +1,6 @@
 from pyweber.models.field import Field
 
-class File: # pragma: no cover
+class File:
     def __init__(self, field: Field):
         self.filename = field.filename
         self.content = field.value

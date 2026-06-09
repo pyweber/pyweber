@@ -3,7 +3,19 @@ from pathlib import Path
 import shutil
 import pytest
 
+
+@pytest.fixture(autouse=True)
+def reset_config_path():
+    original = config.path
+    yield
+    if original:
+        config.set_parameters(path=Path(original).parent, name=Path(original).name)
+    else:
+        config.set_parameters('.pyweber', 'config.toml')
+
+
 def test_get_path():
+    config.set_parameters('.pyweber', 'config.toml')
     assert config.path == str(Path('.pyweber', 'config.toml'))
 
 def test_get_keys():

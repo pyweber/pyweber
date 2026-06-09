@@ -468,6 +468,8 @@ except RouteNameAlreadyExistError:
     print("Route name already exists")
 ```
 
+To support multiple HTTP verbs on the same path, register **once** with `methods=['GET', 'POST', ...]` or call `update_route()`. See [routing guide](../guides/routing-advanced.md#multiple-http-methods-on-one-path).
+
 ### Missing Routes
 ```python
 try:

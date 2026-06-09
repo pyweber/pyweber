@@ -4,7 +4,7 @@ from pyweber.models.request import Request, ClientInfo
 from pyweber.connection.websocket import WebsocketManager
 import os
 
-if TYPE_CHECKING: # pragma: no cover
+if TYPE_CHECKING:
     from pyweber.pyweber.pyweber import Pyweber
 
 WS_RUNNING = False
@@ -23,7 +23,7 @@ def run(
         ignore_reload_time: int = 10,
         mobile: bool = False,
         **kwargs
-    ): # pragma: no cover
+    ):
     """
     For running the pyweber project.
     ```python
@@ -97,7 +97,7 @@ def encode_header(headers: dict[str, Any], /,*ignore_headers: str):
 
     return byte_headers
 
-async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None): # pragma: no cover
+async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = None):
     global WS_RUNNING
     global ws_server
 
@@ -140,10 +140,11 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
         os.environ['PYWEBER_WS_PORT'] = str(request.port)
         response = await app.get_response(request=request)
 
-        headers = encode_header(response['headers'], 'set-cookie', 'code')
+        headers = encode_header(response.headers, 'set-cookie', 'code')
 
-        if app.cookies:
-            for cookie in app.cookies.values():
+        set_cookies = response.headers.get('Set-Cookie', {})
+        if isinstance(set_cookies, dict):
+            for cookie in set_cookies.values():
                 headers.append((b'set-cookie', cookie.encode()))
 
         await send({

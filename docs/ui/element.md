@@ -2,6 +2,9 @@
 
 Elements are the fundamental building blocks of PyWeber applications, representing HTML elements with a powerful object-oriented API for DOM manipulation.
 
+!!! tip "Read this first"
+    Before deep-diving here, read the **[Element model guide](../guides/element-model.md)** — it explains how `childs`, `content`, and `{{placeholders}}` stay in sync. Most ordering bugs come from skipping that page.
+
 ## Creating Elements
 
 Elements can be created programmatically or retrieved from templates:
@@ -78,29 +81,27 @@ The `clone` property performs a deep copy of the entire element tree, ensuring t
 
 ## Advanced Content with Child Elements
 
-PyWeber allows you to combine text content with child elements using a special placeholder syntax:
+PyWeber combines text `content` with child elements using **`{{uuid}}` placeholders** (double braces):
+
 ```python
-# Create a button with an icon and text
-button = pw.Element(
-    tag="button",
-    id="action-btn",
-    classes=["btn", "primary"]
-)
-
-# Create an icon element
-icon = pw.Element(
-    tag="i",
-    classes=["bi", "bi-play-fill"]
-)
-
-# Add icon as a child
-button.childs = [icon]
-
-# Set content with placeholder for the icon
-button.content = f"{{{icon.uuid}}} Start Process"
+icon = pw.Element(tag='i', classes=['bi', 'bi-play-fill'])
+button = pw.Element(tag='button', classes=['btn', 'primary'], childs=[icon])
+# Placeholder uses the icon's UUID — registered automatically when assigning childs
+button.content = f"{{{{{icon.uuid}}}}} Start Process"
 ```
 
-This creates a button with the icon followed by the text "Start Process". The `{uuid}` syntax is a placeholder that will be replaced with the rendered child element.
+You can also pass slots via kwargs:
+
+```python
+middle = pw.Element('em', content='middle')
+parent = pw.Element(
+    'div',
+    childs=[pw.Element('span', content='A'), '{{middle}}', pw.Element('span', content='B')],
+    middle=middle,
+)
+```
+
+See [Element model](../guides/element-model.md) for full details.
 
 ## Form Components
 
@@ -160,9 +161,7 @@ class IconButton(pw.Element):
 
         # Add icon as child
         self.childs = [self.icon]
-
-        # Set content with placeholder
-        self.content = f"{{{self.icon.uuid}}} {content}"
+        self.content = f"{{{{{self.icon.uuid}}}}} {content}"
 ```
 Usage:
 ```python
@@ -243,17 +242,23 @@ last_child = parent.childs[-1]
 ## Element Selection
 
 Elements provide methods to find child elements:
+
 ```python
-# Select by CSS selector
+# CSS selectors (preferred)
 button = element.querySelector("#submit-button")
 items = element.querySelectorAll(".item")
 
-# Select by attribute
-element.getElement(by="id", value="header")
-element.getElements(by="classes", value="card")
-element.getElements(by="attrs", value="type:submit")
-element.getElements(by="style", value="color:blue")
+# Attribute-based lookup
+from pyweber.utils.types import GetBy
+
+element.getElement(by=GetBy.ID, value="header")
+element.getElements(by=GetBy.CLASSES, value="card")
+element.getElements(by=GetBy.ATTRS, value="type:submit")
+element.getElements(by=GetBy.STYLE, value="color:blue")
 ```
+
+!!! note "Deprecated methods removed in 1.0.2+"
+    `getElementById`, `getElementByClass`, and `getElementByUUID` on templates were replaced by `getElement` / `getElements` with `GetBy`.
 
 ## Event Handling
 
@@ -281,39 +286,31 @@ button.remove_event(EventType.CLICK)
 
 ## Efficient DOM Updates with TemplateDiff
 
-PyWeber uses an intelligent diffing algorithm to efficiently update the DOM:
+PyWeber uses an intelligent diffing algorithm to efficiently update the DOM. This runs automatically when you call `e.update()` — you rarely need to use `TemplateDiff` directly.
 
 ```python
-from pyweber import TemplateDiff
+from pyweber.models.template_diff import TemplateDiff
 
-# Create original element structure
 original = pw.Element(
     tag="div",
     classes=["container"],
     childs=[
         pw.Element(tag="p", content="Hello world"),
-        pw.Element(tag="button", content="Press")
-    ]
+        pw.Element(tag="button", content="Press"),
+    ],
 )
 
-# Create a clone and modify it
 modified = original.clone
 modified.add_class("main")
 modified.childs[0].content = "Updated content"
-modified.remove_child(modified.childs[1])
-modified.add_child(pw.Element(tag="span", content="New element"))
 
-# Generate diff between versions
-diff = TemplateDiff(new_element=modified, old_element=original)
+diff = TemplateDiff()
+diff.track_differences(modified, original)
 
-# The diff contains only the actual changes:
-# - Added class to container
-# - Updated content of paragraph
-# - Removed button
-# - Added span element
+# diff.differences maps uuid → {status, element, parent, ...}
 ```
 
-This diffing system allows PyWeber to send only the necessary changes to the client, minimizing network traffic and improving performance.
+See [Reactivity guide](../guides/reactivity.md) for the full update loop.
 
 ## Example: Clock Component
 
@@ -392,7 +389,7 @@ class ClockSpace(pw.Element):
 1. **Use Custom Components**: Create reusable components by extending Element
 2. **Use Form Components**: Leverage the built-in form components for proper HTML attributes
 3. **Leverage Clone**: Use the clone property when you need independent copies
-4. **Combine Content and Children**: Use the `{uuid}` placeholder syntax to mix text and elements
+4. **Combine content and children**: Use `{{uuid}}` placeholders — see [Element model](../guides/element-model.md)
 5. **Maintain Element Hierarchy**: Keep parent-child relationships consistent
 6. **Update the UI**: Always call `e.update()` after making changes
 7. **Use Semantic HTML**: Choose appropriate HTML tags for their intended purpose
@@ -419,7 +416,7 @@ def add_comment(self, e: pw.EventHandler):
 
         # Add avatar as child and use placeholder in content
         comment.childs = [avatar]
-        comment.content = f"{{{avatar.uuid}}} {text}"
+        comment.content = f"{{{{{avatar.uuid}}}}} {text}"
 
         # Add to comments section
         self.comments_section.add_child(comment)
@@ -454,6 +451,7 @@ for i in range(5):
 
 ## Next Steps
 
-- Learn about [Templates](template.md) for creating complete pages
-- Explore [Pyweber](router.md) for handling navigation
-- Understand [Event Handling](events.md) in more detail
+- [Element model guide](../guides/element-model.md) — placeholders and child order
+- [Templates](template.md) for creating complete pages
+- [Pyweber application](../core/pyweber.md) for routing
+- [Event handling](../interaction/events.md) in more detail

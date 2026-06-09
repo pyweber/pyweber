@@ -27,21 +27,27 @@ event_data.timestamp  # Time when the event occurred
 ## EventHandler
 
 The `EventHandler` object is passed to every event handler function and provides context and methods:
+
 ```python
 # EventHandler properties
-e.event_type  # Type of event (e.g., "onclick")
-e.route       # Current route path
-e.element     # Element that triggered the event
-e.template    # Template containing the element
-e.window      # Browser window object
-e.event_data  # Data specific to the event
-e.app         # PyWeber application instance
-e.session_id  # Current user session ID
+e.event_type       # Type of event (e.g., "onclick")
+e.route            # Current route path
+e.target           # Element that triggered the event (use this)
+e.current_target   # Element that owns the handler
+e.template         # Template containing the element
+e.window           # Browser window object
+e.event_data       # Data specific to the event
+e.app              # PyWeber application instance
+e.session          # Session for this browser tab
 
 # EventHandler methods
-e.update()    # Update the UI after changes
-e.reload()    # Reload the current page
+e.update()         # Update the UI after changes
+e.update_all()     # Sync state to other connected clients
+e.reload()         # Reload the current page
 ```
+
+!!! note "`e.element` is deprecated"
+    Use `e.target` instead. `e.element` still works but will be removed in a future release.
 
 ## Registering Event Handlers
 
@@ -289,9 +295,8 @@ class TodoList(pw.Template):
 
     async def handle_list_click(self, e: pw.EventHandler):
         # Check if the clicked element is a delete button
-        if "delete-btn" in e.element.classes:
-            # Find the parent todo item
-            todo_item = e.element.parent
+        if "delete-btn" in e.target.classes:
+            todo_item = e.target.parent
 
             # Remove from list
             self.todo_list.remove_child(todo_item)
@@ -309,6 +314,7 @@ class TodoList(pw.Template):
 
 ## Next Steps
 
-- Learn about [Elements](elements.md) for DOM manipulation
-- Explore [Templates](template.md) for creating complete pages
-- Understand [Pyweber](router.md) for handling navigation
+- [Element model guide](../guides/element-model.md) — placeholders and child order
+- [Elements](../ui/element.md) for DOM manipulation
+- [Templates](../ui/template.md) for creating complete pages
+- [Pyweber application](../core/pyweber.md) for routing

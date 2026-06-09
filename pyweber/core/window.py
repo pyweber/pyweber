@@ -8,7 +8,7 @@ from pyweber.core.events import WindowEvents
 from pyweber.connection.websocket import WebsocketManager
 from pyweber.utils.types import WindowEventType, OrientationType, BaseStorage
 
-class Orientation: # pragma: no cover
+class Orientation:
     def __init__(self, angle: int, type: OrientationType, on_change: Callable = None):
         self.angle = angle
         self.on_change = on_change
@@ -29,7 +29,7 @@ class Orientation: # pragma: no cover
 
         self.__on_change = event
 
-class Screen: # pragma: no cover
+class Screen:
     def __init__(
         self,
         width: float,
@@ -48,7 +48,7 @@ class Screen: # pragma: no cover
         self.screenX = screenX
         self.screenY = screenY
 
-class Location: # pragma: no cover
+class Location:
     def __init__(
         self,
         host: str,
@@ -63,7 +63,7 @@ class Location: # pragma: no cover
         self.route = route
         self.protocol = protocol
 
-class LocalStorage(BaseStorage): # pragma: no cover
+class LocalStorage(BaseStorage):
     """Localstorage"""
     def __init__(self, data: dict[str, (int, float)], session_id: str, ws: 'WebsocketManager'):
         super().__init__(data=data)
@@ -102,7 +102,7 @@ class LocalStorage(BaseStorage): # pragma: no cover
                 session_id=self.sesssion_id
             ))
 
-class SessionStorage(BaseStorage): # pragma: no cover
+class SessionStorage(BaseStorage):
     """SessionStorage"""
     def __init__(self, data: dict[str, (int, float)], session_id: str, ws: 'WebsocketManager'):
         super().__init__(data=data)
@@ -137,7 +137,7 @@ class SessionStorage(BaseStorage): # pragma: no cover
                 session_id=self.sesssion_id
             ))
 
-class Confirm: # pragma: no cover
+class Confirm:
     def __init__(self, confirm_result: str, confirm_id: str):
         self.result=confirm_result
         self.id=confirm_id
@@ -145,7 +145,7 @@ class Confirm: # pragma: no cover
     def __repr__(self):
         return f'result={self.result}, id={self.id}'
 
-class Prompt: # pragma: no cover
+class Prompt:
     def __init__(self, prompt_result: str, prompt_id: str):
         self.result=prompt_result
         self.id=prompt_id
@@ -153,7 +153,7 @@ class Prompt: # pragma: no cover
     def __repr__(self):
         return f'result={self.result}, id={self.id}'
 
-class Window: # pragma: no cover
+class Window:
     def __init__(self):
         self.__events_dict: dict[str, Callable] = {}
         self.width: float = 0.0
@@ -325,4 +325,26 @@ class Window: # pragma: no cover
                 session_id=self.session_id
             ))
 
-window = Window()
+
+class _WindowProxy:
+    """Delegates to the per-session Window stored in the active context."""
+
+    def __getattr__(self, name):
+        from pyweber.models.context import get_current_window
+
+        ctx = get_current_window()
+        if ctx is not None:
+            return getattr(ctx, name)
+        raise RuntimeError(
+            'No active window context. Use e.window inside event handlers, '
+            'or pw.session() while handling a WebSocket message.'
+        )
+
+    def __repr__(self):
+        from pyweber.models.context import get_current_window
+
+        ctx = get_current_window()
+        return repr(ctx) if ctx is not None else 'Window(no active context)'
+
+
+window = _WindowProxy()

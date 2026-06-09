@@ -778,33 +778,38 @@ Route(
 ## Common Patterns
 
 ### RESTful API Routes
+
+Use **one route per path** with every HTTP verb in `methods`, then branch in the handler:
+
 ```python
-# RESTful user resource
-user_routes = [
-    Route(route="/users", template=list_users, methods=["GET"]),
-    Route(route="/users", template=create_user, methods=["POST"]),
-    Route(route="/users/{user_id}", template=get_user, methods=["GET"]),
-    Route(route="/users/{user_id}", template=update_user, methods=["PUT"]),
-    Route(route="/users/{user_id}", template=delete_user, methods=["DELETE"])
-]
+@app.route('/users', methods=['GET', 'POST'])
+def users_collection(request: pw.Request):
+    if request.method == 'GET':
+        return list_users()
+    return create_user()
+
+@app.route('/users/{user_id}', methods=['GET', 'PUT', 'DELETE'])
+def user_detail(user_id: int, request: pw.Request):
+    if request.method == 'GET':
+        return get_user(user_id)
+    if request.method == 'PUT':
+        return update_user(user_id)
+    return delete_user(user_id)
 ```
 
-### Form Handling Pattern
-```python
-# Display form
-form_route = Route(
-    route="/contact",
-    template=contact_form_template,
-    methods=["GET"]
-)
+!!! warning
+    Pyweber does **not** allow multiple `Route` objects on the same path (e.g. separate GET and POST registrations). That raises `RouteAlreadyExistError`. See [routing guide](../guides/routing-advanced.md#multiple-http-methods-on-one-path).
 
-# Process form
-form_handler = Route(
-    route="/contact",
-    template=process_contact_form,
-    methods=["POST"],
-    callback=process_contact_form
-)
+### Form Handling Pattern
+
+Single route with GET and POST:
+
+```python
+@app.route('/contact', methods=['GET', 'POST'])
+def contact(request: pw.Request):
+    if request.method == 'GET':
+        return contact_form_template()
+    return process_contact_form(request)
 ```
 
 ### API Versioning
@@ -827,10 +832,11 @@ v2_routes = [
 ### Common Issues
 
 1. **Route not matching**: Ensure route starts with '/'
-2. **Method not allowed**: Check methods list includes the HTTP method
-3. **Middleware errors**: Verify all middleware functions are callable
-4. **Parameter extraction**: Ensure callback parameters match URL parameters
-5. **Content type issues**: Set appropriate ContentTypes for response
+2. **405 Method Not Allowed**: The path exists but the verb is missing from `methods` — add it via `@app.route(..., methods=[...])` or `update_route()`. Response includes `Allow: ...` (1.3.0+).
+3. **RouteAlreadyExistError**: Only one registration per path — combine verbs in one `methods` list instead of separate routes.
+4. **Middleware errors**: Verify all middleware functions are callable
+5. **Parameter extraction**: Ensure callback parameters match URL parameters
+6. **Content type issues**: Set appropriate ContentTypes for response
 
 ### Debugging Routes
 ```python

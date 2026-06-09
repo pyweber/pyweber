@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from time import time
 
 @dataclass
-class StreamStats: # pragma: no cover
+class StreamStats:
     total_bytes: int = 0
     total_chunks: int = 0
     elapsed_ms: float = 0.0
@@ -38,7 +38,7 @@ class StreamStats: # pragma: no cover
         }
 
 
-class AdaptiveController: # pragma: no cover
+class AdaptiveController:
     """Controla chunk_size e interval dinamicamente"""
 
     def __init__(self, max_size: int):

@@ -122,13 +122,22 @@ from .components.input import (
     InputUrl
 )
 
-def session_id() -> str | None: # pragma: no cover
-    PrintLine(text='This is an experimental feature', level='WARNING')
-    return window.session_storage.get('_pyweber_sessionId', None)
+def session_id() -> str | None:
+    from pyweber.models.context import get_current_window
 
-def session(): # pragma: no cover
+    ctx_window = get_current_window()
+    if ctx_window and ctx_window.session_id:
+        return ctx_window.session_id
+
     PrintLine(text='This is an experimental feature', level='WARNING')
-    return sessions.get_session(session_id())
+    return None
+
+def session():
+    sid = session_id()
+    if not sid:
+        PrintLine(text='This is an experimental feature', level='WARNING')
+        return None
+    return sessions.get_session(sid)
 
 __all__ = [
     'Template',

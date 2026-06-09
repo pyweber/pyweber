@@ -196,9 +196,10 @@ If you encounter issues during installation or setup:
 
 Now that you have PyWeber installed, you can:
 
-- Explore [Templates](template.md) for creating UI components
-- Learn about [Elements](element.md) for DOM manipulation
-- Understand [Events](events.md) for handling user interactions
-- Set up routing with the [PyWeber class](router.md)
+- Read the **[Element model](guides/element-model.md)** guide (highly recommended)
+- Explore [Templates](ui/template.md) for creating UI components
+- Learn about [Elements](ui/element.md) for DOM manipulation
+- Understand [Events](interaction/events.md) for handling user interactions
+- Set up routing with the [Pyweber class](core/pyweber.md)
 
-Happy coding with PyWeber!
+See also the [Changelog](changelog.md) for recent features.

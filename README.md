@@ -2,7 +2,7 @@
 
 <img src="https://pyweber.readthedocs.io/images/pyweber.png" alt="Pyweber Logo">
 
-[![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master) [![License](https://img.shields.io/pypi/l/pyweber.svg)](https://github.com/pyweber/pyweber/blob/master/LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 Pyweber is a lightweight Python web framework designed to create dynamic, reactive web applications with a simple and intuitive API. It combines the simplicity of Python with the reactivity of modern frontend frameworks.
 
@@ -14,6 +14,7 @@ Pyweber is a lightweight Python web framework designed to create dynamic, reacti
 - **Intuitive DOM Manipulation**: Query and modify elements with familiar selectors
 - **Event-Driven Programming**: Handle user interactions with Python event handlers
 - **WebSocket Integration**: Real-time communication between client and server
+- **Template Handoff (1.3.0)**: WebSocket sessions reuse the HTTP-rendered template — handlers are not executed twice on connect
 - **Minimal Configuration**: Get started quickly with sensible defaults
 
 ## Quick Start
@@ -220,4 +221,8 @@ pyweber add-section --section-name database
 pyweber --update
 ```
 
-Visit [Pyweber Docs](https://pyweber.dev/) for complete documentation.
+Visit [Pyweber Docs](https://pyweber.dev/) for complete documentation. See [CHANGELOG.md](CHANGELOG.md) for release notes (latest: **1.3.0** — Template Handoff, 405 fixes, recursion tracking).
+
+## License
+
+Copyright 2026 Pyweber Technology. Licensed under the [Apache License, Version 2.0](LICENSE).

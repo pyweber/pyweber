@@ -3,6 +3,7 @@ import ssl
 import os
 import shutil
 import re
+import errno
 import asyncio
 import threading
 
@@ -15,7 +16,7 @@ from pyweber.models.request import Request, ClientInfo
 from pyweber.connection.websocket import WebsocketUpgrade, WebsocketServer
 from pyweber.connection.selector import IOSelector
 
-class HttpServer: # pragma: no cover
+class HttpServer:
     def __init__(self, *args, **kwargs):
         self.port: int = None
         self.host: str = None
@@ -234,6 +235,35 @@ class HttpServer: # pragma: no cover
         finally:
             client.close()
 
+    def _accept_clients(self, client_server: socket.socket):
+        """Drain the accept queue — required with EPOLLET on Linux."""
+        while True:
+            try:
+                client, addr = client_server.accept()
+
+                if self.ssl_context:
+                    try:
+                        client = self.ssl_context.wrap_socket(
+                            client, server_side=True
+                        )
+                    except Exception as error:
+                        PrintLine(f"SSL configuration failed {error}", level='ERROR')
+                        client.close()
+                        continue
+
+                threading.Thread(
+                    target=self._dispatch_client,
+                    args=(client,),
+                    daemon=True
+                ).start()
+            except BlockingIOError:
+                break
+            except OSError as error:
+                if error.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
+                    break
+                PrintLine(text=f'Accept error: {error}', level='ERROR')
+                break
+
     def start_server(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_server:
             client_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -242,6 +272,7 @@ class HttpServer: # pragma: no cover
             try:
                 client_server.bind((self.host, self.port))
                 client_server.listen(socket.SOMAXCONN)
+                client_server.setblocking(False)
                 protocol = 'https' if self.ssl_context else 'http'
 
                 public_url = f"Server online in {Colors.GREEN}{protocol}://{self.host if self.host != '0.0.0.0' else '127.0.0.1'}:{self.port}{self.route}{Colors.RESET}"
@@ -265,24 +296,7 @@ class HttpServer: # pragma: no cover
 
                             for sock in ready:
                                 if sock is client_server:
-                                    client, addr = client_server.accept()
-
-                                    if self.ssl_context:
-                                        try:
-                                            client = self.ssl_context.wrap_socket(
-                                                client, server_side=True
-                                            )
-                                        except Exception as error:
-                                            PrintLine(f"SSL configuration failed {error}", level='ERROR')
-                                            client.close()
-                                            continue
-
-                                    # Thread dedicada para dispatch — não bloqueia o pool HTTP
-                                    threading.Thread(
-                                        target=self._dispatch_client,
-                                        args=(client,),
-                                        daemon=True
-                                    ).start()
+                                    self._accept_clients(client_server)
 
                         except KeyboardInterrupt:
                             self.clear_cache(path='.')
@@ -328,17 +342,34 @@ class HttpServer: # pragma: no cover
 
     def clear_cache(self, path: str = '.'):
         for root, folders, files in os.walk(path):
-            if any(p in root for p in ['__pycache__', 'tests/config', '.pyweber']):
+            if any(p in root for p in ['__pycache__', 'tests/config', '.pyweber/cert']):
                 shutil.rmtree(root, ignore_errors=True)
 
-    def get_local_ip(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    def get_local_ip(self) -> str:
+        """Return a LAN-facing IPv4 address without requiring internet access."""
+        return self._resolve_local_ip()
+
+    @staticmethod
+    def _resolve_local_ip() -> str:
+        # Preferred: UDP trick to 8.8.8.8 (fast when online; must not block offline)
         try:
-            s.connect(('8.8.8.8', 80))
-            local_ip = s.getsockname()[0]
-        finally:
-            s.close()
-        return local_ip
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.settimeout(0.5)
+                s.connect(('8.8.8.8', 80))
+                return s.getsockname()[0]
+        except OSError:
+            pass
+
+        # Offline / firewalled: derive from hostname
+        try:
+            for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+                ip = info[4][0]
+                if not ip.startswith('127.'):
+                    return ip
+        except OSError:
+            pass
+
+        return '127.0.0.1'
 
     def generate_qrcode(self, text: str):
         import qrcode

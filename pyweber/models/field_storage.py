@@ -2,7 +2,7 @@ import re
 from uuid import uuid4
 from pyweber.models.field import Field
 
-class FieldStorage: # pragma: no cover
+class FieldStorage:
     def __init__(self, content_type: str, callbacks: bytes):
         self.boundary = content_type
         self.callbacks = callbacks

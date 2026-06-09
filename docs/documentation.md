@@ -205,7 +205,8 @@ PyWeber redefines how API documentation should work:
 
 Now, you can explore more about pyweber:
 
-- Explore [Templates](template.md) for creating UI components
-- Learn about [Elements](element.md) for DOM manipulation
-- Understand [Events](events.md) for handling user interactions
-- Set up routing with the [PyWeber class](router.md)
+- [Element model guide](guides/element-model.md)
+- [Templates](ui/template.md) for creating UI components
+- [Elements](ui/element.md) for DOM manipulation
+- [Events](interaction/events.md) for handling user interactions
+- [Pyweber application](core/pyweber.md) for routing

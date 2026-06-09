@@ -16,13 +16,14 @@ from pyweber.connection.session import sessions, Session
 from pyweber.models.template_diff import TemplateDiff
 from pyweber.models.task_manager import TaskManager
 from pyweber.core.events import EventConstrutor, EventBook
+from pyweber.models.context import set_current_window, reset_current_window
 
-if TYPE_CHECKING: # pragma: no cover
+if TYPE_CHECKING:
     from pyweber.pyweber.pyweber import Pyweber
     from pyweber.core.template import Template
     from pyweber.core.window import Window
 
-def need_message_keys(): # pragma: no cover
+def need_message_keys():
     return [
         'type',
         'event_ref',
@@ -36,10 +37,11 @@ def need_message_keys(): # pragma: no cover
         'window_response',
         'window_event',
         'sessionId',
-        'file_content'
+        'file_content',
+        'handoffToken',
     ]
 
-def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool: # pragma: no cover
+def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool:
     """Check if event is running"""
     if message.session_id in task_manager.active_handlers_async:
         template = sessions.get_session(session_id=message.session_id).template
@@ -50,7 +52,7 @@ def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool: # p
 
     return False
 
-class WebsocketUpgrade: # pragma: no cover
+class WebsocketUpgrade:
     def __init__(self, headers: bytes):
         self.headers = headers.decode('iso-8859-1')
 
@@ -81,7 +83,7 @@ class WebsocketUpgrade: # pragma: no cover
             f'Sec-WebSocket-Accept: {self.server_accept_key}\r\n\r\n'
         )
 
-class WebsocketServer: # pragma: no cover
+class WebsocketServer:
 
     def __init__(self, client: Union[socket.socket, ssl.SSLSocket]):
         self.id = None
@@ -263,7 +265,7 @@ class WebsocketServer: # pragma: no cover
 
         return bytes(frame)
 
-class BaseWebsockets: # pragma: no cover
+class BaseWebsockets:
     def __init__(self, app: 'Pyweber', protocol: Literal['pyweber', 'uvicorn'] = 'pyweber'):
         self.protocol: Literal['pyweber', 'uvicorn'] = protocol
         self.task_manager = TaskManager()
@@ -294,50 +296,53 @@ class BaseWebsockets: # pragma: no cover
         ).build_event()
 
     async def message_handler(self, message: wsMessage):
+        token = set_current_window(message.window)
+        try:
+            event_handler = self.event_handler(message)
 
-        event_handler = self.event_handler(message)
+            if message.event_ref == 'document':
+                if event_handler.current_target:
+                    event_id = event_handler.current_target.events.__dict__.get(f'on{message.type}')
+                    if event_id and event_id in EventBook:
+                        handler: Callable[..., Any] = EventBook.get(event_id).get('event')
 
-        if message.event_ref == 'document':
-            if event_handler.current_target:
-                event_id = event_handler.current_target.events.__dict__.get(f'on{message.type}')
-                if event_id and event_id in EventBook:
-                    handler: Callable[..., Any] = EventBook.get(event_id).get('event')
+                        if inspect.iscoroutinefunction(handler):
+                            if event_id not in self.task_manager.active_handlers_async.get(message.session_id, {}):
+                                await self.task_manager.create_task_async(
+                                    session_id=message.session_id,
+                                    event_id=event_id,
+                                    handler=handler,
+                                    event_handler=event_handler
+                                )
+                        else:
+                            if event_id not in self.task_manager.active_handlers.get(message.session_id, {}):
+                                self.task_manager.create_task(
+                                    session_id=message.session_id,
+                                    event_id=event_id,
+                                    handler=handler,
+                                    event_handler=event_handler
+                                )
 
+            elif message.event_ref == 'window':
+                handler = message.window.get_event(event_id=message.window_event)
+                event_id = f'{message.window_event}_{message.session_id}'
+                if callable(handler):
                     if inspect.iscoroutinefunction(handler):
-                        if event_id not in self.task_manager.active_handlers_async.get(message.session_id, {}):
-                            await self.task_manager.create_task_async(
-                                session_id=message.session_id,
-                                event_id=event_id,
-                                handler=handler,
-                                event_handler=event_handler
-                            )
+                        await self.task_manager.create_task_async(
+                            session_id=message.session_id,
+                            event_id=event_id,
+                            handler=handler,
+                            event_handler=event_handler
+                        )
                     else:
-                        if event_id not in self.task_manager.active_handlers.get(message.session_id, {}):
-                            self.task_manager.create_task(
-                                session_id=message.session_id,
-                                event_id=event_id,
-                                handler=handler,
-                                event_handler=event_handler
-                            )
-
-        elif message.event_ref == 'window':
-            handler = message.window.get_event(event_id=message.window_event)
-            event_id = f'{message.window_event}_{message.session_id}'
-            if callable(handler):
-                if inspect.iscoroutinefunction(handler):
-                    await self.task_manager.create_task_async(
-                        session_id=message.session_id,
-                        event_id=event_id,
-                        handler=handler,
-                        event_handler=event_handler
-                    )
-                else:
-                    self.task_manager.create_task(
-                        session_id=message.session_id,
-                        event_id=event_id,
-                        handler=handler,
-                        event_handler=event_handler
-                    )
+                        self.task_manager.create_task(
+                            session_id=message.session_id,
+                            event_id=event_id,
+                            handler=handler,
+                            event_handler=event_handler
+                        )
+        finally:
+            reset_current_window(token)
 
     async def data_to_json(self, data: Any, session_id: str, last_target: bool = False):
         if isinstance(data, dict):
@@ -456,7 +461,7 @@ class BaseWebsockets: # pragma: no cover
 
         return diff.differences
 
-class WebsocketManager(BaseWebsockets): # pragma: no cover
+class WebsocketManager(BaseWebsockets):
     def __init__(self, app: 'Pyweber', protocol: Literal['uvicorn', 'pyweber'] = 'pyweber'):
         super().__init__(app=app, protocol=protocol)
 
@@ -544,7 +549,12 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
             if not all(key in need_message_keys() for key in message):
                 return {}
 
-            if not message.get('template') and message.get('window_data'):
+            session_id = message.get('sessionId')
+            if (
+                not message.get('template')
+                and message.get('window_data')
+                and (not session_id or session_id not in sessions.all_sessions)
+            ):
                 return {}
 
             route = message.get('route', '')
@@ -574,10 +584,15 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
 
             sync_template = await self.get_sync_template(message=message)
 
-            if not message.session_id or any(
-                session_id not in sessions.all_sessions
-                for session_id in [message.session_id, ws_server.id]
-            ):
+            is_new_session = (
+                not message.session_id
+                or any(
+                    session_id not in sessions.all_sessions
+                    for session_id in [message.session_id, ws_server.id]
+                )
+            )
+
+            if is_new_session:
                 ws_server.id = self.get_session_id(session_id=message.session_id)
                 self.ws_connections[ws_server.id] = ws_server
 
@@ -595,6 +610,17 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                     },
                     session_id=ws_server.id
                 )
+
+            elif message.get_value(key='template'):
+                self.update_session(
+                    session_id=ws_server.id,
+                    template=sync_template,
+                    window=message.window,
+                    route=message.route
+                )
+                session = sessions.get_session(session_id=ws_server.id)
+                if session:
+                    session.old_template = sync_template.clone()
 
             if message.type and message.event_ref and not event_is_running(
                 message=message, task_manager=self.task_manager
@@ -633,7 +659,12 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
 
                             sync_template = await self.get_sync_template(message=message)
 
-                            if not message.session_id or message.session_id not in sessions.all_sessions:
+                            is_new_session = (
+                                not message.session_id
+                                or message.session_id not in sessions.all_sessions
+                            )
+
+                            if is_new_session:
                                 ws_connection = self.get_session_id(session_id=message.session_id)
 
                                 self.add_session(
@@ -652,6 +683,17 @@ class WebsocketManager(BaseWebsockets): # pragma: no cover
                                     },
                                     session_id=ws_connection
                                 )
+
+                            elif message.get_value(key='template'):
+                                self.update_session(
+                                    session_id=ws_connection,
+                                    template=sync_template,
+                                    window=message.window,
+                                    route=message.route
+                                )
+                                session = sessions.get_session(session_id=ws_connection)
+                                if session:
+                                    session.old_template = sync_template.clone()
 
                             if message.type and message.event_ref and not event_is_running(message=message, task_manager=self.task_manager):
                                 self.update_session(

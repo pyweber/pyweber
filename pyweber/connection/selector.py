@@ -2,7 +2,7 @@ import sys
 import select
 import socket
 
-class IOSelector: # pragma: no cover
+class IOSelector:
     """
     Selecciona automaticamente o melhor mecanismo de I/O para o OS actual.
     Interface uniforme independente do OS.
@@ -19,7 +19,7 @@ class IOSelector: # pragma: no cover
             return PollSelector()     # fallback genérico
 
 
-class EpollSelector: # pragma: no cover
+class EpollSelector:
     """Linux — epoll. O(1), ilimitado."""
 
     def __init__(self):
@@ -28,7 +28,7 @@ class EpollSelector: # pragma: no cover
 
     def register(self, sock: socket.socket):
         self._sockets[sock.fileno()] = sock
-        self._epoll.register(sock.fileno(), select.EPOLLIN | select.EPOLLET)
+        self._epoll.register(sock.fileno(), select.EPOLLIN)
 
     def unregister(self, sock: socket.socket):
         try:
@@ -45,7 +45,7 @@ class EpollSelector: # pragma: no cover
         self._epoll.close()
 
 
-class KqueueSelector: # pragma: no cover
+class KqueueSelector:
     """macOS / BSD — kqueue. O(1), ilimitado."""
 
     def __init__(self):
@@ -85,7 +85,7 @@ class KqueueSelector: # pragma: no cover
         self._kqueue.close()
 
 
-class PollSelector: # pragma: no cover
+class PollSelector:
     """Linux/macOS/BSD — poll. Sem limite de fds, mais portável que epoll."""
 
     def __init__(self):
@@ -112,7 +112,7 @@ class PollSelector: # pragma: no cover
         pass
 
 
-class SelectSelector: # pragma: no cover
+class SelectSelector:
     """Windows + fallback universal — select. Limite ~1024 fds."""
 
     def __init__(self):

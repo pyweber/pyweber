@@ -4,12 +4,13 @@ from pyweber.connection.session import sessions
 from pyweber.core.element import Element
 from pyweber.models.file import File
 from pyweber.models.file import Field
+from pyweber.models.handoff import handoff_registry
 
-if TYPE_CHECKING: # pragma: no cover
+if TYPE_CHECKING:
     from pyweber.pyweber.pyweber import Pyweber
     from pyweber.connection.websocket import WebsocketManager
 
-class wsMessage: # pragma: no cover
+class wsMessage:
     def __init__(self, raw_message: dict[str, (str, float)], app, ws: 'WebsocketManager'):
         self.ws = ws
         self.__app = app
@@ -43,7 +44,12 @@ class wsMessage: # pragma: no cover
         if self.session_id in sessions.all_sessions:
             session_template = sessions.get_session(session_id=self.session_id).template
         else:
-            session_template = await self.__app.clone_template(route=self.route)
+            session_template = handoff_registry.consume(
+                token=self.get_value(key='handoffToken'),
+                route=self.route or '',
+            )
+            if session_template is None:
+                session_template = await self.__app.clone_template(route=self.route)
 
         if self.get_value(key='template'):
             session_template.root = session_template.parse_html(html=self.get_value('template'))
@@ -52,8 +58,10 @@ class wsMessage: # pragma: no cover
         return session_template
 
     def get_window(self):
-        from pyweber.core.window import Screen, Location, Orientation, LocalStorage, SessionStorage
-        from pyweber.core.window import window
+        from pyweber.core.window import Window, Screen, Location, Orientation, LocalStorage, SessionStorage
+
+        existing = sessions.get_session(self.session_id) if self.session_id else None
+        window = existing.window if existing else Window()
 
         window._Window__ws = self.ws
         window.session_id = self.session_id

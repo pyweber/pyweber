@@ -4,7 +4,7 @@ from pyweber.core.element import Element, SEARCH_MODE
 from pyweber.config.config import config
 from pyweber.utils.types import HTTPStatusCode, GetBy
 
-class Template: # pragma: no cover
+class Template:
     def __init__(self, template: str, status_code: int = 200, title: str = None, include_uuid: bool = True, **kwargs):
         self.__include_uuid = include_uuid
         self.__template = Element.read_file(file_path=template)
@@ -137,24 +137,64 @@ class Template: # pragma: no cover
     def __create_default_element(self, *args, **kwargs):
         return Element(*args, **kwargs)
 
+    @staticmethod
+    def _link_is_favicon(link: Element) -> bool:
+        if link.tag != 'link':
+            return False
+        rel = (link.get_attr('rel') or '').lower()
+        href = (link.get_attr('href') or '').lower()
+        return (
+            'icon' in rel
+            or href.endswith('.ico')
+            or 'favicon' in href
+        )
+
+    @staticmethod
+    def _link_is_stylesheet(link: Element) -> bool:
+        return link.tag == 'link' and (link.get_attr('rel') or '').lower() == 'stylesheet'
+
+    @staticmethod
+    def _is_pyweber_ws_script(child: Element) -> bool:
+        src = child.get_attr('src', '') or ''
+        return (
+            child.tag == 'script'
+            and src.startswith('/_pyweber/static/')
+            and src.endswith('/.js')
+        )
+
+    @staticmethod
+    def _is_pyweber_stylesheet(link: Element) -> bool:
+        href = link.get_attr('href', '') or ''
+        return (
+            Template._link_is_stylesheet(link)
+            and href.startswith('/_pyweber/static/')
+            and href.endswith('/.css')
+        )
+
     def __inject_default_elements(self, root: Element):
-        has_websocket_script, has_icon, has_description, has_css, has_keywords, has_title = False, False, False, False, False, False
-        for child in root.childs[0].childs:
-            if child.tag == 'script' and child.get_attr('src', '').startswith('/_pyweber/static/') and child.get_attr('src', '').endswith('/.js'):
+        head = root.childs[0]
+        has_websocket_script = False
+        has_icon = False
+        has_description = False
+        has_css = False
+        has_keywords = False
+        has_title = False
+
+        for child in head.childs:
+            if self._is_pyweber_ws_script(child):
                 has_websocket_script = True
 
-            elif child.tag == 'link':
-                if 'icon' in list(child.attrs.values()):
-                    has_icon = True
+            elif self._link_is_favicon(child):
+                has_icon = True
 
-                elif child.get_attr('rel') == 'stylesheet' and child.get_attr('href', '').startswith('/_pyweber/static/') and child.get_attr('href', '').endswith('/.css'):
-                    has_css = True
+            elif self._link_is_stylesheet(child):
+                has_css = True
 
             elif child.tag == 'meta':
-                if 'description' in list(child.attrs.values()):
+                name = (child.get_attr('name') or '').lower()
+                if name == 'description':
                     has_description = True
-
-                elif 'keywords' in list(child.attrs.values()):
+                elif name == 'keywords':
                     has_keywords = True
 
             elif child.tag == 'title':
@@ -164,11 +204,10 @@ class Template: # pragma: no cover
                 break
 
         if not has_websocket_script:
-            # insert websockets port if exists
             disable_ws = os.environ.get('PYWEBER_DISABLE_WS', False)
 
             if disable_ws not in [True, 'True', 'true', '1', 1]:
-                root.childs[0].childs.extend(
+                head.childs.extend(
                     [
                         self.__create_default_element(
                             tag='script',
@@ -178,7 +217,7 @@ class Template: # pragma: no cover
                 )
 
         if not has_icon:
-            root.childs[0].childs.append(
+            head.childs.append(
                 self.__create_default_element(
                     tag='link',
                     attrs={'rel': 'icon', 'href': f'{self.__icon.strip()}'.replace('\\', '/')}
@@ -186,7 +225,7 @@ class Template: # pragma: no cover
             )
 
         if not has_css:
-            root.childs[0].childs.insert(
+            head.childs.insert(
                 1,
                 self.__create_default_element(
                     tag='link',
@@ -195,7 +234,7 @@ class Template: # pragma: no cover
             )
 
         if not has_description:
-            root.childs[0].childs.insert(
+            head.childs.insert(
                 0,
                 self.__create_default_element(
                     tag='meta',
@@ -204,7 +243,7 @@ class Template: # pragma: no cover
             )
 
         if not has_keywords:
-            root.childs[0].childs.insert(
+            head.childs.insert(
                 0,
                 self.__create_default_element(
                     tag='meta',
@@ -216,7 +255,7 @@ class Template: # pragma: no cover
             has_title.content = self.title if self.title else has_title.content
 
         else:
-            root.childs[0].childs.append(
+            head.childs.append(
                 self.__create_default_element(
                     tag='title',
                     content=self.title if self.title else config.get('app', 'name')

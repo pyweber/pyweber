@@ -41,7 +41,7 @@ function connectWebSocket() {
     socket.onopen = async function () {
         socketReady = true;
         reconnectAttempts = 0;
-        sendToServer(await getEventData({}));
+        sendToServer(await getEventData({ includeTemplate: true }));
     };
 
     socket.onerror = function (error) {
@@ -373,10 +373,42 @@ function fromBase64(base64) {
     return new TextDecoder().decode(Uint8Array.from(atob(base64), c => c.charCodeAt(0)));
 }
 
+function getHandoffToken() {
+    return document.querySelector('meta[name="pyweber-handoff"]')?.content || null;
+}
+
+/** Atribui uuid a nós injectados por JS (ou libs externas) antes do sync com o servidor. */
+function stampMissingUuids(root = document.documentElement) {
+    if (!(root instanceof Element)) return;
+
+    const nodes = root === document.documentElement
+        ? root.querySelectorAll('*')
+        : [root, ...root.querySelectorAll('*')];
+
+    nodes.forEach(el => {
+        if (el instanceof Element && !el.getAttribute('uuid')) {
+            el.setAttribute('uuid', crypto.randomUUID());
+        }
+    });
+}
+
+/** Re-sincroniza DOM → servidor depois de JS injectar HTML (sem uuid) após o WS abrir. */
+async function resyncDomWithServer() {
+    if (!socketReady || socket.readyState !== WebSocket.OPEN) return;
+    stampMissingUuids();
+    await sendToServer(await getEventData({ includeTemplate: true }));
+}
+
+window.__pyweber_resyncDom = resyncDomWithServer;
+
 // ─── Construção do payload ────────────────────────────────────────────────────
-async function getEventData({ type = null, event = null, event_ref = null, window_response = null, file_content = null }) {
+async function getEventData({ type = null, event = null, event_ref = null, window_response = null, file_content = null, includeTemplate = false }) {
     const target = event?.target instanceof HTMLElement ? event.target : null;
     const values = await getFormValues();
+
+    if (includeTemplate) {
+        stampMissingUuids();
+    }
 
     return {
         type,
@@ -384,7 +416,7 @@ async function getEventData({ type = null, event = null, event_ref = null, windo
         route: window.location.pathname,
         target_uuid: target?.getAttribute('uuid') ?? null,
         current_target_uuid: target?.closest(`[_on${type}]`)?.getAttribute('uuid') ?? null,
-        template: document.documentElement.outerHTML,
+        template: includeTemplate ? document.documentElement.outerHTML : null,
         values,                         // ← sem JSON.stringify desnecessário
         event_data: {
             clientX: event?.clientX ?? null,
@@ -435,7 +467,8 @@ async function getEventData({ type = null, event = null, event_ref = null, windo
         window_response: window_response ?? {},
         window_event: event_ref === EventRef.WINDOW ? sessionStorage.getItem(type) : null,
         file_content: file_content ?? {},
-        sessionId: getsessionId()
+        sessionId: getsessionId(),
+        handoffToken: getHandoffToken()
     };
 }
 

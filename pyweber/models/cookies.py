@@ -8,6 +8,9 @@ class CookieManager:
     def cookies(self):
         return self.__cookies
 
+    def clear(self):
+        self.__cookies.clear()
+
     def set_cookie(
         self,
         cookie_name: str,

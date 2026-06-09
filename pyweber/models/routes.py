@@ -13,7 +13,7 @@ from pyweber.utils.exceptions import (
     RouteNameAlreadyExistError
 )
 
-class RedirectRoute: # pragma: no cover
+class RedirectRoute:
     def __init__(
         self,
         route: 'Route',
@@ -63,7 +63,7 @@ class RedirectRoute: # pragma: no cover
             f'status_code={self.status_code})'
         )
 
-class Route: # pragma: no cover
+class Route:
     def __init__(
         self,
         route: str,
@@ -341,7 +341,7 @@ class Route: # pragma: no cover
             f'status_code={self.status_code})'
         )
 
-class RouteManager: # pragma: no cover
+class RouteManager:
     def __init__(self):
         self.__routes: dict[str, Route] = {}
         self.__redirects: dict[str, RedirectRoute] = {}
@@ -474,7 +474,7 @@ class RouteManager: # pragma: no cover
             raise RouteNameAlreadyExistError(name=name)
 
         if not callable(template):
-            template = lambda **kwargs: template
+            template = (lambda static: lambda **kwargs: static)(template)
 
         handler = kwargs.get('callback', None) or template
 

@@ -12,10 +12,12 @@ class Response:
         code: int,
         cookies: dict[str, str],
         response_type: ContentTypes,
-        route: str
+        route: str,
+        allowed_methods: list[str] = None,
     ):
         request_headers = request.accept_control_request_headers or "Content-Type, Authorization, X-Requested-With, Accept"
         self.__request = request
+        self.__allowed_methods = allowed_methods
         self.__body = response_content
         self.__headers: dict[str, bytes] = {
             "Content-Type": f"{response_type.value}; charset=UTF-8",
@@ -50,7 +52,8 @@ class Response:
             aditional_code = ('WWW-Authenticate', f"Basic realm={config.get('app', 'name')}")
 
         elif self.status_code == 405:
-            aditional_code = ('Allow', 'GET, POST, PUT, DELETE')
+            allow = ', '.join(self.__allowed_methods) if self.__allowed_methods else 'GET, POST, PUT, DELETE'
+            aditional_code = ('Allow', allow)
 
         elif self.status_code == 503:
             aditional_code = ('Retry-After', '60')

@@ -10,7 +10,7 @@ from pyweber.utils.loads import StaticTemplates
 from pyweber.utils.utils import PrintLine, Colors
 from importlib.metadata import version, PackageNotFoundError
 
-class CLI: # pragma: no cover
+class CLI:
     def __init__(self):
         self.default_file = 'main.py'
         self.default_path_config_file = '.pyweber'
@@ -331,7 +331,7 @@ class CLI: # pragma: no cover
         except PackageNotFoundError:
             return "0.0.0"
 
-class CommandFunctions: # pragma: no cover
+class CommandFunctions:
     def __init__(self):
         self.project_name: Path = None
 
@@ -645,7 +645,7 @@ class CommandFunctions: # pragma: no cover
         }
         PrintLine(f"{colors.get(level, '')}{message}{colors.get('reset')}")
 
-class ConfigManagerCLI: # pragma: no cover
+class ConfigManagerCLI:
     def __init__(self):
         self.config_file = config
     
@@ -870,11 +870,11 @@ class ConfigManagerCLI: # pragma: no cover
 
         return walk(config.config)
 
-def app(): # pragma: no cover
+def app():
     cli = CLI()
     cli.run()
 
-def guide_config(): # pragma: no cover
+def guide_config():
     text= """
 📘 Config Guide (Type hints optional — default is str):
 
@@ -895,7 +895,7 @@ def guide_config(): # pragma: no cover
 """
     return text
 
-class DefaultTypes: # pragma: no cover
+class DefaultTypes:
     integer = ['integer', 'int', 'number']
     string = ['text', 'string', 'str']
     floats = ['double', 'float']

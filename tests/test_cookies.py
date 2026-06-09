@@ -15,7 +15,7 @@ def test_set_cookies(cookies):
         max_age=3600
     )
 
-    assert "name=Alex" in cookies.cookies[-1]
+    assert "name=Alex" in cookies.cookies['name']
 
 def test_raise_attributeerror(cookies):
     with pytest.raises(ValueError, match=r"SameSite is not valid. Please use one of: \['Strict', 'Lax']"):

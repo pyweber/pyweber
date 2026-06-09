@@ -13,7 +13,17 @@ from pyweber.connection.websocket import WebsocketManager
 from pyweber.utils.utils import PrintLine
 from pyweber.config.config import config
 
-class CreatApp: # pragma: no cover
+DEFAULT_RELOAD_SKIP = (
+    'alembic',
+    'migrations',
+    'sqlalchemy',
+    'database',
+    'db.engine',
+    'db.session',
+)
+
+
+class CreatApp:
     def __init__(self, target: Callable, **kwargs):
         self.target = target
         self.app: Pyweber = None
@@ -25,6 +35,11 @@ class CreatApp: # pragma: no cover
         self.__server_port = kwargs.get('port', None) or os.environ.get('PYWEBER_SERVER_PORT') or config.get('server', 'port')
         self.__server_route = kwargs.get('route', None) or os.environ.get('PYWEBER_SERVER_ROUTE') or config.get('server', 'route')
         self.mobile_mode = kwargs.get('mobile', None) or os.environ.get('PYWEBER_MOBILE_MODE') or config.get('server', 'mobile')
+        self.__reload_skip_modules = tuple(
+            kwargs.get('reload_skip_modules')
+            or os.environ.get('PYWEBER_RELOAD_SKIP', '').split(',')
+            or DEFAULT_RELOAD_SKIP
+        )
         self.http_server = HttpServer()
         self.ws_server = WebsocketManager(app=self.app, protocol='pyweber')
         self.reload_server = ReloadServer(
@@ -73,8 +88,11 @@ class CreatApp: # pragma: no cover
         return os.path.basename(os.path.abspath(sys.argv[0])).split('.')[0]
     
     def get_main_module(self):
-        if self.main_module not in sys.modules:  return import_module(self.main_module)
-        return reload(sys.modules.get(self.main_module))
+        if self.main_module not in sys.modules:
+            return import_module(self.main_module)
+        if self.is_reloadable_module(self.main_module):
+            return reload(sys.modules.get(self.main_module))
+        return sys.modules.get(self.main_module)
     
     def project_modules(self):
         modules: dict[str, ModuleType] = {}
@@ -90,22 +108,31 @@ class CreatApp: # pragma: no cover
 
         return '.'.join(module_path.parts)
 
+    def is_reloadable_module(self, module_name: str) -> bool:
+        lower = module_name.lower().replace('\\', '.').replace('/', '.')
+        return not any(skip.strip() and skip.strip().lower() in lower for skip in self.__reload_skip_modules)
+
+    def reset_reload_globals(self):
+        from pyweber.connection.session import sessions
+
+        for session_id in list(sessions.all_sessions):
+            sessions.remove_session(session_id)
+
     def reload_modules(self, changed_file: str):
         try:
             if changed_file and str(changed_file).endswith('.py'):
                 module_name = self.path_to_module(filepath=changed_file)
-                project_modules = self.project_modules()
-                main_module = self.main_module
 
                 if module_name in sys.modules:
-                    for key, module in project_modules.items():
-                        if main_module != module_name and (key != '__main__' or getattr(module, '__spec__', None) is not None):
-                            reload(module)
+                    if self.is_reloadable_module(module_name):
+                        reload(sys.modules[module_name])
                 else:
                     import_module(module_name)
-            
+
+                self.reset_reload_globals()
+
             self.load_target()
-        
+
         except Exception as e:
             PrintLine(text=f'Error to import module: {e}', level='ERROR')
             raise e

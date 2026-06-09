@@ -16,17 +16,28 @@ class TestResponse:
         request.scheme = "HTTP/1.1"
         request.path = "/test"
         request.first_line = "GET /test HTTP/1.1"
+        request.full_path = "/test"
+        request.origin = "http://localhost"
+        request.host = "localhost"
+        request.accept_control_request_headers = ""
         return request
 
     @pytest.fixture
-    def sample_response(self, mock_request):
+    def sample_cookies(self):
+        return {
+            "session": "session=abc123; Path=/;",
+            "user": "user=john; Path=/;",
+        }
+
+    @pytest.fixture
+    def sample_response(self, mock_request, sample_cookies):
         """Response de exemplo para os testes"""
         return Response(
             request=mock_request,
             response_content=b"<html><body>Test</body></html>",
             code=200,
-            cookies=["session=abc123", "user=john"],
-            response_type=ContentTypes.html,  # Corrigido para minúsculo
+            cookies=sample_cookies,
+            response_type=ContentTypes.html,
             route="/test"
         )
 
@@ -34,7 +45,7 @@ class TestResponse:
         """Testa se a inicialização cria o Response com atributos corretos"""
         content = b"Test content"
         code = 200
-        cookies = ["test=value"]
+        cookies = {"test": "test=value; Path=/;"}
         response_type = ContentTypes.json  # Corrigido para minúsculo
         route = "/api/test"
 
@@ -66,7 +77,7 @@ class TestResponse:
         assert headers["Status"] == 200
         assert headers["Server"] == "Pyweber/1.0"
         assert "Date" in headers
-        assert headers["Set-Cookie"] == ["session=abc123", "user=john"]
+        assert headers["Set-Cookie"] == sample_response.cookies
         assert headers["Request-Path"] == "/test"
         assert headers["Response-Path"] == "/test"
 
@@ -90,9 +101,9 @@ class TestResponse:
         """Testa a propriedade response_content"""
         assert sample_response.response_content == b"<html><body>Test</body></html>"
 
-    def test_cookies_property(self, sample_response):
+    def test_cookies_property(self, sample_response, sample_cookies):
         """Testa a propriedade cookies"""
-        assert sample_response.cookies == ["session=abc123", "user=john"]
+        assert sample_response.cookies == sample_cookies
 
     def test_code_property(self, sample_response):
         """Testa a propriedade code"""
@@ -121,7 +132,7 @@ class TestResponse:
             request=mock_request,
             response_content=b"",
             code=301,
-            cookies=[],
+            cookies={},
             response_type=ContentTypes.html,  # Corrigido para minúsculo
             route="/new-location"
         )
@@ -138,7 +149,7 @@ class TestResponse:
             request=mock_request,
             response_content=b"",
             code=405,
-            cookies=[],
+            cookies={},
             response_type=ContentTypes.html,  # Corrigido para minúsculo
             route="/api"
         )
@@ -155,7 +166,7 @@ class TestResponse:
             request=mock_request,
             response_content=b"",
             code=503,
-            cookies=[],
+            cookies={},
             response_type=ContentTypes.html,  # Corrigido para minúsculo
             route="/api"
         )
@@ -282,7 +293,7 @@ class TestResponse:
                 request=mock_request,
                 response_content=b"test",
                 code=code,
-                cookies=[],
+                cookies={},
                 response_type=ContentTypes.html,  # Corrigido para minúsculo
                 route="/test"
             )
@@ -307,7 +318,7 @@ class TestResponse:
                 request=mock_request,
                 response_content=b"test content",
                 code=200,
-                cookies=[],
+                cookies={},
                 response_type=content_type,
                 route="/test"
             )
@@ -320,7 +331,7 @@ class TestResponse:
             request=mock_request,
             response_content=b"",
             code=204,
-            cookies=[],
+            cookies={},
             response_type=ContentTypes.html,  # Corrigido para minúsculo
             route="/empty"
         )
@@ -335,7 +346,7 @@ class TestResponse:
             request=mock_request,
             response_content=large_content,
             code=200,
-            cookies=[],
+            cookies={},
             response_type=ContentTypes.html,  # Corrigido para minúsculo
             route="/large"
         )
@@ -362,7 +373,7 @@ class TestResponseIntegration:
             request=request,
             response_content=b'{"id": 1, "name": "John"}',
             code=201,
-            cookies=["auth=token123"],
+            cookies={"auth": "auth=token123; Path=/;"},
             response_type=ContentTypes.json,  # Corrigido para minúsculo
             route="/api/users"
         )

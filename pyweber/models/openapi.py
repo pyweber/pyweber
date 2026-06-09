@@ -304,6 +304,7 @@ class OpenApiProcessor:
     def prepare_callback_kwargs(cls, callback: Callable, **kwargs):
         assert callable(callback)
 
+        kwargs = dict(kwargs)
         all_callback_parameters = cls.get_callback_parameters(callback)
         kwd: dict[str, Any] = {}
 
@@ -324,7 +325,14 @@ class OpenApiProcessor:
                 kwd[name] = annotation(**parameters)
 
             elif class_resolved == 'request':
-                kwd[name] = kwargs.pop('request')
+                from pyweber.models.context import get_current_request
+                request = kwargs.pop('request', None) or get_current_request()
+                if request is None:
+                    raise TypeError(
+                        'Route handler requires a Request, but none is available. '
+                        'Use app.request inside HTTP handlers or e.session context in WebSocket handlers.'
+                    )
+                kwd[name] = request
 
             else:
                 if annotation.__name__ not in cls.mapping_swagger_types() and annotation != inspect._empty:

@@ -1,14 +1,14 @@
 from typing import TYPE_CHECKING, Callable, Any, Union
 import asyncio
 
-if TYPE_CHECKING: # pragma: no cover
+if TYPE_CHECKING:
     from pyweber.connection.websocket import WebsocketManager
     from pyweber.connection.session import Session
     from pyweber.pyweber.pyweber import Pyweber
     from pyweber.core.template import Template, Element
     from pyweber.core.window import Window
 
-class EventData: # pragma: no cover
+class EventData:
     def __init__(self, event_data: dict[str, Union[int, str]]):
         # Mouse
         self.clientX = event_data.get('clientX', None)
@@ -66,7 +66,7 @@ class EventData: # pragma: no cover
         text = ', '.join([f'{key}: {value}' for key, value in self.__dict__.items() if value]).strip()
         return f"EventData({text})"
 
-class EventHandler: # pragma: no cover
+class EventHandler:
     def __init__(
         self,
         event_type: str,
@@ -126,7 +126,7 @@ class EventHandler: # pragma: no cover
     def __repr__(self):
         return f'EventHandler(event_type: {self.event_type}, route: {self.route})'
 
-class EventConstrutor: # pragma: no cover
+class EventConstrutor:
     def __init__(
         self,
         target_id: str,
@@ -185,7 +185,7 @@ class EventConstrutor: # pragma: no cover
 EventBook: dict[str, dict[str, Union[Callable, dict[str, list[str]]]]] = {}
 WindowBookEvents: dict[str, dict[str, Callable]] = {}
 
-class TemplateEvents: # pragma: no cover
+class TemplateEvents:
     def __init__(
         self,
         # Eventos de Mouse
@@ -525,7 +525,7 @@ class WindowEvents:
         self.ongotpointercapture = ongotpointercapture
         self.onlostpointercapture = onlostpointercapture
 
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):
         """Representação legível dos eventos."""
         events = {k: v for k, v in self.__dict__.items() if v is not None}
         return f"WindowEvents({events})"

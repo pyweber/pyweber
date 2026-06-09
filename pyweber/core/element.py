@@ -15,7 +15,7 @@ from pyweber.models.element import (
 
 SEARCH_MODE = Literal['exact', 'regex', 'contains', 'startswith', 'endswith']
 
-class Element(ElementConstrutor): # pragma: no cover
+class Element(ElementConstrutor):
     def __init__(
         self,
         tag: HTMLTag,
@@ -76,9 +76,6 @@ class Element(ElementConstrutor): # pragma: no cover
         if not isinstance(value, (list, ChildElements)):
             raise TypeError(f"Children must be a ChildElements instances, but got {type(value).__name__}")
 
-        if isinstance(value, list):
-            value = ChildElements(self).extend(value)
-
         value = self.__render_dynamic_elements(childs=value)
 
         self.__childs = value
@@ -106,7 +103,6 @@ class Element(ElementConstrutor): # pragma: no cover
             raise TypeError("Child must be Element instances")
 
         self.__childs.append(child)
-        child.parent = self
 
     def remove_child(self, child: 'Element'):
         if child not in self.__childs:
@@ -304,7 +300,7 @@ class Element(ElementConstrutor): # pragma: no cover
 
         self.__element_methods.pop(method, None)
 
-    def __render_dynamic_elements(self, childs: ChildElements):
+    def __render_dynamic_elements(self, childs: ChildElements | list):
         new_childs: ChildElements = ChildElements(self)
         if childs:
             for child in childs:

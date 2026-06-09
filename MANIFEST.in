@@ -1,1 +1,3 @@
 recursive-include pyweber/static *
+include LICENSE
+include NOTICE

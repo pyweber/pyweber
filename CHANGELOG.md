@@ -1,5 +1,32 @@
 # PyWeber Changelog
 
+## [1.3.0] - 2026-06-09
+
+### Added
+
+- **Template Handoff** — on reactive HTML responses, Pyweber stores the rendered template under a one-time token and injects `<meta name="pyweber-handoff" content="...">` in the page. When the browser opens WebSocket, it sends `handoffToken` so the server reuses the HTTP template instead of calling `clone_template()` (which re-executes the route handler). See [reactivity guide](docs/guides/reactivity.md#template-handoff-http--websocket).
+- **`TemplateResult.allowed_methods`** — populated on 405 responses; `Response` sets the `Allow` header from this list.
+
+### Changed
+
+- **Per-request route visit tracking** — `_check_recursion()` uses a `ContextVar` set in `get_response()` instead of a shared set on the `Pyweber` instance.
+- **WebSocket client** — `js.js` sends `handoffToken` on connect; event payloads keep `template: null` after the first message (smaller frames).
+
+### Fixed
+
+- **False `RecursionError`** when two requests hit the same route or redirect in sequence.
+- **405 vs 404** — HTTP method not in `route.methods` returns **405 Method Not Allowed** with `Allow: GET, POST, ...` instead of 404.
+- **Request context isolation** — `Request` and cookies use `ContextVar`; fixes cross-request leakage and `request=None` in handlers after install.
+- **Element ordering** — correct HTML order when combining `childs`, `content`, and `{{placeholders}}`.
+- **Dev reload** — static file changes no longer cascade full server reload; Python/config changes still reload the app.
+- **Offline startup** — `get_local_ip()` no longer blocks when the network is unavailable.
+- **WebSocket session bootstrap** — accepts first message without full template when session already exists.
+
+### Notes for upgraders
+
+- You **cannot** register two routes on the same path with different methods. Use one route with `methods=['GET', 'POST', 'DELETE']` or `app.update_route('/path', methods=[...])`.
+- `clone_template()` remains as a fallback when handoff token is missing or expired (5 minute TTL, single use).
+
 ## [1.2.0] - 2026-03-06
 
 ### Added
@@ -120,7 +147,9 @@ def get_selection_values(self, e: pw.EventHandler):
 ```
 
 ### Changed
-- Isn't necessary specify the websocket port for built-in websocket server. It automatically detect the hostname and port server.
+
+- **License** — project relicensed from MIT to **Apache License 2.0** (copyright Pyweber Technology)
+- WebSocket port auto-detection (same host/port as HTTP)
 
 ### Fixed
 - Fixed render dynamic values in `Element` instances.

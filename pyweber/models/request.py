@@ -9,7 +9,7 @@ from pyweber.models.field_storage import FieldStorage
 from pyweber.models.headers import Headers
 from pyweber.models.file import File
 
-class RequestMode(Enum): # pragma: no cover
+class RequestMode(Enum):
     asgi = 'asgi'
     wsgi = 'wsgi'
 
@@ -17,11 +17,11 @@ class RequestMode(Enum): # pragma: no cover
         return self.value
 
 @dataclass
-class ClientInfo: # pragma: no cover
+class ClientInfo:
     host: str
     port: int
 
-class Request: # pragma: no cover
+class Request:
     def __init__(
         self,
         headers: Union[Headers, str, dict[str, Union[tuple[str, str], str]]],
@@ -207,6 +207,25 @@ class Request: # pragma: no cover
     @property
     def request_parts_splitter(self):
         return '\r\n\r\n'
+
+    @classmethod
+    def stub(
+        cls,
+        method: str,
+        path: str,
+        query_params: dict | None = None,
+        client_info: ClientInfo | None = None,
+    ) -> 'Request':
+        """Minimal request for template resolution outside HTTP (WebSocket sync, clone)."""
+        query_params = query_params or {}
+        query = '&'.join(f'{key}={value}' for key, value in query_params.items())
+        uri = f'{path}?{query}' if query else path
+        headers = f'{method} {uri} HTTP/1.1\r\nHost: localhost\r\n\r\n'
+        return cls(
+            headers=headers,
+            body=b'',
+            client_info=client_info or ClientInfo(host='127.0.0.1', port=0),
+        )
 
     def __repr__(self):
         return f"Request(method={self.method}, mode={self.request_mode})"

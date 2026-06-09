@@ -18,19 +18,23 @@ from pyweber.utils.types import (
 from pyweber.models.file import File
 from questionary import checkbox
 
-if TYPE_CHECKING: # pragma: no cover
+if TYPE_CHECKING:
     from pyweber.core.template import Template
     from pyweber.core.element import Element
 
-class ChildElements(list['Element']): # pragma: no cover
+class ChildElements(list['Element']):
     def __init__(self, parent: 'Element'):
         super().__init__()
         self.parent = parent
 
+    def _register_child(self, element: 'Element', *, before_uuid: str = None):
+        element.parent = self.parent
+        if hasattr(self.parent, 'register_child_placeholder'):
+            self.parent.register_child_placeholder(element, before_uuid=before_uuid)
+
     def append(self, element: 'Element'):
         super().append(element)
-        element.parent = self.parent
-
+        self._register_child(element)
         return self
 
     def remove(self, element: 'Element'):
@@ -43,8 +47,8 @@ class ChildElements(list['Element']): # pragma: no cover
 
     def insert(self, index: int, element: 'Element'):
         super().insert(index, element)
-        element.parent = self.parent
-
+        before_uuid = self[index + 1].uuid if index + 1 < len(self) else None
+        self._register_child(element, before_uuid=before_uuid)
         return self
 
     def extend(self, elements):
@@ -55,7 +59,7 @@ class ChildElements(list['Element']): # pragma: no cover
             self.append(element=element)
         return self
 
-class ElementConstrutor: # pragma: no cover
+class ElementConstrutor:
     def __init__(
         self,
         tag: HTMLTag,
@@ -87,6 +91,22 @@ class ElementConstrutor: # pragma: no cover
         self.files = files or []
         self.events = events or TemplateEvents()
         self.childs = childs or ChildElements(self)
+
+    def register_child_placeholder(self, child: 'ElementConstrutor', *, before_uuid: str = None):
+        """Garante que cada filho tem {{uuid}} no content na posição correta."""
+        placeholder = "{{" + child.uuid + "}}"
+        content = self.content or ''
+
+        if placeholder in content:
+            return
+
+        if before_uuid:
+            before = "{{" + before_uuid + "}}"
+            if before in content:
+                self.content = content.replace(before, placeholder + before, 1)
+                return
+
+        self.content = content + placeholder
 
     @property
     def selection_start(self): return self.__selection_start
@@ -329,6 +349,14 @@ class ElementConstrutor: # pragma: no cover
             except Exception as e:
                 raise ValueError(f"Could not convert value to string: {e}")
 
+        if self.__content is not None:
+            childs = getattr(self, '_Element__childs', None)
+            if childs:
+                placeholders = {match.strip() for match in re.findall(r'\{\{(.*?)\}\}', self.__content)}
+                for child in list(childs):
+                    if child.uuid not in placeholders:
+                        childs.remove(child)
+
     @property
     def value(self):
         if self.tag == 'select':
@@ -442,19 +470,41 @@ class ElementConstrutor: # pragma: no cover
             html += '>'
 
         final_content = str((self.render_dynamic_values(content=element.content, **self.kwargs) or ''))
+        raw_content = element.content or ''
+        child_by_uuid = {child.uuid: child for child in element.childs}
         has_children = bool(element.childs)
+        rendered_child_uuids: set[str] = set()
 
         if has_children or '\n' in final_content:
             html += '\n'
 
-        for child in element.childs:
-            child_html = self.to_html(child, indent + 4)
-            uuid_placeholder = "{{" + child.uuid + "}}"
+        if raw_content:
+            for key in re.findall(r'\{\{(.*?)\}\}', raw_content):
+                key = key.strip()
+                kw_val = self.kwargs.get(key)
+                if isinstance(kw_val, ElementConstrutor):
+                    rendered_child_uuids.add(kw_val.uuid)
 
-            if uuid_placeholder in final_content:
-                final_content: str = final_content.replace(uuid_placeholder, child_html)
-            else:
-                final_content += '\n' + child_html
+        for uuid in re.findall(r'\{\{(.*?)\}\}', raw_content):
+            uuid = uuid.strip()
+            child = child_by_uuid.get(uuid)
+            if not child:
+                continue
+            placeholder = "{{" + uuid + "}}"
+            if child.uuid in rendered_child_uuids:
+                final_content = final_content.replace(placeholder, '', 1)
+                continue
+            child_html = self.to_html(child, indent + 4)
+            if placeholder in final_content:
+                final_content = final_content.replace(placeholder, child_html, 1)
+            rendered_child_uuids.add(child.uuid)
+
+        for child in element.childs:
+            if child.uuid in rendered_child_uuids:
+                continue
+            placeholder = "{{" + child.uuid + "}}"
+            if placeholder not in raw_content:
+                final_content += '\n' + self.to_html(child, indent + 4)
 
         if final_content:
             if has_children or '\n' in final_content:

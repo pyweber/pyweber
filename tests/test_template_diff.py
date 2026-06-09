@@ -63,8 +63,8 @@ def test_element_with_child_added():
 
     diff.track_differences(new_element, old_element)
 
-    assert any(d['status'] == 'Added' for d in diff.differences.values())
-    assert any(d['status'] == 'Removed' for d in diff.differences.values())
+    # Com placeholders sincronizados no content, trocar filhos altera o content do pai.
+    assert diff.differences[parent_uuid]['status'] == 'Changed'
 
 def test_element_differs_by_id():
     elem1 = FakeElement(uuid="1", id="a")

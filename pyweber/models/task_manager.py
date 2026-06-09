@@ -4,8 +4,9 @@ from typing import Callable, Awaitable
 from concurrent.futures import ThreadPoolExecutor, Future
 
 from pyweber.utils.utils import PrintLine
+from pyweber.models.context import set_current_window, reset_current_window
 
-class TaskManager: # pragma: no cover
+class TaskManager:
     """Gerencia tasks async e sync por sessão, evitando tasks antigas após reload."""
 
     def __init__(self):
@@ -29,7 +30,7 @@ class TaskManager: # pragma: no cover
             # Task já em execução, não cria duplicata
             return event_id
 
-        task = asyncio.create_task(handler(event_handler))
+        task = asyncio.create_task(self._run_async_handler(handler, event_handler))
         self.active_handlers_async[session_id][event_id] = task
 
         try:
@@ -45,6 +46,13 @@ class TaskManager: # pragma: no cover
             self.active_handlers_async[session_id].pop(event_id, None)
             if not self.active_handlers_async[session_id]:
                 self.active_handlers_async.pop(session_id, None)
+
+    async def _run_async_handler(self, handler, event_handler):
+        token = set_current_window(event_handler.window)
+        try:
+            return await handler(event_handler)
+        finally:
+            reset_current_window(token)
 
     async def cancel_all_tasks_async(self, session_id: str):
         """Cancela todas as tasks async de uma sessão."""
@@ -63,20 +71,21 @@ class TaskManager: # pragma: no cover
     # ----------------- SYNC TASKS -----------------
     def create_task(self, session_id: str, event_id: str, handler: Callable, event_handler):
         """Cria task sync via ThreadPoolExecutor."""
-        if session_id not in self.active_handlers:
-            self.active_handlers[session_id] = {}
+        with self.lock:
+            if session_id not in self.active_handlers:
+                self.active_handlers[session_id] = {}
 
-        existing = self.active_handlers[session_id].get(event_id)
-        if existing and not existing.done():
-            # Task já em execução
-            return False
+            existing = self.active_handlers[session_id].get(event_id)
+            if existing and not existing.done():
+                return False
 
-        future = self.executor.submit(self.__run_executor, session_id, event_id, handler, event_handler)
-        self.active_handlers[session_id][event_id] = future
-        return True
+            future = self.executor.submit(self.__run_executor, session_id, event_id, handler, event_handler)
+            self.active_handlers[session_id][event_id] = future
+            return True
 
     def __run_executor(self, session_id: str, event_id: str, handler: Callable, event_handler):
         """Executa handler sync em thread, limpa após terminar."""
+        token = set_current_window(event_handler.window)
         try:
             result = handler(event_handler)
             return result
@@ -84,19 +93,21 @@ class TaskManager: # pragma: no cover
             PrintLine(f"Error on sync handler ({event_id}): {e}", level='ERROR')
             raise e
         finally:
-            # Limpa handler finalizado
-            if session_id in self.active_handlers:
-                self.active_handlers[session_id].pop(event_id, None)
-                if not self.active_handlers[session_id]:
-                    self.active_handlers.pop(session_id, None)
+            reset_current_window(token)
+            with self.lock:
+                if session_id in self.active_handlers:
+                    self.active_handlers[session_id].pop(event_id, None)
+                    if not self.active_handlers[session_id]:
+                        self.active_handlers.pop(session_id, None)
 
     def cancel_session_handlers(self, session_id: str):
         """Cancela todas as tasks sync de uma sessão."""
-        if session_id in self.active_handlers:
-            for event_id, future in self.active_handlers[session_id].items():
-                if future and not future.done():
-                    future.cancel()
-            self.active_handlers.pop(session_id, None)
+        with self.lock:
+            if session_id in self.active_handlers:
+                for event_id, future in self.active_handlers[session_id].items():
+                    if future and not future.done():
+                        future.cancel()
+                self.active_handlers.pop(session_id, None)
 
     # ----------------- SHUTDOWN -----------------
     async def cancel_all_async(self):

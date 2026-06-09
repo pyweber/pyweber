@@ -1,11 +1,11 @@
 from typing import TYPE_CHECKING
 from time import time
 
-if TYPE_CHECKING: # pragma: no cover
+if TYPE_CHECKING:
     from pyweber.core.template import Template
     from pyweber.core.window import Window
 
-class Session: # pragma: no cover
+class Session:
     def __init__(self, template: 'Template', window: 'Window', session_id: str, current_route: str):
         self.template = template
         self.window = window
@@ -14,7 +14,7 @@ class Session: # pragma: no cover
         self.current_route = current_route
         self.old_template = template
 
-class SessionManager: # pragma: no cover
+class SessionManager:
     def __init__(self):
         self.__sessions: dict[str, Session] = {}
     

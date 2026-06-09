@@ -80,7 +80,7 @@ The `status_code` property provides enhanced status codes with additional header
 
 - **3xx (Redirects)**: Adds `Location` header
 - **401 (Unauthorized)**: Adds `WWW-Authenticate` header with app name
-- **405 (Method Not Allowed)**: Adds `Allow` header with supported methods
+- **405 (Method Not Allowed)**: Adds `Allow` header listing the route's allowed methods (from `Response(..., allowed_methods=[...])` or defaults)
 - **503 (Service Unavailable)**: Adds `Retry-After` header
 
 #### Default Headers

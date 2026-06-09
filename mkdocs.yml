@@ -1,5 +1,5 @@
 site_name: Pyweber Documentation
-site_description: Pyweber is a lightweight Python web framework designed to create dynamic, reactive web applications with a simple and intuitive API.
+site_description: Pyweber is a lightweight Python web framework for reactive web applications with real-time DOM updates.
 
 theme:
   name: material
@@ -22,6 +22,7 @@ theme:
     - navigation.sections
     - navigation.expand
     - navigation.top
+    - navigation.indexes
     - toc.integrate
     - search.suggest
     - search.highlight
@@ -34,7 +35,15 @@ nav:
 
   - Getting Started:
     - Installation: installation.md
+    - Element model (important): guides/element-model.md
+    - Reactivity & updates: guides/reactivity.md
     - Environment Variables: environment.md
+
+  - Guides:
+    - Components: guides/components.md
+    - File streaming: guides/file-streaming.md
+    - Routing (path & query): guides/routing-advanced.md
+    - Deployment: guides/deployment.md
 
   - Core Framework:
     - PyWeber Application: core/pyweber.md
@@ -48,11 +57,11 @@ nav:
     - Redirects: routing/redirectroute.md
 
   - Templates & UI:
-    - Templates: templates/template.md
-    - Elements: templates/element.md
-    - Template Results: templates/templateresult.md
-    - Content Results: templates/contentresult.md
-    - State Results: templates/stateresult.md
+    - Templates: ui/template.md
+    - Elements: ui/element.md
+    - Template Results: ui/templateresult.md
+    - Content Results: ui/contentresult.md
+    - State Results: ui/stateresult.md
 
   - Forms & Files:
     - File Uploads: forms/file.md
@@ -71,16 +80,17 @@ nav:
     - Base Storage: storage/basestorage.md
 
   - User Interaction:
+    - Event Handlers: interaction/events.md
     - Prompts: interaction/prompt.md
     - Confirmations: interaction/confirm.md
-    - Event Handlers: interaction/events.md
 
   - Tools & CLI:
     - Command Line Interface: cli.md
 
   - Reference:
-    - Documentation: documentation.md
     - Examples: examples.md
+    - Changelog: changelog.md
+    - API index: documentation.md
 
 markdown_extensions:
   - toc:

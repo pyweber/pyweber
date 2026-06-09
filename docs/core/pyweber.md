@@ -2,6 +2,32 @@
 
 The `Pyweber` class is the main application class for the PyWeber web framework. It inherits from multiple manager classes to provide comprehensive web application functionality including routing, middleware, cookies, and error handling.
 
+!!! tip "Prefer the guides for day-to-day use"
+    This page is a detailed API reference. For practical topics, start with:
+
+    - [Deployment](../guides/deployment.md) — ASGI, HTTPS, production
+    - [Routing advanced](../guides/routing-advanced.md) — query parameters
+    - [File streaming](../guides/file-streaming.md) — large uploads
+    - [Components](../guides/components.md) — form inputs
+
+## Static asset directories (1.2.0+)
+
+Only directories you register are served as static files:
+
+```python
+app = pw.Pyweber('static')
+app.static('assets', 'images')
+```
+
+## File streaming
+
+```python
+async for chunk in app.stream(file=f, session_id=e.session.session_id):
+    ...
+```
+
+See [File streaming guide](../guides/file-streaming.md).
+
 ## Dependencies
 
 ```python
@@ -81,10 +107,11 @@ Main method for processing HTTP requests and generating responses.
 1. Validates request type
 2. Handles OpenAPI route registration
 3. Processes before-request middleware
-4. Gets template for the route
-5. Converts template to bytes
-6. Processes after-request middleware
-7. Returns final response
+4. Gets template for the route (returns **405** if path exists but method is not allowed — 1.3.0+)
+5. Registers **Template Handoff** token for reactive HTML responses (1.3.0+)
+6. Converts template to bytes
+7. Processes after-request middleware
+8. Returns final response
 
 **Raises:**
 - `TypeError`: If request is not a Request instance
@@ -115,6 +142,10 @@ Resolves and processes a route to get the template result.
 - `method`: HTTP method (default: 'GET')
 
 **Returns:** TemplateResult with processed template
+
+**Method validation (1.3.0+):** If the path is registered but `method` is not in `route.methods`, returns status **405** with `allowed_methods` set for the `Allow` header.
+
+**See also:** [Multiple HTTP methods](../guides/routing-advanced.md#multiple-http-methods-on-one-path)
 
 **Process Flow:**
 1. Resolves route path and extracts parameters
@@ -195,7 +226,12 @@ Loads static file content from filesystem.
 ### Framework Integration Methods
 
 #### `async clone_template(route: str) -> Template`
-Creates a clone of a template for a specific route.
+Creates a clone of a template for a specific route by **re-running the route handler**.
+
+!!! note "WebSocket sessions (1.3.0+)"
+    On normal page loads, the browser sends a **Template Handoff** token from `<meta name="pyweber-handoff">` when opening WebSocket. The server reuses the HTTP-rendered template and does **not** call `clone_template()` unless the token is missing or expired. See [Template Handoff](../guides/reactivity.md#template-handoff-http--websocket).
+
+Use `clone_template()` explicitly when you need a fresh template outside the HTTP→WS flow (tests, scripts, admin tools).
 
 #### `update(changed_file: str = None)`
 Triggers update handler for file change notifications.
@@ -215,7 +251,7 @@ ASGI application interface for deployment.
 ### Internal Methods
 
 #### `_check_recursion(route: str)`
-Prevents infinite recursion in route processing.
+Prevents infinite redirect loops during template processing. Visit tracking is **scoped per HTTP request** (1.3.0+) — sequential requests to the same route do not trigger a false `RecursionError`.
 
 #### `__add_framework_routes()`
 Adds built-in framework routes (admin, docs, static files).

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 
-class Field: # pragma: no cover
+class Field:
     def __init__(
         self,
         name: Optional[str] = None,

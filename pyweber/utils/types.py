@@ -4,20 +4,20 @@ from enum import Enum
 from typing import Dict, Any, Union
 from importlib.resources import files
 
-class DateFormat: pass # pragma: no cover
-class DateTimeFormat: pass # pragma: no cover
-class PasswordFormat: pass # pragma: no cover
-class ByteFormat: pass # pragma: no cover
-class EmailFormat: pass # pragma: no cover
-class UuidFormat: pass # pragma: no cover
-class UrlFormat: pass # pragma: no cover
-class HostnameFormat: pass # pragma: no cover
-class Ipv4Format: pass # pragma: no cover
-class Ipv6Format: pass # pragma: no cover
-class Int32Format: pass # pragma: no cover
-class Int64Format: pass # pragma: no cover
-class FloatFormat: pass # pragma: no cover
-class DoubleFormnat: pass # pragma: no cover
+class DateFormat: pass
+class DateTimeFormat: pass
+class PasswordFormat: pass
+class ByteFormat: pass
+class EmailFormat: pass
+class UuidFormat: pass
+class UrlFormat: pass
+class HostnameFormat: pass
+class Ipv4Format: pass
+class Ipv6Format: pass
+class Int32Format: pass
+class Int64Format: pass
+class FloatFormat: pass
+class DoubleFormnat: pass
 
 class BaseStorage:
     def __init__(self, data: dict[str, (str, int)]):
@@ -45,10 +45,10 @@ class BaseStorage:
         except (TypeError, json.JSONDecodeError):
             return self.data
     
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):
         return repr(self.__filter_data())
 
-class Colors: # pragma: no cover
+class Colors:
     RESET = "\033[0m"
     BOLD = "\033[1m"
 
@@ -79,7 +79,7 @@ class Colors: # pragma: no cover
     BOLD_CYAN = "\033[1;96m"
     BOLD_WHITE = "\033[1;97m"
 
-class JWTAlgorithms(Enum): # pragma: no cover
+class JWTAlgorithms(Enum):
     HS256 = 'HS256'
     HS384 = 'HS384'
     HS512 = 'HS512'
@@ -93,13 +93,13 @@ class JWTAlgorithms(Enum): # pragma: no cover
     PS384 = 'PS384'
     PS512 = 'PS512'
 
-class OrientationType(Enum): # pragma: no cover
+class OrientationType(Enum):
     LANDSCAPE_PRIMARY = "landscape-primary"
     LANDSCAPE_SECONDARY = "landscape-secondary"
     PORTRAIT_PRIMARY = "portrait-primary"
     PORTRAIT_SECONDARY = "portrait-secondary"
 
-class ContentTypes(Enum): # pragma: no cover
+class ContentTypes(Enum):
     # -------- TEXT TYPES --------
     html = "text/html"
     css = "text/css"
@@ -173,7 +173,7 @@ class ContentTypes(Enum): # pragma: no cover
     def content_list(cls) -> list[str]:
         return [value.name for value in cls]
 
-class StaticFilePath(Enum): # pragma: no cover
+class StaticFilePath(Enum):
     framework = 'pyweber'
     html_base = files(framework).joinpath(os.path.join('static', 'html.html'))
     html_404 = files(framework).joinpath(os.path.join('static', 'html404.html'))
@@ -196,7 +196,7 @@ class StaticFilePath(Enum): # pragma: no cover
     def all_static_files(cls):
         return [value.value for value in cls]
 
-class WebSocketStatusCode(Enum): # pragma: no cover
+class WebSocketStatusCode(Enum):
     NORMAL_CLOSURE = "1000 Normal Closure"
     GOING_AWAY = "1001 Going Away"
     PROTOCOL_ERROR = "1002 Protocol Error"
@@ -225,7 +225,7 @@ class WebSocketStatusCode(Enum): # pragma: no cover
         
         return cls.INTERNAL_SERVER_ERROR.value
 
-class HTTPStatusCode(Enum): # pragma: no cover
+class HTTPStatusCode(Enum):
     # Informational Responses (1xx)
     CONTINUE = "100 Continue"
     SWITCHING_PROTOCOLS = "101 Switching Protocols"
@@ -317,7 +317,7 @@ class HTTPStatusCode(Enum): # pragma: no cover
     def code(self) -> int:
         return int(self.value.split(' ')[0])
 
-class EventType(Enum): # pragma: no cover
+class EventType(Enum):
     # Mouse Events
     CLICK = "onclick"
     DBLCLICK = "ondblclick"
@@ -377,7 +377,7 @@ class EventType(Enum): # pragma: no cover
     TOUCHEND = "ontouchend"
     TOUCHCANCEL = "ontouchcancel"
 
-class WindowEventType(Enum): # pragma: no cover
+class WindowEventType(Enum):
     # Eventos de Janela e Navegação
     AFTER_PRINT = "onafterprint"
     BEFORE_PRINT = "onbeforeprint"
@@ -482,7 +482,7 @@ class WindowEventType(Enum): # pragma: no cover
     GOTPOINTERCAPTURE = "ongotpointercapture"
     LOSTPOINTERCAPTURE = "onlostpointercapture"
 
-class HTMLTag(Enum): # pragma: no cover
+class HTMLTag(Enum):
     # Tags Semânticas e de Estruturação
     html = "html"
     head = "head"
@@ -591,7 +591,7 @@ class HTMLTag(Enum): # pragma: no cover
     # Tags de Comentários
     comment = "comment"
 
-class NonSelfClosingHTMLTags(Enum): # pragma: no cover
+class NonSelfClosingHTMLTags(Enum):
     # Tags Semânticas e de Estruturação
     html = "html"
     head = "head"
@@ -694,7 +694,7 @@ class NonSelfClosingHTMLTags(Enum): # pragma: no cover
     def non_autoclosing_tags(cls) -> list[str]:
         return [val.value for val in cls]
 
-class GetBy(Enum): # pragma: no cover
+class GetBy(Enum):
     tag = 'tag'
     classes = 'classes'
     id = 'id'
@@ -704,7 +704,7 @@ class GetBy(Enum): # pragma: no cover
     style = 'style'
     uuid = 'uuid'
 
-class Icons(Enum): # pragma: no cover
+class Icons(Enum):
     _0_CIRCLE_FILL = 'bi bi-0-circle-fill'
     _0_CIRCLE = 'bi bi-0-circle'
     _0_SQUARE_FILL = 'bi bi-0-square-fill'

@@ -2,6 +2,10 @@
 
 Templates are the core building blocks of PyWeber applications. They represent HTML pages or components that can be dynamically manipulated through Python code.
 
+!!! tip "Related guides"
+    - [Element model](../guides/element-model.md) — `{{placeholders}}` in HTML files
+    - [Reactivity](../guides/reactivity.md) — `e.update()` after changes
+
 ## Creating Templates
 
 A template in PyWeber can be created from an HTML file or from an HTML string:
@@ -145,35 +149,18 @@ paragraphs = template.querySelectorAll("p")
 items = template.querySelectorAll(".item")
 ```
 
-### getElementById
-```python 
-getElementById(element_id: str, element: Element = None) -> Element | None
-```   
+### getElement / getElements (since 1.0.2)
 
-Selects an element by its ID.
 ```python
-button = template.getElementById("submit-button")
+from pyweber.utils.types import GetBy
+
+# Single element by id, class, attrs, or style
+button = template.getElement(by=GetBy.ID, value="submit-button")
+items = template.getElements(by=GetBy.CLASSES, value="item")
 ```
 
-### getElementByClass
-```python
-getElementByClass(class_name: str, element: Element = None) -> list[Element]
-```
-
-Selects all elements with the specified class.
-```python
-items = template.getElementByClass("item")
-```
-
-### getElementByUUID
-```python
-getElementByUUID(element_uuid: str, element: Element = None) -> Element | None
-```
-
-Selects an element by its UUID (internal identifier).
-```python
-element = template.getElementByUUID("12345678-1234-5678-1234-567812345678")
-```
+!!! warning "Removed in 1.0.2"
+    `getElementById`, `getElementByClass`, and `getElementByUUID` were removed. Use `getElement` / `getElements` with `GetBy` instead.
 
 ## HTML Manipulation
 
@@ -415,8 +402,8 @@ def add_item(self, e: pw.EventHandler):
     e.update()
 
 def delete_item(self, e: pw.EventHandler):
-    # Get the button that was clicked
-    button = e.element
+    # Prefer e.target (e.element is deprecated)
+    button = e.target
 
     # Get the parent item
     item = button.parent
@@ -496,8 +483,7 @@ class TodoList(pw.Template):
             e.update()
 
     def delete_todo(self, e: pw.EventHandler):
-        # Get the button that was clicked
-        button = e.element
+        button = e.target
 
         # Get the parent item
         item = button.parent
@@ -534,6 +520,7 @@ if __name__ == "__main__":
 
 ## Next Steps
 
-- Learn about [Elements](element.md) in detail
-- Explore [Routing](router.md) to connect templates to URLs
-- Understand [Event Handling](events.md) for interactive applications
+- [Element model guide](../guides/element-model.md)
+- [Elements](element.md) in detail
+- [Routing advanced](../guides/routing-advanced.md) to connect templates to URLs
+- [Event handling](../interaction/events.md) for interactive applications

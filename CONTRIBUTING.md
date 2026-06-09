@@ -146,7 +146,7 @@ For maintainers:
 
 ## License
 
-By contributing to PyWeber, you agree that your contributions will be licensed under the project's MIT License.
+By contributing to PyWeber, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE), copyright Pyweber Technology.
 
 ## Contact
 
