@@ -591,7 +591,14 @@ class Pyweber(
             return False
 
         template = template_result.template
-        return not isinstance(template, (dict, list, set))
+        if isinstance(template, (dict, list, set)):
+            return False
+        # No stable uuid contract → no reactive session handoff
+        if isinstance(template, Template) and not template.include_uuid:
+            return False
+        if isinstance(template, Element) and not getattr(template, 'include_uuid', True):
+            return False
+        return True
 
     def _ensure_template_object(
         self,

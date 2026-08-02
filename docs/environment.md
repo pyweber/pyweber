@@ -17,6 +17,7 @@ PyWeber supports configuration through environment variables, allowing you to ov
 | `PYWEBER_ALLOWED_ORIGINS` | Comma-separated CORS allowlist | empty (no CORS) | `PYWEBER_ALLOWED_ORIGINS=https://app.example` |
 | `PYWEBER_MAX_BODY_SIZE` | Max request body size in bytes | `10485760` | `PYWEBER_MAX_BODY_SIZE=2097152` |
 | `PYWEBER_CSRF_ENABLED` | Enable CSRF checks on mutating HTTP methods | `true` | `PYWEBER_CSRF_ENABLED=false` |
+| `PYWEBER_CSP` | Override `Content-Security-Policy` (`off` to disable) | CDN-friendly default | `PYWEBER_CSP=off` |
 
 ## Security config (`config.toml`)
 
@@ -29,9 +30,11 @@ env = 'development'   # use 'production' to hide 500 details
 allowed_origins = []  # e.g. ['https://app.example']
 max_body_size = 10485760
 csrf_enabled = true
+# csp = 'off'  # or a full policy string; PYWEBER_CSP env overrides this
 ```
 
 - Cross-origin browser apps must list origins in `allowed_origins` (CORS is off by default).
+- Default CSP allows `'self'`, `'unsafe-inline'`, and `https:` for scripts/styles/fonts/images so Bootstrap/Google Fonts/jsDelivr work. Tighten via `PYWEBER_CSP` / `[security].csp` in production if you self-host assets.
 - `Element` escapes HTML by default; use `sanitize=False` only for trusted markup.
 - Save uploads with `secure_filename(file.filename)` (filenames from multipart are already sanitized).
 

@@ -56,3 +56,42 @@ def test_existing_stylesheet_skips_default_pyweber_css():
         and (link.get_attr('rel') or '').lower() == 'stylesheet'
     ]
     assert pyweber_css == []
+
+
+def _ws_scripts(template: Template):
+    head = template.root.querySelector('head')
+    if not head:
+        return []
+    return [
+        s for s in head.querySelectorAll('script')
+        if (s.get_attr('src') or '').startswith('/_pyweber/static/')
+        and (s.get_attr('src') or '').endswith('/.js')
+    ]
+
+
+def test_include_uuid_false_skips_websocket_script():
+    t = Template(
+        template='<html><head><link rel="stylesheet" href="/app.css"></head><body><h1>Hi</h1></body></html>',
+        include_uuid=False,
+    )
+    assert _ws_scripts(t) == []
+    html = t.build_html()
+    assert 'uuid=' not in html.lower()
+    assert '/_pyweber/static/' not in html or '/.js' not in html
+
+
+def test_include_uuid_true_injects_websocket_script():
+    t = Template(
+        template='<html><head></head><body><h1>Hi</h1></body></html>',
+        include_uuid=True,
+    )
+    scripts = _ws_scripts(t)
+    assert len(scripts) == 1
+    assert 'uuid=' in t.build_html().lower()
+
+
+def test_include_uuid_false_clone_preserves_flag():
+    t = Template(template='<html><head></head><body></body></html>', include_uuid=False)
+    cloned = t.clone()
+    assert cloned.include_uuid is False
+    assert _ws_scripts(cloned) == []

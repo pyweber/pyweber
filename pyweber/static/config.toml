@@ -40,5 +40,6 @@ rate_limit_enabled = false
 rate_limit_rpm = 120
 gzip_enabled = true
 gzip_min_bytes = 500
+# csp = 'off'  # or a full Content-Security-Policy string; env PYWEBER_CSP wins
 
 [api_keys]

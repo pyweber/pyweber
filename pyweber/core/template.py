@@ -16,6 +16,11 @@ class Template:
         self.__root = self.parse_html()
 
     @property
+    def include_uuid(self) -> bool:
+        """When False, HTML is static (no uuid attrs) and the reactive WS script is not injected."""
+        return self.__include_uuid
+
+    @property
     def template(self):
         return self.__template
 
@@ -135,6 +140,7 @@ class Template:
         return element
 
     def __create_default_element(self, *args, **kwargs):
+        kwargs.setdefault('include_uuid', self.__include_uuid)
         return Element(*args, **kwargs)
 
     @staticmethod
@@ -204,9 +210,13 @@ class Template:
                 break
 
         if not has_websocket_script:
+            # Reactivity requires stable uuid attrs in HTML. Static pages
+            # (include_uuid=False) must not load the WS client — it stamps
+            # random uuids and can rewrite documentElement (breaking CSS).
             disable_ws = os.environ.get('PYWEBER_DISABLE_WS', False)
+            ws_disabled = disable_ws in [True, 'True', 'true', '1', 1]
 
-            if disable_ws not in [True, 'True', 'true', '1', 1]:
+            if self.__include_uuid and not ws_disabled:
                 head.childs.extend(
                     [
                         self.__create_default_element(
@@ -269,6 +279,7 @@ class Template:
             template=self.template,
             status_code=self.status_code,
             title=self.title,
+            include_uuid=self.__include_uuid,
             **self.kwargs
         )
         tpl.data = self.data

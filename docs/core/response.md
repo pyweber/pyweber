@@ -110,6 +110,7 @@ The response automatically includes these headers:
 - `Set-Cookie`: List of cookies to set
 - `Request-Path`: Original request path
 - `Response-Path`: Route that handled the request
+- Security: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Content-Security-Policy` (default allows `'self'`, `'unsafe-inline'`, and `https:` CDNs for scripts/styles/fonts/images). Override with `PYWEBER_CSP` / `[security].csp`, or set `off` to disable.
 
 ### Dictionary-like Access
 

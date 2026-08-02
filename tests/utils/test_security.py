@@ -128,6 +128,53 @@ class TestCORSAndHeaders:
         assert response.headers['Access-Control-Allow-Origin'] == 'https://app.example'
         assert response.headers['Access-Control-Allow-Credentials'] == 'true'
 
+    def test_default_csp_allows_https_cdn_styles(self):
+        from pyweber.utils.security import DEFAULT_CSP, resolve_csp
+
+        csp = resolve_csp()
+        assert csp is not None
+        assert "style-src 'self' 'unsafe-inline' https:" in csp
+        assert "script-src 'self' 'unsafe-inline' https:" in csp
+        assert "font-src 'self' data: https:" in csp
+        assert csp == DEFAULT_CSP
+
+        response = Response(
+            request=self._request(),
+            response_content=b'ok',
+            code=200,
+            cookies={},
+            response_type=ContentTypes.html,
+            route='/',
+        )
+        assert 'https:' in response.headers['Content-Security-Policy']
+
+    def test_csp_off_via_env(self, monkeypatch):
+        monkeypatch.setenv('PYWEBER_CSP', 'off')
+        from pyweber.utils.security import resolve_csp
+
+        assert resolve_csp() is None
+        response = Response(
+            request=self._request(),
+            response_content=b'ok',
+            code=200,
+            cookies={},
+            response_type=ContentTypes.html,
+            route='/',
+        )
+        assert 'Content-Security-Policy' not in response.headers
+
+    def test_csp_custom_via_env(self, monkeypatch):
+        monkeypatch.setenv('PYWEBER_CSP', "default-src 'none'")
+        response = Response(
+            request=self._request(),
+            response_content=b'ok',
+            code=200,
+            cookies={},
+            response_type=ContentTypes.html,
+            route='/',
+        )
+        assert response.headers['Content-Security-Policy'] == "default-src 'none'"
+
     @pytest.mark.asyncio
     async def test_cors_preflight_options(self, monkeypatch):
         from pyweber.pyweber.pyweber import Pyweber

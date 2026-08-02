@@ -74,6 +74,27 @@ class TestHttpHandoffRegistration:
         assert len(handoff_registry._entries) == 1
 
     @pytest.mark.asyncio
+    async def test_static_include_uuid_false_skips_handoff_and_ws(self):
+        app = Pyweber()
+        page = Template(
+            template='<html><head><link rel="stylesheet" href="/a.css"></head><body><h1>Land</h1></body></html>',
+            include_uuid=False,
+        )
+        app.add_route(route='/', template=page, methods=['GET'])
+
+        request = Request(
+            headers='GET / HTTP/1.1\r\nHost: localhost\r\n\r\n',
+            body=b'',
+            client_info=ClientInfo(host='127.0.0.1', port=0),
+        )
+        resp = await app.get_response(request)
+        body = resp.response_content.decode()
+        assert 'uuid=' not in body.lower()
+        assert '/.js' not in body
+        assert 'pyweber-handoff' not in body
+        assert len(handoff_registry._entries) == 0
+
+    @pytest.mark.asyncio
     async def test_json_response_does_not_inject_handoff(self):
         app = Pyweber()
         app.add_route(route='/api', template={'ok': True}, methods=['GET'], content_type=ContentTypes.json)
@@ -133,6 +154,47 @@ class TestWsHandoffConsumption:
 
         assert 'from-handoff' in template.build_html()
         app.clone_template.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_ws_keeps_handoff_when_include_uuid_false(self):
+        """Client outerHTML with invented uuids must not overwrite a static template."""
+        app = Pyweber()
+        static = Template(
+            template='<html><head></head><body><p class="hero">Safe</p></body></html>',
+            include_uuid=False,
+        )
+        token = handoff_registry.create(static, '/land')
+
+        poisoned = (
+            '<html uuid="aaaa"><head></head><body uuid="bbbb">'
+            '<p class="hero" uuid="cccc">Broken</p></body></html>'
+        )
+        raw_message = {
+            'type': None,
+            'event_ref': None,
+            'route': '/land',
+            'target_uuid': None,
+            'current_target_uuid': None,
+            'template': poisoned,
+            'values': {},
+            'event_data': {},
+            'window_data': {
+                'width': 100, 'height': 100, 'innerWidth': 100, 'innerHeight': 100,
+                'scrollX': 0, 'scrollY': 0, 'screen': {}, 'location': {},
+                'sessionStorage': {}, 'localStorage': {},
+            },
+            'window_response': {},
+            'window_event': None,
+            'sessionId': 'static-session',
+            'file_content': {},
+            'handoffToken': token,
+        }
+
+        msg = wsMessage(raw_message=raw_message, app=app, ws=Mock())
+        template = await msg.template
+        html = template.build_html()
+        assert 'Safe' in html
+        assert 'Broken' not in html
 
     @pytest.mark.asyncio
     async def test_ws_falls_back_to_clone_without_token(self):

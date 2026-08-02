@@ -41,6 +41,7 @@ class wsMessage:
 
     async def get_template(self):
         self.__app: 'Pyweber' = self.__app
+        used_handoff = False
         if self.session_id in sessions.all_sessions:
             session_template = sessions.get_session(session_id=self.session_id).template
         else:
@@ -48,12 +49,23 @@ class wsMessage:
                 token=self.get_value(key='handoffToken'),
                 route=self.route or '',
             )
+            if session_template is not None:
+                used_handoff = True
             if session_template is None:
                 session_template = await self.__app.clone_template(route=self.route)
 
-        if self.get_value(key='template'):
-            session_template.root = session_template.parse_html(html=self.get_value('template'))
-            self.insert_values(element=session_template.root)
+        client_html = self.get_value(key='template')
+        if client_html:
+            # With include_uuid=False (or handoff without uuid attrs in HTML),
+            # never parse client outerHTML over the server template — client
+            # may have stamped random uuids that poison the diff contract.
+            keep_server = (
+                not getattr(session_template, 'include_uuid', True)
+                or (used_handoff and 'uuid=' not in client_html.lower())
+            )
+            if not keep_server:
+                session_template.root = session_template.parse_html(html=client_html)
+                self.insert_values(element=session_template.root)
 
         return session_template
 

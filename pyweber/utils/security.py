@@ -110,6 +110,40 @@ def csrf_enabled() -> bool:
     return bool(value)
 
 
+# Allows HTTPS CDNs (Bootstrap, Google Fonts, jsDelivr icons) while still
+# blocking exotic schemes and clickjacking. Override with PYWEBER_CSP /
+# [security].csp; set to "off" to omit the header.
+DEFAULT_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https:; "
+    "style-src 'self' 'unsafe-inline' https:; "
+    "font-src 'self' data: https:; "
+    "img-src 'self' data: https:; "
+    "connect-src 'self' ws: wss: https:; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
+
+_CSP_OFF = frozenset({'', '0', 'false', 'off', 'none', 'disable', 'disabled'})
+
+
+def resolve_csp() -> str | None:
+    """Return CSP header value, or None to omit the header.
+
+    Precedence: ``PYWEBER_CSP`` env → ``[security].csp`` config → ``DEFAULT_CSP``.
+    """
+    raw = os.environ.get('PYWEBER_CSP')
+    if raw is None:
+        raw = _config().get('security', 'csp', default=None)
+    if raw is None:
+        return DEFAULT_CSP
+    value = str(raw).strip()
+    if value.lower() in _CSP_OFF:
+        return None
+    return value
+
+
 def get_allowed_origins() -> set[str]:
     origins = _config().get('security', 'allowed_origins', default=None)
     if origins is None:

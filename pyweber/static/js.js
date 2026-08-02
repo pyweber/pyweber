@@ -41,7 +41,9 @@ function connectWebSocket() {
     socket.onopen = async function () {
         socketReady = true;
         reconnectAttempts = 0;
-        sendToServer(await getEventData({ includeTemplate: true }));
+        // Só envia outerHTML no handshake se existir contrato uuid estável
+        const includeTemplate = pageHasStableUuids();
+        sendToServer(await getEventData({ includeTemplate }));
     };
 
     socket.onerror = function (error) {
@@ -250,20 +252,34 @@ async function send_file_chunk(file_id, status, data) {
 }
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
+function pageHasStableUuids() {
+    return !!document.documentElement.querySelector('[uuid]');
+}
+
 function applyDifferences(differences) {
+    if (!differences || typeof differences !== 'object') return;
+
     Object.keys(differences).forEach(key => {
         const diff = differences[key];
+        if (!diff) return;
 
+        // Root-level replace destroys <link rel="stylesheet"> / Bootstrap / scripts.
+        // Never rewrite documentElement.innerHTML — ignore and keep the live DOM.
         if (!diff.parent) {
             if (diff.status === 'Changed') {
-                const doc = new DOMParser().parseFromString(diff.element, 'text/html');
-                document.documentElement.innerHTML = doc.documentElement.innerHTML;
+                console.warn(
+                    'PyWeber: ignored root document replace (would break CSS/scripts). ' +
+                    'Use include_uuid=True for reactive updates.'
+                );
             }
             return;
         }
 
         const parentElement = document.querySelector(`[uuid="${diff.parent}"]`);
-        if (!parentElement) return;
+        if (!parentElement) {
+            // UUID contract broken (e.g. stamped client uuids vs server) — skip, do not invent a full replace
+            return;
+        }
 
         switch (diff.status) {
             case 'Added':
@@ -286,6 +302,7 @@ function applyDifferences(differences) {
                     if (toChange) {
                         toChange.parentNode.replaceChild(createElementFromHTML(diff.element), toChange);
                     }
+                    // missing uuid target → ignore (do not fall back to full-document rewrite)
                 }
                 break;
             }
@@ -377,9 +394,12 @@ function getHandoffToken() {
     return document.querySelector('meta[name="pyweber-handoff"]')?.content || null;
 }
 
-/** Atribui uuid a nós injectados por JS (ou libs externas) antes do sync com o servidor. */
+/** Atribui uuid a nós injectados por JS (ou libs externas) antes do sync com o servidor.
+ *  Só corre se a página já tiver o contrato uuid (include_uuid=True). Nunca inventa
+ *  um universo de UUIDs em páginas estáticas — isso parte o handoff/diff. */
 function stampMissingUuids(root = document.documentElement) {
     if (!(root instanceof Element)) return;
+    if (!pageHasStableUuids()) return;
 
     const nodes = root === document.documentElement
         ? root.querySelectorAll('*')
@@ -395,6 +415,7 @@ function stampMissingUuids(root = document.documentElement) {
 /** Re-sincroniza DOM → servidor depois de JS injectar HTML (sem uuid) após o WS abrir. */
 async function resyncDomWithServer() {
     if (!socketReady || socket.readyState !== WebSocket.OPEN) return;
+    if (!pageHasStableUuids()) return;
     stampMissingUuids();
     await sendToServer(await getEventData({ includeTemplate: true }));
 }

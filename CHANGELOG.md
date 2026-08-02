@@ -24,6 +24,8 @@
 - Typo fixes with aliases: `DoubleFormat` (`DoubleFormnat` deprecated), `normalize_path` (`normaize_path`), `CreateApp` (`CreatApp`), `toggle_class` (`toogle_class`).
 - **`WWW-Authenticate` is no longer auto-added on every 401.** Set it via `Response(..., headers=...)` / `set_header`, or let OpenAPI schemes (`HTTPBasic` / `HTTPBearer`) attach it when that scheme rejects the request.
 - **CORS on uvicorn/ASGI**: internal bookkeeping headers stripped from the wire; `Access-Control-Request-Headers` lookup is case-insensitive; whitelisted `OPTIONS` preflight returns **204** with CORS headers early.
+- **`include_uuid=False` is a clear static contract**: no reactive WS script injection, no handoff token. The client never rewrites `document.documentElement.innerHTML` on root diffs (preserves CSS/Bootstrap); `stampMissingUuids` only runs when stable uuids already exist.
+- **CSP default allows HTTPS CDNs** (`style-src` / `script-src` / `font-src` / `img-src` include `https:`). Override with `PYWEBER_CSP` or `[security].csp`; set `off` to omit the header. (The previous `'self'`-only policy blocked Bootstrap/Google Fonts and broke layouts.)
 
 ## [1.4.0.dev0] - Unreleased
 

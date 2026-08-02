@@ -7,18 +7,15 @@ from typing import Any
 from pyweber.utils.types import ContentTypes, HTTPStatusCode
 from pyweber.models.request import Request
 from pyweber.utils.utils import PrintLine, Colors
-from pyweber.utils.security import get_allowed_origins, https_enabled
-
-DEFAULT_CSP = (
-    "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline'; "
-    "style-src 'self' 'unsafe-inline'; "
-    "img-src 'self' data:; "
-    "connect-src 'self' ws: wss:; "
-    "frame-ancestors 'none'; "
-    "base-uri 'self'; "
-    "form-action 'self'"
+from pyweber.utils.security import (
+    DEFAULT_CSP,
+    get_allowed_origins,
+    https_enabled,
+    resolve_csp,
 )
+
+# Re-export for callers that imported DEFAULT_CSP from response
+__all_csp__ = (DEFAULT_CSP, resolve_csp)
 
 # Internal bookkeeping headers — stripped on ASGI wire format
 INTERNAL_RESPONSE_HEADERS = frozenset({
@@ -121,10 +118,13 @@ class Response:
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
             "Referrer-Policy": "strict-origin-when-cross-origin",
-            "Content-Security-Policy": DEFAULT_CSP,
             "X-Forwarded-Proto": "https" if https_enabled() else "http",
             "X-Forwarded-Host": getattr(request, 'host', None) or 'localhost',
         }
+
+        csp = resolve_csp()
+        if csp:
+            self.__headers["Content-Security-Policy"] = csp
 
         if https_enabled():
             self.__headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -133,7 +133,10 @@ class Response:
 
         if headers:
             for key, value in headers.items():
-                self.__headers[key] = value
+                if value is None:
+                    self.__headers.pop(key, None)
+                else:
+                    self.__headers[key] = value
 
         self.http_status_code = HTTPStatusCode.search_by_code(status)
         self.__check_status_code()
