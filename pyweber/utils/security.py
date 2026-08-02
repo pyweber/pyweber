@@ -167,6 +167,16 @@ def get_max_body_size() -> int:
     return size if size > 0 else DEFAULT_MAX_BODY_SIZE
 
 
+def validate_uploads_enabled() -> bool:
+    env = os.environ.get('PYWEBER_VALIDATE_UPLOADS')
+    if env is not None:
+        return env.strip().lower() in {'1', 'true', 'yes', 'on'}
+    value = _config().get('security', 'validate_uploads', default=False)
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+    return bool(value)
+
+
 def https_enabled() -> bool:
     value = _config().get('server', 'https_enabled', default=False)
     if isinstance(value, str):

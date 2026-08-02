@@ -56,6 +56,7 @@ class OpenAPIConfig:
     security: list[str] | list[dict[str, list[str]]] | None = None
     tags: list[dict[str, str]] | None = None
     expose_in_production: bool = False
+    docs_security: list[str] | list[dict[str, list[str]]] | None = None
 
     def normalized_security(self) -> list[dict[str, list[str]]] | None:
         return normalize_security_requirements(self.security)

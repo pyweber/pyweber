@@ -18,6 +18,7 @@ PyWeber supports configuration through environment variables, allowing you to ov
 | `PYWEBER_MAX_BODY_SIZE` | Max request body size in bytes | `10485760` | `PYWEBER_MAX_BODY_SIZE=2097152` |
 | `PYWEBER_CSRF_ENABLED` | Enable CSRF checks on mutating HTTP methods | `true` | `PYWEBER_CSRF_ENABLED=false` |
 | `PYWEBER_CSP` | Override `Content-Security-Policy` (`off` to disable) | CDN-friendly default | `PYWEBER_CSP=off` |
+| `PYWEBER_VALIDATE_UPLOADS` | Sniff MIME magic bytes on multipart uploads | `false` | `PYWEBER_VALIDATE_UPLOADS=1` |
 
 ## Security config (`config.toml`)
 

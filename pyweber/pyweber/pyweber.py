@@ -24,6 +24,8 @@ from pyweber.models.context import (
     get_visited_routes,
     begin_route_visit_tracking,
     reset_route_visit_tracking,
+    set_cookie_manager,
+    reset_cookie_manager,
 )
 from pyweber.models.handoff import handoff_registry, inject_handoff_token
 
@@ -239,6 +241,7 @@ class Pyweber(
 
         req_token = set_current_request(request)
         visit_token = begin_route_visit_tracking()
+        cookie_token = set_cookie_manager(self)
         self.cookies.clear()
 
         try:
@@ -272,6 +275,7 @@ class Pyweber(
             self.cookies.clear()
             reset_current_request(req_token)
             reset_route_visit_tracking(visit_token)
+            reset_cookie_manager(cookie_token)
 
     def _finalize_response(self, request: Request, response: Response) -> Response:
         return self._apply_gzip(request, response)
@@ -591,7 +595,7 @@ class Pyweber(
             return False
 
         template = template_result.template
-        if isinstance(template, (dict, list, set)):
+        if isinstance(template, (dict, list, set, Response)):
             return False
         # No stable uuid contract → no reactive session handoff
         if isinstance(template, Template) and not template.include_uuid:
@@ -605,6 +609,8 @@ class Pyweber(
         template: Union[Template, Element, str],
         title: str = None,
     ) -> Template:
+        if isinstance(template, Response):
+            raise TypeError('Response cannot be converted to Template for handoff')
         if isinstance(template, Template):
             return template
         if isinstance(template, Element):
@@ -989,6 +995,16 @@ class Pyweber(
             state_result.status_code = HTTPStatusCode.INTERNAL_SERVER_ERROR.code
             state_result.content_type = ContentTypes.html
 
+        if isinstance(template, Response):
+            return TemplateResult(
+                status_code=template.status_code,
+                content_type=ContentTypes.json if 'json' in str(template.response_type) else ContentTypes.html,
+                redirect_path=state_result.redirect_path,
+                process_response=False,
+                template=template,
+                response_headers=state_result.response_headers,
+            )
+
         return TemplateResult(
             status_code=state_result.status_code,
             content_type=state_result.content_type,
@@ -1111,13 +1127,17 @@ class Pyweber(
         if is_production() and not expose:
             return
 
+        docs_security = getattr(config, 'docs_security', None)
+        if docs_security is None:
+            docs_security = []
+
         if config.docs_url:
             routes.append(
                 Route(
                     route=config.docs_url,
                     template=StaticFilePath.pyweber_docs.value,
                     title='Pyweber Documentation',
-                    security=[],
+                    security=docs_security,
                     include_in_schema=False,
                 )
             )
@@ -1129,7 +1149,7 @@ class Pyweber(
                     template=self.get_openapi_schema,
                     content_type=ContentTypes.json,
                     process_response=False,
-                    security=[],
+                    security=docs_security,
                     include_in_schema=False,
                     title='OpenAPI Schema',
                 )
@@ -1141,7 +1161,7 @@ class Pyweber(
                     template=self.get_openapi_schema,
                     content_type=ContentTypes.json,
                     process_response=False,
-                    security=[],
+                    security=docs_security,
                     include_in_schema=False,
                     title='OpenAPI Schema',
                 )

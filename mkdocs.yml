@@ -44,6 +44,7 @@ nav:
     - File streaming: guides/file-streaming.md
     - Routing (path & query): guides/routing-advanced.md
     - Deprecations: guides/deprecations.md
+    - Authentication: guides/authentication.md
     - Deployment: guides/deployment.md
 
   - Core Framework:

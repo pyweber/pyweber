@@ -1,20 +1,25 @@
 # PyWeber Changelog
 
-## [1.5.0.dev0] - Unreleased
+## [1.5.0] - Unreleased
 
 ### Added
 
 - **Deprecation framework** (`pyweber.utils.deprecation`) — one-shot `DeprecationWarning`s; removals targeted at **2.0**. See [deprecations guide](docs/guides/deprecations.md).
 - **Onion middleware**: `@app.middleware` with `(request, call_next)`.
-- **Flask-style hooks**: `@app.before_request` / `@app.after_request` (with or without `()`), plus `add_before_request` / `add_after_request`.
-- **`Response.json` / `.text` / `.html`** and ergonomic constructor (`content=`, `status=`, optional `request`, `headers=`).
+- **Flask-style hooks**: `@app.before_request` / `@app.after_request` (with or without `()`), plus `add_before_request` / `add_after_request`. Legacy `status_code=` / `process_response=` on those decorators are deprecated until **2.0**.
+- **`Response.json` / `.text` / `.html`** and ergonomic constructor (`content=`, `status=`, optional `request` / `headers=`). Legacy aliases `response_content` / `code` / `response_type` still work.
 - **`pyweber.testing.TestClient`** — in-process HTTP client (`get`/`post`/…, cookies, CSRF helpers).
 - **Rate limiting** (opt-in): `[security] rate_limit_enabled` / `rate_limit_rpm` (or env). Returns **429** + `Retry-After`.
 - **ETag / 304** for static assets; **gzip** compression when `Accept-Encoding: gzip` (configurable).
 - **Upload MIME sniffing**: `File.validate()` / `pyweber.utils.mime.validate_upload`.
 - Preferred module `pyweber.models.stream_stats` (re-exports `strem_stats`).
 - `Icons` moved to `pyweber.utils.icons` (still importable from `types` with a deprecation warning).
-- Redesigned default **404 / 401 / 500** error pages.
+- Redesigned default **404 / 401 / 500** error pages (shared visual language).
+- Configurable **Content-Security-Policy** via `PYWEBER_CSP` or `[security].csp` (`off` / `false` / `none` omits the header).
+- **`pyweber.auth`** — `@login_required`, `login_user` / `logout_user` / `current_user`, `hash_password` / `check_password` (PBKDF2). See [authentication guide](docs/guides/authentication.md).
+- **RBAC** — `register_roles` / `define_role`, `@permission_required` / `@role_required`, `permissions=` / `roles_all=` on `@login_required`, helpers `has_role` / `has_permission` / `user_permissions` (wildcards `*` / `ns:*`).
+- `OpenAPIConfig.docs_security` — optional security schemes on `/docs` and OpenAPI routes.
+- Opt-in upload MIME sniffing: `PYWEBER_VALIDATE_UPLOADS` / `[security] validate_uploads`.
 
 ### Changed
 
@@ -22,10 +27,25 @@
 - `update_route` only sets known `Route` attributes; unknown keys merge into `route.kwargs`.
 - `/docs` and `/openapi.json` are **auto-disabled in production** unless `OpenAPIConfig(expose_in_production=True)`.
 - Typo fixes with aliases: `DoubleFormat` (`DoubleFormnat` deprecated), `normalize_path` (`normaize_path`), `CreateApp` (`CreatApp`), `toggle_class` (`toogle_class`).
-- **`WWW-Authenticate` is no longer auto-added on every 401.** Set it via `Response(..., headers=...)` / `set_header`, or let OpenAPI schemes (`HTTPBasic` / `HTTPBearer`) attach it when that scheme rejects the request.
+- **`WWW-Authenticate` is no longer auto-added on every 401.** Set it via `Response(..., headers=...)` / `set_header`, or let OpenAPI schemes (`HTTPBasic` / `HTTPBearer`) attach it when that scheme rejects the request. HTML `Accept` may serve `page_unauthorized` instead of JSON `{detail}`.
 - **CORS on uvicorn/ASGI**: internal bookkeeping headers stripped from the wire; `Access-Control-Request-Headers` lookup is case-insensitive; whitelisted `OPTIONS` preflight returns **204** with CORS headers early.
-- **`include_uuid=False` is a clear static contract**: no reactive WS script injection, no handoff token. The client never rewrites `document.documentElement.innerHTML` on root diffs (preserves CSS/Bootstrap); `stampMissingUuids` only runs when stable uuids already exist.
-- **CSP default allows HTTPS CDNs** (`style-src` / `script-src` / `font-src` / `img-src` include `https:`). Override with `PYWEBER_CSP` or `[security].csp`; set `off` to omit the header. (The previous `'self'`-only policy blocked Bootstrap/Google Fonts and broke layouts.)
+- **Default CSP is CDN-friendly**: `style-src` / `script-src` / `font-src` / `img-src` include `https:` so Bootstrap, Google Fonts, jsDelivr, etc. load. The previous `'self'`-only policy blocked remote stylesheets and broke layouts that depend on CDNs.
+- **`include_uuid=False` is a clear static contract**: no reactive WS script injection, no handoff token. Apps that need reactivity keep `include_uuid=True`.
+
+### Fixed
+
+- **Layout break with CDN CSS** — CSP no longer refuses stylesheets from `cdn.jsdelivr.net` / `fonts.googleapis.com` by default.
+- **Static pages + WebSocket** — with `include_uuid=False`, the WS client is not injected; handoff is skipped; client `outerHTML` with invented UUIDs does not overwrite the server template.
+- **Client DOM safety** — `applyDifferences` never rewrites `document.documentElement.innerHTML` (that destroyed CSS/Bootstrap). Missing UUID targets are ignored; `stampMissingUuids` only runs when stable UUIDs already exist on the page.
+- **OpenAPI `int | None` on Python 3.10** — `schema_for_type` / `annotation_type_name` handle `types.UnionType` (PEP 604), not only `typing.Union`.
+- **`safe_join`** — absolute / drive / UNC path segments are rejected (`None`) instead of being stripped and joined under the base (Linux path-escape false negatives).
+
+### Notes for upgraders (1.5)
+
+- Landing / marketing pages: use `Template(..., include_uuid=False)` when you do not need reactivity.
+- If you self-host all assets, tighten CSP: `PYWEBER_CSP="default-src 'self'; …"` or set `csp` under `[security]`.
+- Restart the app process after upgrading so response headers (CSP) are reloaded from the new package.
+- Prefer `@app.middleware(request, call_next)` for cross-cutting concerns; Flask-style before/after remain supported.
 
 ## [1.4.0.dev0] - Unreleased
 
@@ -75,6 +95,7 @@
 - Swagger UI loads `/openapi.json` (pinned `swagger-ui-dist@5.17.14`). Set `OpenAPIConfig(docs_url=None, openapi_url=None)` to disable docs in production.
 - Global `security=` on `OpenAPIConfig` applies to all routes unless a route sets `security=[]` (public) or its own schemes.
 - `HTTPStatusCode.FORBIDDEN` is corrected to **403** (was wrongly 402); `PAYMENT_REQUIRED` (402) was added.
+
 ## [1.3.0] - 2026-06-09
 
 ### Added

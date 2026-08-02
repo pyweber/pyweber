@@ -80,6 +80,24 @@ from .utils.security import (
 from .utils.icons import Icons
 from .utils.deprecation import warn_deprecated
 from .testing import TestClient
+from .auth import (
+    login_required,
+    login_user,
+    logout_user,
+    current_user,
+    get_user_id,
+    hash_password,
+    check_password,
+    permission_required,
+    role_required,
+    register_roles,
+    clear_roles,
+    define_role,
+    has_role,
+    has_all_roles,
+    has_permission,
+    user_permissions,
+)
 
 from .utils.types import (
     ContentTypes,
@@ -244,6 +262,22 @@ __all__ = [
     'SecurityEnforcer',
     'SecurityError',
     'ForbiddenError',
+    'login_required',
+    'login_user',
+    'logout_user',
+    'current_user',
+    'get_user_id',
+    'hash_password',
+    'check_password',
+    'permission_required',
+    'role_required',
+    'register_roles',
+    'clear_roles',
+    'define_role',
+    'has_role',
+    'has_all_roles',
+    'has_permission',
+    'user_permissions',
     'Icon',
     'Style',
     'Script',

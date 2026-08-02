@@ -1,7 +1,7 @@
 import re
 from uuid import uuid4
 from pyweber.models.field import Field
-from pyweber.utils.security import secure_filename
+from pyweber.utils.security import secure_filename, validate_uploads_enabled
 
 
 class FieldStorage:
@@ -46,6 +46,7 @@ class FieldStorage:
         ]
 
         fids: list[Field] = []
+        validate = validate_uploads_enabled()
 
         for value in values:
             k, _, v = value.partition("\r\n\r\n".encode())
@@ -57,12 +58,20 @@ class FieldStorage:
             field = Field(field_id=str(uuid4()))
 
             if filename:
-                field.content_type = content_type.group(1)
+                declared = content_type.group(1) if content_type else None
+                field.content_type = declared
                 field.name = name.group(1).split('";')[0]
                 field.filename = secure_filename(filename.group(1))
                 field.value = v
                 field.size = len(field.value)
+                if validate:
+                    from pyweber.utils.mime import validate_upload
 
+                    validate_upload(
+                        field.value if isinstance(field.value, bytes) else b'',
+                        filename=field.filename,
+                        declared_type=declared,
+                    )
                 fids.append(field)
             elif name:
                 field.name = name.group(1)
@@ -78,4 +87,4 @@ class FieldStorage:
         return len(self.fields())
 
     def __repr__(self):
-        return f'FileStorage(files={self.__len__()})'
+        return f"FileStorage(fields={self.fields()})"

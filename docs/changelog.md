@@ -4,6 +4,81 @@ This page summarizes recent releases in plain language. For the full history, se
 
 ---
 
+## 1.5.0.dev3 — Unreleased
+
+### New
+
+- **Deprecation policy** — warnings for APIs removed in **2.0** ([guide](guides/deprecations.md))
+- **Onion middleware** — `@app.middleware` with `(request, call_next)`
+- **Flask-style hooks** — `@app.before_request` / `@app.after_request`, plus `add_before_request` / `add_after_request`
+- **`pyweber.auth`** — `@login_required`, password hashing, signed login cookie, lightweight **RBAC** (`register_roles`, `@permission_required`) ([guide](guides/authentication.md))
+- **Easier `Response`** — `Response.json(...)`, `.text()`, `.html()`, and `content=` / `status=` without wiring every route argument
+- **`TestClient`** — in-process HTTP testing (`pyweber.testing`)
+- **Ops** — optional rate limit (429), ETag/304 for static files, gzip, upload MIME validation
+- **Configurable CSP** — `PYWEBER_CSP` or `[security].csp` (`off` disables the header)
+- Redesigned default **404 / 401 / 500** pages
+
+### Changed
+
+- Route params (`int` / `float` / `bool`) are coerced; bad values → **400**
+- Docs/OpenAPI auto-disabled in production unless `expose_in_production=True`
+- **`WWW-Authenticate` only when you ask** — not on every 401; schemes / `headers=` set it explicitly
+- CORS works correctly under uvicorn (header filtering, OPTIONS preflight when origins are whitelisted)
+- **Default CSP allows HTTPS CDNs** (Bootstrap, Google Fonts, jsDelivr) — the old `'self'`-only policy blocked remote CSS
+- **`include_uuid=False`** means static HTML: no WS script, no handoff (reactivity needs `include_uuid=True`)
+
+### Fixed
+
+- Landing pages with CDN CSS no longer lose Bootstrap/Fonts because of CSP
+- Static pages no longer get a reactive WS client that rewrites the document and breaks layout
+- Client never does `document.documentElement.innerHTML = …` on root diffs
+- OpenAPI `int | None` on Python 3.10 (`types.UnionType`)
+- `safe_join` rejects absolute / drive escapes on Linux
+
+### Upgrade tips (1.5)
+
+| Topic | Action |
+|-------|--------|
+| Marketing / static HTML | `Template(..., include_uuid=False)` |
+| Tighten CSP | `PYWEBER_CSP=...` or `[security] csp = '...'` |
+| After upgrade | Restart the server so new response headers load |
+| Middleware | Prefer `@app.middleware(request, call_next)` for cross-cutting work |
+
+---
+
+## 1.4.0.dev0 — Unreleased
+
+### Security (breaking)
+
+- **CORS closed by default** — whitelist via `allowed_origins` / `PYWEBER_ALLOWED_ORIGINS`
+- **HTML auto-escape on** (`sanitize=True`); use `sanitize=False` only for trusted markup
+- **CSRF** on POST/PUT/PATCH/DELETE (disable with `csrf_enabled = false`)
+- Signed WebSocket session cookie; path traversal jail; production 500s hide details
+- Security headers + configurable `max_body_size` (413 when exceeded)
+- `secure_filename()` for uploads
+
+### New
+
+- OpenAPI 3.0 overhaul, security schemes (`HTTPBearer`, `HTTPBasic`, API keys), runtime enforcement
+- Pluggable HTML parser (stdlib by default; `pyweber[fast-html]` for lxml)
+- Same path, different HTTP methods without overlapping verbs
+
+### Fixed
+
+- String / postponed OpenAPI annotations no longer crash schema generation
+- OpenAPI paths include group prefix (`full_route`)
+
+### Upgrade tips (1.4)
+
+| Topic | Action |
+|-------|--------|
+| Secret | Set a real `session.secret_key` / `PYWEBER_SECRET_KEY` |
+| CORS | List browser origins in `allowed_origins` |
+| Forms | `Form(method='POST')` gets `_csrf` automatically |
+| Raw HTML | `sanitize=False` or build Element trees |
+
+---
+
 ## 1.3.0 — June 2026
 
 ### New
@@ -91,6 +166,8 @@ This page summarizes recent releases in plain language. For the full history, se
 
 Recent doc improvements (this site):
 
+- [Deprecations](guides/deprecations.md) — SemVer policy through 2.0
+- [Environment](environment.md) — `PYWEBER_CSP`, CORS, CSRF, secrets
 - [Template Handoff](guides/reactivity.md#template-handoff-http--websocket) — HTTP→WebSocket without re-running handlers
 - [Multi-method routing](guides/routing-advanced.md#multiple-http-methods-on-one-path) — GET/POST/DELETE on a single route, 405 behaviour
 - [Element model guide](guides/element-model.md) — `childs`, `content`, and `{{placeholders}}`
@@ -106,6 +183,8 @@ Recent doc improvements (this site):
 
 | From | Action |
 |------|--------|
+| `< 1.5` | Restart after upgrade (CSP headers); use `include_uuid=False` for static landings; see tips above |
+| `< 1.4` | Set `secret_key`, configure CORS whitelist, expect CSRF on mutating forms |
 | `< 1.3.0` | List every HTTP verb on one `@app.route(..., methods=[...])`; use `update_route()` instead of a second route on the same path |
 | `< 1.3.0` | No app changes needed for Template Handoff — enabled automatically on reactive HTML pages |
 | `< 1.2.0` | Replace `Response.code` with `status_code` |

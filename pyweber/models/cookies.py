@@ -63,3 +63,21 @@ class CookieManager:
 
         if cookie not in self.__cookies:
             self.__cookies[cookie_name] = cookie
+
+    def delete_cookie(
+        self,
+        cookie_name: str,
+        path: str = '/',
+        samesite: str = 'Strict',
+        httponly: bool = True,
+        secure: bool = True,
+    ):
+        """Expire a cookie immediately (logout)."""
+        cookie = f'{cookie_name}=; Path={path}; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT;'
+        if httponly:
+            cookie += ' HttpOnly;'
+        if secure:
+            cookie += ' Secure;'
+        if samesite:
+            cookie += f' SameSite={samesite}'
+        self.__cookies[cookie_name] = cookie
