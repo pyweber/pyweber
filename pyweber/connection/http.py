@@ -13,9 +13,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pyweber.pyweber.pyweber import Pyweber
 from pyweber.utils.async_utils import async_timeout
 from pyweber.utils.utils import Colors, PrintLine
+from pyweber.utils.security import get_max_body_size
 from pyweber.models.request import Request, ClientInfo
 from pyweber.connection.websocket import WebsocketUpgrade, WebsocketServer
 from pyweber.connection.selector import IOSelector
+from pyweber.utils.types import ContentTypes, HTTPStatusCode
 
 class HttpServer:
     def __init__(self, *args, **kwargs):
@@ -48,6 +50,28 @@ class HttpServer:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, client.recv, length)
 
+    def _parse_cookies(self, header_text: str) -> dict[str, str]:
+        cookies = {}
+        match = re.search(r'(?im)^Cookie:\s*(.+)$', header_text)
+        if not match:
+            return cookies
+        for part in match.group(1).split(';'):
+            if '=' not in part:
+                continue
+            name, value = part.split('=', 1)
+            cookies[name.strip()] = value.strip()
+        return cookies
+
+    async def _send_simple_error(self, client, code: int, body: bytes, content_type: str = 'text/plain'):
+        reason = HTTPStatusCode.search_by_code(code) if hasattr(HTTPStatusCode, 'search_by_code') else f'{code}'
+        response = (
+            f'HTTP/1.1 {reason}\r\n'
+            f'Content-Type: {content_type}; charset=UTF-8\r\n'
+            f'Content-Length: {len(body)}\r\n'
+            'Connection: close\r\n\r\n'
+        ).encode() + body
+        await self.send_data(client, response)
+
     async def process_request(self, client: Union[socket.socket, ssl.SSLSocket]):
         try:
             request_data = bytearray()
@@ -65,14 +89,30 @@ class HttpServer:
             if content_match:
                 content_length = int(content_match.group(1))
 
+            max_body = get_max_body_size()
+            if content_length > max_body:
+                await self._send_simple_error(
+                    client,
+                    413,
+                    b'Payload Too Large',
+                )
+                return None, None
+
             body = bytearray(body_start)
+            if len(body) > max_body:
+                await self._send_simple_error(client, 413, b'Payload Too Large')
+                return None, None
+
             async with async_timeout(self.timeout):
                 while len(body) < content_length:
-                    remaining = content_length - len(body)
+                    remaining = min(content_length - len(body), max_body - len(body) + 1)
                     chunk = await self.read_data(client, remaining)
                     if not chunk:
                         break
                     body.extend(chunk)
+                    if len(body) > max_body:
+                        await self._send_simple_error(client, 413, b'Payload Too Large')
+                        return None, None
 
             return header_bytes, bytes(body)
 
@@ -85,7 +125,7 @@ class HttpServer:
         try:
             headers, body = await self.process_request(client)
 
-            if not headers:
+            if headers is None or not headers:
                 return
 
             client_details = client.getpeername()
@@ -115,7 +155,7 @@ class HttpServer:
         try:
             headers, body = await self.process_request(client)
 
-            if not headers:
+            if headers is None or not headers:
                 return
 
             request = Request(
@@ -127,7 +167,7 @@ class HttpServer:
             upgrade = WebsocketUpgrade(headers=headers)
             await self.send_data(client, upgrade.upgrade_response.encode('utf-8'))
 
-            ws_connection = WebsocketServer(client)
+            ws_connection = WebsocketServer(client, cookies=dict(request.cookies))
             await self.app.ws_server.connect_wsgi(ws_connection=ws_connection)
 
         except TypeError:
@@ -186,15 +226,24 @@ class HttpServer:
             if match:
                 content_length = int(match.group(1))
 
+            max_body = get_max_body_size()
+            if content_length > max_body:
+                await self._send_simple_error(client, 413, b'Payload Too Large')
+                return
+
             body = bytearray(body_start)
             async with async_timeout(self.timeout):
                 while len(body) < content_length:
+                    remaining = min(content_length - len(body), max_body - len(body) + 1)
                     chunk = await asyncio.get_event_loop().run_in_executor(
-                        None, client.recv, content_length - len(body)
+                        None, client.recv, remaining
                     )
                     if not chunk:
                         break
                     body.extend(chunk)
+                    if len(body) > max_body:
+                        await self._send_simple_error(client, 413, b'Payload Too Large')
+                        return
 
             client_details = client.getpeername()
             client_info = ClientInfo(
@@ -222,11 +271,13 @@ class HttpServer:
         """WebSocket com headers já lidos."""
         try:
             header_bytes = raw.partition(b'\r\n\r\n')[0]
+            header_text = header_bytes.decode('iso-8859-1')
+            cookies = self._parse_cookies(header_text)
 
             upgrade = WebsocketUpgrade(headers=header_bytes)
             client.sendall(upgrade.upgrade_response.encode('utf-8'))
 
-            ws_connection = WebsocketServer(client)
+            ws_connection = WebsocketServer(client, cookies=cookies)
             await self.app.ws_server.connect_wsgi(ws_connection=ws_connection)
 
         except TypeError:

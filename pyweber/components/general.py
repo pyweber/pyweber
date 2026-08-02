@@ -95,7 +95,7 @@ class TextArea(Element):
         oninput: Callable = None,
         onclick: Callable = None,
         onselect: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__(tag='textarea')
         self.sanitize = sanitize

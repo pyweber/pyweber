@@ -1,6 +1,38 @@
 # PyWeber Changelog
 
+## [1.5.0.dev0] - Unreleased
+
+### Added
+
+- **Deprecation framework** (`pyweber.utils.deprecation`) — one-shot `DeprecationWarning`s; removals targeted at **2.0**. See [deprecations guide](docs/guides/deprecations.md).
+- **Onion middleware**: `@app.middleware` with `(request, call_next)`. Legacy single-arg `before_request`/`after_request` still works (deprecated).
+- **`pyweber.testing.TestClient`** — in-process HTTP client (`get`/`post`/…, cookies, CSRF helpers).
+- **Rate limiting** (opt-in): `[security] rate_limit_enabled` / `rate_limit_rpm` (or env). Returns **429** + `Retry-After`.
+- **ETag / 304** for static assets; **gzip** compression when `Accept-Encoding: gzip` (configurable).
+- **Upload MIME sniffing**: `File.validate()` / `pyweber.utils.mime.validate_upload`.
+- Preferred module `pyweber.models.stream_stats` (re-exports `strem_stats`).
+- `Icons` moved to `pyweber.utils.icons` (still importable from `types` with a deprecation warning).
+
+### Changed
+
+- Route path parameters annotated as `int`/`float`/`bool` are **coerced** at runtime (bad values → **400**).
+- `update_route` only sets known `Route` attributes; unknown keys merge into `route.kwargs`.
+- `/docs` and `/openapi.json` are **auto-disabled in production** unless `OpenAPIConfig(expose_in_production=True)`.
+- Typo fixes with aliases: `DoubleFormat` (`DoubleFormnat` deprecated), `normalize_path` (`normaize_path`), `CreateApp` (`CreatApp`), `toggle_class` (`toogle_class`).
+
 ## [1.4.0.dev0] - Unreleased
+
+### Security (breaking)
+
+- **CORS is closed by default.** Responses no longer reflect arbitrary `Origin` with credentials. Configure `security.allowed_origins` (or `PYWEBER_ALLOWED_ORIGINS`) to opt in.
+- **HTML auto-escape is on by default** (`sanitize=True` on `Element`). Attribute values, content, id/class/style are escaped via `html.escape` at serialize time. Pass `sanitize=False` only for trusted markup.
+- **CSRF protection** for POST/PUT/PATCH/DELETE (double-submit cookie + `X-CSRF-Token` / `_csrf`). Disable with `security.csrf_enabled = false` or `PYWEBER_CSRF_ENABLED=false`. Framework routes under `/_pyweber/` are exempt.
+- **WebSocket sessions** bind to signed HttpOnly cookie `pyweber_sid` (HMAC with `session.secret_key`). Client-supplied `sessionId` alone is no longer trusted.
+- **Static file path traversal** blocked via `realpath`/`commonpath` jail under registered static roots.
+- **Production 500 pages** hide exception details when `session.env` / `PYWEBER_ENV` is `production`/`prod`.
+- Default **security headers**: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` (HSTS when HTTPS enabled).
+- Configurable **`security.max_body_size`** (default 10 MiB); oversized bodies get HTTP 413.
+- Upload filenames are sanitized with **`secure_filename()`** (also exported publicly).
 
 ### Changed
 
@@ -9,20 +41,28 @@
 - Select backend with `set_html_parser_backend('stdlib'|'lxml')` or env `PYWEBER_HTML_PARSER=stdlib|lxml`.
 - **Same path, different HTTP methods** — you can register separate handlers for the same path when methods do not overlap (e.g. `@app.route('/x', methods=['GET'])` and `@app.route('/x', methods=['POST'])`). Overlapping methods still raise `RouteAlreadyExistError`.
 - **OpenAPI 3.0 overhaul** — `OpenAPIConfig`, live `/openapi.json`, typed responses / `response_model`, tags, description, `operationId`, `components.schemas` (`$ref`), security schemes in Swagger, and optional disabling of `/docs`.
+- Minimum test coverage gate raised to **87.5%**.
 
 ### Added
 
 - Security helpers: `HTTPBearer`, `HTTPBasic`, `APIKeyHeader`, `APIKeyQuery`, `APIKeyCookie`.
 - Runtime **security enforcement** for schemes declared on routes / global config (`request.auth`, 401/403).
 - Route OpenAPI fields: `tags`, `description`, `responses`, `response_model`, `security`, `deprecated`, `include_in_schema`, `operation_id`.
+- Config section `[security]` (`allowed_origins`, `max_body_size`, `csrf_enabled`).
+- Public helpers: `secure_filename`, `safe_join`, `sign_value`, `unsign_value`, `generate_csrf_token`.
 
 ### Fixed
 
 - **OpenAPI / Swagger** — string and postponed annotations (`"str"`, `"int | None"`, `from __future__ import annotations`, common AI-generated type strings) no longer crash schema generation (`'str' object has no attribute '__name__'`).
 - OpenAPI paths now use `full_route` (group prefix included).
+- Duplicate `update_app_template` definition removed from `WebsocketManager`.
 
 ### Notes for upgraders
 
+- Set a real `session.secret_key` (or `PYWEBER_SECRET_KEY`); the placeholder `TOKEN_HEX` is rejected in production.
+- Apps that inject raw HTML must use `sanitize=False` or build Element trees.
+- Cross-origin browser clients need `allowed_origins` configured.
+- POST forms built with `Form(method='POST')` receive an automatic `_csrf` hidden field.
 - If you relied on `lxml` being installed transitively via Pyweber, install `pyweber[fast-html]` (or `lxml` yourself) and set `PYWEBER_HTML_PARSER=lxml`.
 - Duplicate registration of the **same** path + method still raises `RouteAlreadyExistError`; different methods on the same path are allowed.
 - Swagger UI loads `/openapi.json` (pinned `swagger-ui-dist@5.17.14`). Set `OpenAPIConfig(docs_url=None, openapi_url=None)` to disable docs in production.
@@ -96,7 +136,7 @@ class Form(pw.Element):
         if len(content) != file.size:
             raise ValueError(f'File Incomplete {len(content)}/{file.size}')
 
-        with open(f'assets/{file.filename}', 'wb') as f:
+        with open(f'assets/{pw.secure_filename(file.filename)}', 'wb') as f:
             f.write(content)
 
     async def get_file(self, e: pw.EventHandler):

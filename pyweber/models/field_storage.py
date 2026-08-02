@@ -1,12 +1,14 @@
 import re
 from uuid import uuid4
 from pyweber.models.field import Field
+from pyweber.utils.security import secure_filename
+
 
 class FieldStorage:
     def __init__(self, content_type: str, callbacks: bytes):
         self.boundary = content_type
         self.callbacks = callbacks
-    
+
     @property
     def boundary(self) -> str: return self.__boundary
 
@@ -15,9 +17,9 @@ class FieldStorage:
         boundary = re.search(f"boundary=(.+)", value)
         if not boundary:
             raise TypeError('None boundary was detected')
-        
+
         self.__boundary = boundary.group(1)
-    
+
     @property
     def callbacks(self): return self.__callbacks
 
@@ -25,12 +27,12 @@ class FieldStorage:
     def callbacks(self, value: bytes):
         if not value or not isinstance(value, bytes):
             raise TypeError('callbacks must be bytes instances')
-        
+
         if not value.startswith(f"--{self.boundary}\r\n".encode()) and not value.endswith(f"--{self.boundary}--\r\n".encode()):
             raise ValueError(f'callbacks invalid for boundary {self.boundary}')
-        
+
         self.__callbacks = value
-    
+
     def fields(self) -> list[Field]:
         init_delimiter = f"--{self.boundary}\r\n"
         end_delimiter = f"--{self.boundary}--\r\n"
@@ -57,7 +59,7 @@ class FieldStorage:
             if filename:
                 field.content_type = content_type.group(1)
                 field.name = name.group(1).split('";')[0]
-                field.filename = filename.group(1)
+                field.filename = secure_filename(filename.group(1))
                 field.value = v
                 field.size = len(field.value)
 
@@ -69,11 +71,11 @@ class FieldStorage:
                 field.filename = None
                 field.size = len(field.value)
                 fids.append(field)
-        
+
         return fids
-    
+
     def __len__(self):
         return len(self.fields())
-    
+
     def __repr__(self):
         return f'FileStorage(files={self.__len__()})'

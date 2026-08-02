@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyweber"
-version = "1.4.0.dev0"
+version = "1.5.0.dev0"
 description = "A lightweight Python framework for building and managing web applications."
 readme = "README.md"
 authors = [{ name = "DevPythonMZ", email = "pypi.dev@gmail.com" }]
@@ -37,5 +37,5 @@ pyweber = ["static/**/*", "admin/**/*"]
 omit = ["pyweber/cli/commands.py"]
 
 [tool.coverage.report]
-fail_under = 84
+fail_under = 87.5
 show_missing = true

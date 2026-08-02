@@ -1,6 +1,13 @@
 from pyweber.core.element import Element
-from pyweber.components.input import Input
+from pyweber.components.input import Input, InputHidden
 from typing import Callable, Literal
+
+from pyweber.utils.security import (
+    CSRF_FORM_FIELD,
+    csrf_enabled,
+    generate_csrf_token,
+)
+
 
 class Form(Element):
     def __init__(
@@ -24,6 +31,7 @@ class Form(Element):
         novalidate: bool = True,
         autocapitalize: bool = False,
         spellcheck: bool = False,
+        csrf_token: str = None,
         **kwargs
     ):
         super().__init__(tag='form', classes=classes, style=style, id=id, childs=childs, **kwargs)
@@ -43,16 +51,22 @@ class Form(Element):
         self.onsubmit = onsubmit
         self.onreset = onreset
         self.attrs = {}
-    
+
+        if csrf_enabled() and method and str(method).upper() == 'POST':
+            token = csrf_token or generate_csrf_token()
+            self.childs.append(
+                InputHidden(name=CSRF_FORM_FIELD, value=token, id=f'{id or "form"}_csrf')
+            )
+
     @property
     def onclick(self):
         return self.events.__dict__.get('onclick', None)
-    
+
     @onclick.setter
     def onclick(self, value: Callable):
         if value and callable(value):
             setattr(self.events, 'onclick', value)
-    
+
     @property
     def onsubmit(self):
         return self.events.__dict__.get('onsubmit', None)
@@ -61,7 +75,7 @@ class Form(Element):
     def onsubmit(self, value: Callable):
         if value and callable(value):
             setattr(self.events, 'onsubmit', value)
-    
+
     @property
     def onreset(self):
         return self.events.__dict__.get('onreset', None)
@@ -70,16 +84,16 @@ class Form(Element):
     def onreset(self, value):
         if value and callable(value):
             setattr(self.events, 'onreset', value)
-    
+
     @property
     def attrs(self):
         return self.__attrs
-    
+
     @attrs.setter
     def attrs(self, value: dict[str, str]):
         if value:
             raise AttributeError('Subscript not allowed to this attribute')
-        
+
         self.__attrs = {}
         for key, value in self.__dict__.items():
             if key in ['method', 'name', 'action', 'autocomplete', 'spellcheck', 'autocapitalize', 'novalidate', 'target', 'enctype', 'accept_charset', 'rel', 'tabindex'] and value:

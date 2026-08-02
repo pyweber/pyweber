@@ -602,7 +602,6 @@ class RouteManager:
     def update_route(self, route: str, group: str=None, method: str = None, **kwargs):
         full_route = self.full_route(route=route, group=group)
         _route = self.get_route_by_path(route=full_route, method=method)
-        _kwargs = {}
 
         if not _route:
             raise RouteNotFoundError(route=full_route)
@@ -612,17 +611,26 @@ class RouteManager:
         if route_by_name and route_by_name != _route:
             raise ValueError(f'Already exists a route with name {route_by_name.name}')
 
+        known = {
+            'template', 'methods', 'name', 'middlewares', 'status_code', 'content_type',
+            'title', 'process_response', 'callback', 'tags', 'description', 'responses',
+            'response_model', 'security', 'deprecated', 'include_in_schema', 'operation_id',
+            'group', 'route',
+        }
+        extra = {}
         for key, value in kwargs.items():
-            if not hasattr(_route, key):
-                _kwargs[key] = value
-                continue
+            if key in known and hasattr(_route, key):
+                if value is not None and value != '':
+                    setattr(_route, key, value)
+            else:
+                extra[key] = value
 
-            if value is not None and value != '':
-                setattr(_route, key, value)
-
-        if _kwargs:
-            for key, value in _kwargs.items():
-                setattr(_route, key, value)
+        if extra:
+            merged = dict(getattr(_route, 'kwargs', None) or getattr(_route, 'kwargs', {}) or {})
+            # Route stores free-form kwargs on .kwargs
+            current = dict(_route.kwargs or {})
+            current.update(extra)
+            _route.kwargs = current
 
     def remove_route(self, route: str, group: str = None, methods: list[str] = None):
         group = self.get_group(group=group)

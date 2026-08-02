@@ -12,6 +12,28 @@ PyWeber supports configuration through environment variables, allowing you to ov
 | `PYWEBER_KEY_FILE` | Path to SSL key file for HTTPS | `None` | `PYWEBER_KEY_FILE=/path/to/key.pem` |
 | `PYWEBER_SERVER_HOST` | Host address for the HTTP server | `127.0.0.1` | `PYWEBER_SERVER_HOST=0.0.0.0` |
 | `PYWEBER_SERVER_PORT` | Port for the HTTP server | `8800` | `PYWEBER_SERVER_PORT=8080` |
+| `PYWEBER_ENV` | Runtime environment (`development` / `production`) | `development` | `PYWEBER_ENV=production` |
+| `PYWEBER_SECRET_KEY` | HMAC secret for session/CSRF cookies (overrides config) | from `session.secret_key` | `PYWEBER_SECRET_KEY=...` |
+| `PYWEBER_ALLOWED_ORIGINS` | Comma-separated CORS allowlist | empty (no CORS) | `PYWEBER_ALLOWED_ORIGINS=https://app.example` |
+| `PYWEBER_MAX_BODY_SIZE` | Max request body size in bytes | `10485760` | `PYWEBER_MAX_BODY_SIZE=2097152` |
+| `PYWEBER_CSRF_ENABLED` | Enable CSRF checks on mutating HTTP methods | `true` | `PYWEBER_CSRF_ENABLED=false` |
+
+## Security config (`config.toml`)
+
+```toml
+[session]
+secret_key = 'replace-me'
+env = 'development'   # use 'production' to hide 500 details
+
+[security]
+allowed_origins = []  # e.g. ['https://app.example']
+max_body_size = 10485760
+csrf_enabled = true
+```
+
+- Cross-origin browser apps must list origins in `allowed_origins` (CORS is off by default).
+- `Element` escapes HTML by default; use `sanitize=False` only for trusted markup.
+- Save uploads with `secure_filename(file.filename)` (filenames from multipart are already sanitized).
 
 ## Usage
 

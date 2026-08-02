@@ -12,6 +12,11 @@ from time import time
 
 from pyweber.models.ws_message import wsMessage
 from pyweber.utils.utils import PrintLine
+from pyweber.utils.security import (
+    SESSION_COOKIE_NAME,
+    generate_session_id,
+    unsign_value,
+)
 from pyweber.connection.session import sessions, Session
 from pyweber.models.template_diff import TemplateDiff
 from pyweber.models.task_manager import TaskManager
@@ -85,9 +90,10 @@ class WebsocketUpgrade:
 
 class WebsocketServer:
 
-    def __init__(self, client: Union[socket.socket, ssl.SSLSocket]):
+    def __init__(self, client: Union[socket.socket, ssl.SSLSocket], cookies: dict[str, str] | None = None):
         self.id = None
         self.client = client
+        self.cookies = cookies or {}
         self.__all_message: bytes = b''
         self.__messages: list[bytes] = []
 
@@ -491,8 +497,15 @@ class WebsocketManager(BaseWebsockets):
             group, route = self.app.get_group_and_route(route=route)
             self.app.update_route(route=route, group=group, template=new_template)
 
-    def get_session_id(self, session_id: str = None):
-        return session_id or str(uuid4())
+    def get_session_id(self, session_id: str = None, cookies: dict[str, str] | None = None):
+        """Resolve session id from signed HttpOnly cookie; never trust client id alone."""
+        cookie_jar = cookies or {}
+        signed = cookie_jar.get(SESSION_COOKIE_NAME)
+        cookie_sid = unsign_value(signed) if signed else None
+        if cookie_sid:
+            return cookie_sid
+        # Ignore client-supplied session_id when cookie is missing/invalid
+        return generate_session_id()
 
     async def get_sync_template(self, message: wsMessage):
         assert isinstance(message, wsMessage)
@@ -501,11 +514,6 @@ class WebsocketManager(BaseWebsockets):
         if session:
             session.old_template = sync_template.clone()
         return sync_template
-
-    def update_app_template(self, new_template: 'Template', route: str):
-        if route in self.app.list_routes:
-            group, route = self.app.get_group_and_route(route=route)
-            self.app.update_route(route=route, group=group, template=new_template)
 
     def add_session(self, session_id: str, template: 'Template', window: 'Window', route: str):
         sessions.add_session(
@@ -593,7 +601,10 @@ class WebsocketManager(BaseWebsockets):
             )
 
             if is_new_session:
-                ws_server.id = self.get_session_id(session_id=message.session_id)
+                ws_server.id = self.get_session_id(
+                    session_id=message.session_id,
+                    cookies=getattr(ws_server, 'cookies', {}) or {},
+                )
                 self.ws_connections[ws_server.id] = ws_server
 
                 self.add_session(
@@ -633,8 +644,9 @@ class WebsocketManager(BaseWebsockets):
                 )
                 await self.message_handler(message=message)
 
-    async def ws_handler_asgi(self, receive: Callable, send: Callable):
+    async def ws_handler_asgi(self, receive: Callable, send: Callable, cookies: dict[str, str] | None = None):
         ws_connection: str = None
+        handshake_cookies = cookies or {}
 
         try:
             while True:
@@ -665,7 +677,10 @@ class WebsocketManager(BaseWebsockets):
                             )
 
                             if is_new_session:
-                                ws_connection = self.get_session_id(session_id=message.session_id)
+                                ws_connection = self.get_session_id(
+                                    session_id=message.session_id,
+                                    cookies=handshake_cookies,
+                                )
 
                                 self.add_session(
                                     session_id=ws_connection,
@@ -720,7 +735,17 @@ class WebsocketManager(BaseWebsockets):
 
     async def __call__(self, scope, receive, send):
         assert scope.get('type', None) == 'websocket'
-        await self.ws_handler_asgi(receive=receive, send=send)
+        headers = {
+            (k.decode() if isinstance(k, bytes) else k).lower():
+            (v.decode() if isinstance(v, bytes) else v)
+            for k, v in scope.get('headers', [])
+        }
+        cookie_header = headers.get('cookie', '')
+        cookies = {
+            part.split('=', 1)[0].strip(): part.split('=', 1)[-1].strip()
+            for part in cookie_header.split(';') if part.strip() and '=' in part
+        }
+        await self.ws_handler_asgi(receive=receive, send=send, cookies=cookies)
 
         for id, handler in self.ws_connections.items():
             if handler == send:

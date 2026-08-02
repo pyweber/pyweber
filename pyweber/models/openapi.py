@@ -47,6 +47,7 @@ class OpenAPIConfig:
     security_schemes: dict[str, SecurityScheme] | None = None
     security: list[str] | list[dict[str, list[str]]] | None = None
     tags: list[dict[str, str]] | None = None
+    expose_in_production: bool = False
 
     def normalized_security(self) -> list[dict[str, list[str]]] | None:
         return normalize_security_requirements(self.security)
@@ -234,6 +235,50 @@ class OpenApiProcessor:
     @staticmethod
     def is_valid_route_param_type(py_type: str):
         return py_type in ['str', 'int', 'float', 'bool']
+
+    @classmethod
+    def coerce_value(cls, name: str, value: Any, annotation: Any) -> Any:
+        """Coerce a route/query string value to the annotated primitive type."""
+        from pyweber.utils.exceptions import ParameterConversionError
+
+        annotation = cls.normalize_annotation(annotation)
+        if annotation is inspect._empty or value is None:
+            return value
+
+        # Already correct type
+        if annotation in (str, int, float, bool) and isinstance(value, annotation):
+            return value
+
+        type_name = cls.annotation_type_name(annotation)
+        raw = value if not isinstance(value, str) else value
+
+        try:
+            if annotation is bool or type_name == 'bool':
+                if isinstance(value, bool):
+                    return value
+                text = str(value).strip().lower()
+                if text in {'1', 'true', 'yes', 'on'}:
+                    return True
+                if text in {'0', 'false', 'no', 'off'}:
+                    return False
+                raise ValueError(f'invalid boolean {value!r}')
+
+            if annotation is int or type_name == 'int':
+                return int(value)
+
+            if annotation is float or type_name == 'float':
+                return float(value)
+
+            if annotation is str or type_name == 'str':
+                return str(value)
+
+            # Marker format classes (EmailFormat, etc.) — keep as str
+            if isinstance(annotation, type) and annotation.__name__.endswith('Format'):
+                return str(value)
+
+            return value
+        except (TypeError, ValueError) as exc:
+            raise ParameterConversionError(name, raw, type_name or str(annotation), cause=exc) from exc
 
     @classmethod
     def resolve_class_type(cls, parameter: inspect.Parameter):
@@ -552,7 +597,8 @@ class OpenApiProcessor:
             elif class_resolved == 'primitive':
                 if parameter.kind not in [inspect.Parameter.VAR_KEYWORD, inspect.Parameter.VAR_POSITIONAL]:
                     if name in kwargs:
-                        kwd[name] = kwargs.pop(name)
+                        raw = kwargs.pop(name)
+                        kwd[name] = cls.coerce_value(name, raw, annotation)
                     elif parameter.default != inspect._empty:
                         kwd[name] = parameter.default
 

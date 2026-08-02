@@ -54,14 +54,19 @@ field = Field(
 uploaded_file = File(field)
 
 # Access file properties
-print(uploaded_file.filename)      # document.pdf
+print(uploaded_file.filename)      # sanitized name (uuid prefix)
 print(uploaded_file.size)          # Length of content in bytes
 print(uploaded_file.content_type)  # application/pdf
 print(len(uploaded_file))          # Same as uploaded_file.size
 
 # Access file content
 file_data = uploaded_file.content  # bytes object
+
+# Prefer File.secure_filename / pyweber.secure_filename when writing to disk
+safe = File.secure_filename('../../etc/passwd')
 ```
+
+Multipart uploads already store a sanitized `filename` on `Field`/`File`. Always write under a fixed directory and never trust a raw client path.
 
 ## Integration
 

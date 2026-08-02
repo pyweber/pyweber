@@ -27,7 +27,7 @@ class Element(ElementConstrutor):
         attrs: dict[str, str] = None,
         events: TemplateEvents = None,
         data: Any = None,
-        sanitize: bool = False,
+        sanitize: bool = True,
         files: list[File] = None,
         include_uuid: bool = True,
         **kwargs: str
@@ -379,7 +379,7 @@ class Element(ElementConstrutor):
             style=style_dict,
             attrs=attrs,
             childs=None,
-            sanitize=False,
+            sanitize=True,
             files=[],
             include_uuid=include_uuid,
             **kwargs

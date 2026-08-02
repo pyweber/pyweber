@@ -120,7 +120,7 @@ class InputColor(Input):
         onchange = None,
         oninput = None,
         onclick = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('color', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -151,7 +151,7 @@ class InputText(Input):
         onchange = None,
         oninput = None,
         onclick = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('text', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -200,7 +200,7 @@ class InputPassword(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('password', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -259,7 +259,7 @@ class InputEmail(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('email', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -307,7 +307,7 @@ class InputNumber(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('number', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -581,7 +581,7 @@ class InputSearch(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('search', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -630,7 +630,7 @@ class InputTel(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('tel', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -679,7 +679,7 @@ class InputUrl(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('url', name, id, form, tabindex, classes, style, disabled, autofocus, required, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -717,7 +717,7 @@ class InputHidden(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('hidden', name, id, form, None, classes, style, None, None, None, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -745,7 +745,7 @@ class InputSubmit(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('submit', name, id, form, tabindex, classes, style, disabled, autofocus, None, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -783,7 +783,7 @@ class InputButton(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('button', name, id, form, tabindex, classes, style, disabled, autofocus, None, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize
@@ -807,7 +807,7 @@ class InputReset(Input):
         onchange: Callable = None,
         oninput: Callable = None,
         onclick: Callable = None,
-        sanitize: bool = False
+        sanitize: bool = True
     ):
         super().__init__('reset', name, id, form, tabindex, classes, style, disabled, autofocus, None, onfocus, onblur, onchange, oninput, onclick,)
         self.sanitize = sanitize

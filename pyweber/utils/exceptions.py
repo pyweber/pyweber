@@ -45,3 +45,13 @@ class InvalidCallableError(RouterError):
     """Exception for invalid callable format"""
     def __init__(self):
         super().__init__("The decorator function must be a callable function")
+class ParameterConversionError(ValueError):
+    """Raised when a route/query parameter cannot be coerced to the annotated type."""
+
+    def __init__(self, name: str, value, expected: str, cause: Exception | None = None):
+        self.name = name
+        self.value = value
+        self.expected = expected
+        super().__init__(f"Cannot convert parameter '{name}'={value!r} to {expected}")
+        if cause is not None:
+            self.__cause__ = cause

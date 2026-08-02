@@ -1,3 +1,4 @@
+import html as html_lib
 import re
 from uuid import uuid4
 
@@ -247,6 +248,11 @@ class ElementConstrutor:
         return False
 
     def toogle_class(self, class_name: str):
+        from pyweber.utils.deprecation import warn_deprecated
+        warn_deprecated('toogle_class', alternative='toggle_class', removal='2.0')
+        return self.toggle_class(class_name)
+
+    def toggle_class(self, class_name: str):
         if isinstance(class_name, str):
             for cls in class_name.split(' '):
                 if cls in self.__classes:
@@ -344,8 +350,8 @@ class ElementConstrutor:
             self.__content = None
         else:
             try:
-                self.__content = str(value) if not self.sanitize else self.sanitize_values(str(value))
-
+                # Escape happens at serialize time (to_html) when sanitize=True
+                self.__content = str(value)
             except Exception as e:
                 raise ValueError(f"Could not convert value to string: {e}")
 
@@ -378,7 +384,7 @@ class ElementConstrutor:
     def value(self, value: str):
         if value is not None:
             try:
-                value = str(value) if not self.sanitize else self.sanitize_values(str(value))
+                value = str(value)
             except Exception as e:
                 raise ValueError(f"Could not convert value to string: {e}")
 
@@ -434,25 +440,37 @@ class ElementConstrutor:
         if not isinstance(element, ElementConstrutor):
             raise TypeError(f'element must be an Element instances, but got {type(element).__name__}')
 
+        def esc_attr(val: Any) -> str:
+            text = str(val)
+            if element.sanitize:
+                return html_lib.escape(text, quote=True)
+            return text
+
+        def esc_text(val: Any) -> str:
+            text = str(val) if val is not None else ''
+            if element.sanitize:
+                return html_lib.escape(text, quote=False)
+            return text
+
         indentation = ' ' * indent
-        uuid_attribute = f' uuid="{element.uuid}"' if self.include_uuid else ""
+        uuid_attribute = f' uuid="{esc_attr(element.uuid)}"' if self.include_uuid else ""
         html = f'{indentation}<{element.tag}{uuid_attribute}' if element.tag != 'comment' else f'{indentation}<!--'
 
         if element.id:
-            html += f' id="{element.id}"'
+            html += f' id="{esc_attr(element.id)}"'
         if element.classes and len(element.classes) > 0:
-            html += f' class="{" ".join(element.classes)}"'
+            html += f' class="{esc_attr(" ".join(element.classes))}"'
         if element.value:
-            html += f' value="{element.value}"'
+            html += f' value="{esc_attr(element.value)}"'
 
         if element.style and len(element.style) > 0:
             style_str = '; '.join([f"{key}: {value}" for key, value in element.style.items()])
-            html += f' style="{style_str}"'
+            html += f' style="{esc_attr(style_str)}"'
 
         for key, value in element.attrs.items():
             if value is not None:
                 if value and value not in [True, False]:
-                    html += f' {key}="{value}"'
+                    html += f' {key}="{esc_attr(value)}"'
                 else:
                     html += f" {key}"
 
@@ -469,8 +487,10 @@ class ElementConstrutor:
         if element.tag != 'comment':
             html += '>'
 
-        final_content = str((self.render_dynamic_values(content=element.content, **self.kwargs) or ''))
         raw_content = element.content or ''
+        # Escape text early so {{placeholders}} remain (braces are not escaped)
+        safe_raw = esc_text(raw_content) if element.sanitize else raw_content
+        final_content = str((self.render_dynamic_values(content=safe_raw, sanitize=element.sanitize, **self.kwargs) or ''))
         child_by_uuid = {child.uuid: child for child in element.childs}
         has_children = bool(element.childs)
         rendered_child_uuids: set[str] = set()
@@ -517,7 +537,7 @@ class ElementConstrutor:
         return html
 
     @classmethod
-    def render_dynamic_values(cls, content: str, **kwargs):
+    def render_dynamic_values(cls, content: str, sanitize: bool = True, **kwargs):
 
         if content:
             pattern = r'\{\{(.*?)\}\}'
@@ -529,6 +549,8 @@ class ElementConstrutor:
                     if value is not None:
                         if isinstance(value, ElementConstrutor):
                             value = value.to_html(element=value)
+                        else:
+                            value = html_lib.escape(str(value), quote=False) if sanitize else str(value)
 
                         content = content.replace("{{" + r + "}}", str(value))
         return content
@@ -563,11 +585,7 @@ class ElementConstrutor:
         return event_id
 
     def sanitize_values(self, text: str):
-        for key, value in self.__character_to_replace__().items():
-            if key in text:
-                text = text.replace(key, value)
-
-        return text
+        return html_lib.escape(str(text), quote=True)
 
     def __character_to_replace__(self):
         return {"<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#x27;", "/": "&#x2F;", "&": "&amp;"}

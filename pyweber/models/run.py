@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING, Callable, Any
-from pyweber.models.create_app import CreatApp
+from pyweber.models.create_app import CreateApp, CreatApp
 from pyweber.models.request import Request, ClientInfo
 from pyweber.connection.websocket import WebsocketManager
 import os
@@ -84,7 +84,7 @@ def run(
     if target and not callable(target):
         raise TypeError('The target must be callable function')
 
-    CreatApp(target=target, **kwargs).run()
+    CreateApp(target=target, **kwargs).run()
 
 def encode_header(headers: dict[str, Any], /,*ignore_headers: str):
     byte_headers: list[tuple[bytes, bytes]] = []

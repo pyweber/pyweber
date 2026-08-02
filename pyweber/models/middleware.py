@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Callable, Union, Any
 from dataclasses import dataclass
 import inspect
 from pyweber.models.request import Request
@@ -6,6 +6,7 @@ from pyweber.models.response import Response
 from pyweber.core.element import Element
 from pyweber.core.template import Template
 from pyweber.utils.types import HTTPStatusCode
+from pyweber.utils.deprecation import warn_deprecated
 from pyweber.models.routes import RouteManager
 
 @dataclass
@@ -18,15 +19,20 @@ class MiddlewareManager:
     def __init__(self):
         self.__before_request: list[dict[str, Union[int, Callable, bool]]] = []
         self.__after_request: list[dict[str, Union[int, Callable, bool]]] = []
-    
+        self.__onion: list[dict[str, Any]] = []
+
     @property
     def get_before_request_middlewares(self):
         return self.__before_request
-    
+
     @property
     def get_after_request_middlewares(self):
         return self.__after_request
-    
+
+    @property
+    def get_onion_middlewares(self):
+        return self.__onion
+
     def before_request(self, status_code: int = 200, process_response: bool = True, order: int = -1):
         def wrapper(middleware: Callable[..., Template | Element | str | None]):
             self.__before_request.insert(order, self.set_middleware(
@@ -38,7 +44,7 @@ class MiddlewareManager:
             )
             return middleware
         return wrapper
-    
+
     def after_request(self, status_code: int = None, process_response: bool = True, order: int = -1):
         def wrapper(middleware: Callable[..., Response | None]):
             self.__after_request.insert(order, self.set_middleware(
@@ -50,19 +56,33 @@ class MiddlewareManager:
             )
             return middleware
         return wrapper
-    
+
+    def middleware(self, order: int = -1):
+        """Register onion middleware: ``async def mw(request, call_next)``."""
+        def wrapper(middleware: Callable[..., Any]):
+            entry = self._set_onion_middleware(middleware=middleware, order=order)
+            if order < 0 or order >= len(self.__onion):
+                self.__onion.append(entry)
+            else:
+                self.__onion.insert(order, entry)
+            return middleware
+        return wrapper
+
     def clear_before_request_middleware(self):
         self.__before_request.clear()
-    
+
     def remove_before_middleware(self, index: int = -1):
         return self.__before_request.pop(index)
-    
+
     def remove_after_middleware(self, index: int = -1):
         return self.__after_request.pop(index)
-    
+
     def clear_after_request_middleware(self):
         self.__after_request.clear()
-    
+
+    def clear_onion_middlewares(self):
+        self.__onion.clear()
+
     async def process_middleware(
         self,
         resp: Union[Request, Response, str],
@@ -79,7 +99,7 @@ class MiddlewareManager:
             for vars in variables:
                 for k in vars.keys():
                     var.append(k)
-            
+
             kwargs = {key: resp for key in var}
             kwargs = RouteManager.validate_callable_args(middle, **kwargs)
 
@@ -87,7 +107,7 @@ class MiddlewareManager:
                 response = await middle(**kwargs)
             else:
                 response = middle(**kwargs)
-            
+
             if response:
                 break
 
@@ -97,41 +117,98 @@ class MiddlewareManager:
                 process_response=process_response,
                 content=response
             )
-        
+
         if isinstance(resp, Response):
             if middlewares and not isinstance(response, Response):
                 raise TypeError(f'All after request middleware need return Response instances, but got {type(response).__name__}')
-            
+
             return MiddlewareResult(
                 content=response or resp,
                 status_code=resp.status_code,
                 process_response=None
             )
-    
+
+    async def run_onion(
+        self,
+        request: Request,
+        call_handler: Callable[[], Any],
+    ) -> Response | MiddlewareResult | Any:
+        """Run onion middlewares then ``call_handler`` (returns Response or raw result)."""
+        chain = list(self.__onion)
+
+        async def _terminal():
+            return await call_handler() if inspect.iscoroutinefunction(call_handler) else call_handler()
+
+        async def build(index: int):
+            if index >= len(chain):
+                return await _terminal()
+
+            mw = chain[index]['middleware']
+
+            async def call_next():
+                return await build(index + 1)
+
+            if inspect.iscoroutinefunction(mw):
+                return await mw(request, call_next)
+            return mw(request, call_next)
+
+        return await build(0)
+
+    def _set_onion_middleware(self, middleware: Callable, order: int = -1):
+        if not callable(middleware):
+            raise TypeError('The middleware must be a callable function')
+
+        sig = inspect.signature(middleware)
+        params = list(sig.parameters.values())
+        if len(params) < 2:
+            raise TypeError(
+                f"The {middleware.__name__}'s onion middleware must receive "
+                f"(request, call_next)"
+            )
+        return {'middleware': middleware, 'order': order, 'style': 'onion'}
+
     def set_middleware(self, status_code: int, middleware: Callable, process_response: bool = True, order: int = -1):
         if not isinstance(order, int):
             raise ValueError(f'middleware order must be an integer instances, but got {type(order).__name__}')
-        
+
         if status_code and status_code not in HTTPStatusCode.code_list():
             raise ValueError('HttpStatusCode is not valid')
-        
+
         if not callable(middleware):
             raise TypeError('The middleware must be a callable function')
-        
+
         sig = inspect.signature(middleware)
         params = list(sig.parameters.values())
 
-        if len(params) > 1:
-            raise TypeError(f"The {middleware.__name__}'s middleware must be receive one parameter only")
-        
-        if params and not all(param.annotation in [Request, Response] for param in params if param):
-            raise TypeError(f"All parameters of {middleware.__name__}'s middleware must be a Request or Response instances")
-        
+        if len(params) >= 2:
+            raise TypeError(
+                f"Use @app.middleware for onion-style (request, call_next) handlers; "
+                f"{middleware.__name__} has {len(params)} parameters"
+            )
+
+        if len(params) == 1:
+            warn_deprecated(
+                'single-parameter middleware',
+                alternative='@app.middleware with (request, call_next)',
+                removal='2.0',
+            )
+
+        if params and not all(
+            param.annotation in [Request, Response, inspect.Parameter.empty]
+            for param in params
+        ):
+            annotations = [p.annotation for p in params if p.annotation not in (inspect.Parameter.empty,)]
+            if annotations and not all(a in [Request, Response] for a in annotations):
+                raise TypeError(
+                    f"All parameters of {middleware.__name__}'s middleware must be a Request or Response instances"
+                )
+
         return {'status_code': status_code, 'middleware': middleware, 'order': order, 'process_response': process_response}
-    
+
     def __repr__(self):
         return (
             f'MiddlewareManager('
             f'before_request_middlewares={len(self.__before_request)}, '
-            f'after_request_middlewares={len(self.__after_request)})'
+            f'after_request_middlewares={len(self.__after_request)}, '
+            f'onion_middlewares={len(self.__onion)})'
         )

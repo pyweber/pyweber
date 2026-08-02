@@ -1,9 +1,18 @@
+import os
 import pytest
 
 from pyweber.pyweber.pyweber import Pyweber
 from pyweber.core.template import Template
 from pyweber.utils.types import ContentTypes
 from pyweber.connection.websocket import WebsocketManager
+
+
+@pytest.fixture(autouse=True)
+def _security_test_defaults(monkeypatch):
+    """Keep unit tests focused; CSRF is covered explicitly in test_security."""
+    monkeypatch.setenv('PYWEBER_CSRF_ENABLED', 'false')
+    monkeypatch.setenv('PYWEBER_SECRET_KEY', 'test-secret-key-for-pyweber-suite')
+    monkeypatch.setenv('PYWEBER_ENV', 'development')
 
 
 @pytest.fixture

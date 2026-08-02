@@ -44,6 +44,66 @@ class TestWebsocketFrames:
         assert opcode is None
 
 
+class TestWebsocketServerMore:
+    @pytest.mark.asyncio
+    async def test_frame_to_send_huge_payload(self):
+        ws = WebsocketServer(RecvSocket(b''))
+        payload = b'y' * 70000
+        frame = await ws.frame_to_send(payload, opcode=2)
+        assert frame[1] == 127
+
+    @pytest.mark.asyncio
+    async def test_frame_to_send_invalid_utf8_switches_opcode(self):
+        ws = WebsocketServer(RecvSocket(b''))
+        frame = await ws.frame_to_send(b'\xff\xfe', opcode=1)
+        assert frame[0] & 0x0F == 2
+
+    @pytest.mark.asyncio
+    async def test_send_and_close(self):
+        sock = RecvSocket(b'')
+        ws = WebsocketServer(sock)
+        await ws.send(b'hi', opcode=1)
+        assert sock.sent
+        await ws.close()
+        assert sock.closed
+
+    @pytest.mark.asyncio
+    async def test_read_exact_zero(self):
+        ws = WebsocketServer(RecvSocket(b''))
+        assert await ws.read_exact(0) == b''
+
+    @pytest.mark.asyncio
+    async def test_receive_extended_126(self):
+        payload = b'z' * 200
+        sock = RecvSocket(make_masked_frame(payload))
+        ws = WebsocketServer(sock)
+        opcode, message, fin = await ws.receive_frame()
+        assert opcode == 1
+        assert message == payload
+
+    def test_iter_next_empty_raises(self):
+        ws = WebsocketServer(RecvSocket(b''))
+        with pytest.raises(StopIteration):
+            next(ws)
+
+    def test_iter_with_queued_message(self):
+        ws = WebsocketServer(RecvSocket(b''))
+        ws._WebsocketServer__messages.append(b'queued')
+        assert next(iter(ws)) == b'queued'
+
+    @pytest.mark.asyncio
+    async def test_aiter_yields_queued(self):
+        ws = WebsocketServer(RecvSocket(b''))
+        ws._WebsocketServer__messages.append('hello')
+
+        async def take_one():
+            async for msg in ws:
+                return msg
+
+        result = await asyncio.wait_for(take_one(), timeout=1)
+        assert result == 'hello'
+
+
 class TestWebsocketManager:
     @pytest.fixture
     def manager(self, pyweber_app):

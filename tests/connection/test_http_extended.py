@@ -55,3 +55,32 @@ class TestHttpServerExtended:
         client = RecvSocket(make_ws_upgrade_request())
         server._dispatch_client(client)
         assert started
+
+    def test_peek_is_websocket_false_and_exception(self, server):
+        client = RecvSocket(make_http_request())
+        is_ws, raw = server._peek_is_websocket(client)
+        assert is_ws is False
+        assert raw.startswith(b'GET')
+
+        class Boom:
+            def settimeout(self, v): pass
+            def recv(self, n):
+                raise OSError('boom')
+
+        is_ws2, raw2 = server._peek_is_websocket(Boom())
+        assert is_ws2 is False
+        assert raw2 == b''
+
+    @pytest.mark.asyncio
+    async def test_handle_websocket_raw_sends_upgrade(self, server, monkeypatch):
+        from helpers import make_ws_upgrade_request
+
+        async def fake_connect(ws_connection):
+            return None
+
+        monkeypatch.setattr(server.app.ws_server, 'connect_wsgi', fake_connect)
+        client = RecvSocket(b'')
+        raw = make_ws_upgrade_request()
+        await server._handle_websocket_raw(client, raw)
+        assert b'101' in client.sent
+        assert client.closed

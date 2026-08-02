@@ -23,7 +23,7 @@ DEFAULT_RELOAD_SKIP = (
 )
 
 
-class CreatApp:
+class CreateApp:
     def __init__(self, target: Callable, **kwargs):
         self.target = target
         self.app: Pyweber = None
@@ -198,3 +198,8 @@ class CreatApp:
     def update(self, module: str = None):
         self.started = True
         self.reload_modules(changed_file=module)
+
+from pyweber.utils.deprecation import deprecated_alias
+
+CreatApp = deprecated_alias('CreatApp', CreateApp, alternative='CreateApp')
+

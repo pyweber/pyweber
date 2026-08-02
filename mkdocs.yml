@@ -43,6 +43,7 @@ nav:
     - Components: guides/components.md
     - File streaming: guides/file-streaming.md
     - Routing (path & query): guides/routing-advanced.md
+    - Deprecations: guides/deprecations.md
     - Deployment: guides/deployment.md
 
   - Core Framework:

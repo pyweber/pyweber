@@ -68,7 +68,8 @@ def test_field_storage_file_upload():
     body = _multipart_body(boundary, 'doc', '', filename='a.txt')
     fs = FieldStorage(f'multipart/form-data; boundary={boundary}', body)
     fields = fs.fields()
-    assert fields[0].filename == 'a.txt'
+    assert fields[0].filename.endswith('_a.txt')
+    assert '..' not in fields[0].filename
     assert fields[0].size == len(fields[0].value)
 
 

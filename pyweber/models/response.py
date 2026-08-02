@@ -2,7 +2,20 @@ from pyweber.utils.types import ContentTypes, HTTPStatusCode
 from pyweber.models.request import Request
 from pyweber.config.config import config
 from pyweber.utils.utils import PrintLine, Colors
+from pyweber.utils.security import get_allowed_origins, https_enabled
 from datetime import datetime, timezone
+
+DEFAULT_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "connect-src 'self' ws: wss:; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
+
 
 class Response:
     def __init__(
@@ -15,7 +28,7 @@ class Response:
         route: str,
         allowed_methods: list[str] = None,
     ):
-        request_headers = request.accept_control_request_headers or "Content-Type, Authorization, X-Requested-With, Accept"
+        request_headers = request.accept_control_request_headers or "Content-Type, Authorization, X-Requested-With, Accept, X-CSRF-Token"
         self.__request = request
         self.__allowed_methods = allowed_methods
         self.__body = response_content
@@ -34,16 +47,33 @@ class Response:
             "Set-Cookie": cookies,
             "Request-Path": request.full_path,
             "Response-Path": route,
-            "Access-Control-Allow-Origin": request.origin,
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": request_headers,
-            "Access-Control-Allow-Credentials": 'true',
-            "X-Forwarded-Proto": "https",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "Referrer-Policy": "strict-origin-when-cross-origin",
+            "Content-Security-Policy": DEFAULT_CSP,
+            "X-Forwarded-Proto": "https" if https_enabled() else "http",
             "X-Forwarded-Host": request.host,
         }
 
+        if https_enabled():
+            self.__headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+        self._apply_cors(request, request_headers)
+
         self.http_status_code = HTTPStatusCode.search_by_code(code)
         self.__check_status_code()
+
+    def _apply_cors(self, request: Request, request_headers: str):
+        origin = request.origin
+        allowed = get_allowed_origins()
+        if origin and origin.rstrip('/') in allowed:
+            self.__headers["Access-Control-Allow-Origin"] = origin
+            self.__headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            self.__headers["Access-Control-Allow-Headers"] = request_headers
+            self.__headers["Access-Control-Allow-Credentials"] = 'true'
+            vary = self.__headers.get("Vary", "")
+            if "Origin" not in str(vary):
+                self.__headers["Vary"] = f"{vary}, Origin" if vary else "Origin"
 
     def __check_status_code(self):
         aditional_code: tuple[str, str] = ()
