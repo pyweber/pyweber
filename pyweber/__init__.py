@@ -76,6 +76,7 @@ from .utils.security import (
     sign_value,
     unsign_value,
     generate_csrf_token,
+    get_csrf_token,
 )
 from .utils.icons import Icons
 from .utils.deprecation import warn_deprecated
@@ -218,6 +219,7 @@ __all__ = [
     'sign_value',
     'unsign_value',
     'generate_csrf_token',
+    'get_csrf_token',
     'ContentTypes',
     'EventType',
     'HTMLTag',

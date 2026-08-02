@@ -460,7 +460,7 @@ class ElementConstrutor:
             html += f' id="{esc_attr(element.id)}"'
         if element.classes and len(element.classes) > 0:
             html += f' class="{esc_attr(" ".join(element.classes))}"'
-        if element.value:
+        if element.value is not None and element.value != '':
             html += f' value="{esc_attr(element.value)}"'
 
         if element.style and len(element.style) > 0:
@@ -488,9 +488,13 @@ class ElementConstrutor:
             html += '>'
 
         raw_content = element.content or ''
-        # Escape text early so {{placeholders}} remain (braces are not escaped)
-        safe_raw = esc_text(raw_content) if element.sanitize else raw_content
-        final_content = str((self.render_dynamic_values(content=safe_raw, sanitize=element.sanitize, **self.kwargs) or ''))
+        # Escape text early so {{placeholders}} remain (braces are not escaped).
+        # Never HTML-escape <script>/<style> bodies — `>`/`&`/`<` would break JS/CSS
+        # (e.g. `if (n > 0)` → `if (n &gt; 0)`), including scripts in <head>/<body>.
+        tag = str(element.tag or '').lower()
+        escape_text = element.sanitize and tag not in {'script', 'style'}
+        safe_raw = esc_text(raw_content) if escape_text else raw_content
+        final_content = str((self.render_dynamic_values(content=safe_raw, sanitize=escape_text, **self.kwargs) or ''))
         child_by_uuid = {child.uuid: child for child in element.childs}
         has_children = bool(element.childs)
         rendered_child_uuids: set[str] = set()

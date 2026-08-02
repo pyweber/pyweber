@@ -87,6 +87,27 @@ class TestXSSEscape:
         el = Element(tag='div', content='<b>raw</b>', sanitize=False)
         assert '<b>raw</b>' in el.to_html()
 
+    def test_script_and_style_bodies_not_escaped(self):
+        js = 'if (n > 0 && x < 1) { console.log("ok"); }'
+        css = 'a > b { color: #fff; content: "x & y"; }'
+        script = Element(tag='script', content=js, sanitize=True)
+        style = Element(tag='style', content=css, sanitize=True)
+        assert js in script.to_html()
+        assert '&gt;' not in script.to_html()
+        assert css in style.to_html()
+        assert '&amp;' not in style.to_html() or 'x & y' in style.to_html()
+
+    def test_script_attrs_still_escaped(self):
+        el = Element(
+            tag='script',
+            content='var x = 1;',
+            attrs={'data-x': '" onclick="alert(1)'},
+            sanitize=True,
+        )
+        html = el.to_html()
+        assert 'var x = 1;' in html
+        assert '&quot;' in html
+
 
 class TestCORSAndHeaders:
     def _request(self, origin='https://evil.example'):
@@ -276,6 +297,46 @@ class TestCSRFEnforcement:
         html = form.to_html()
         assert CSRF_FORM_FIELD in html
         assert 'type="hidden"' in html or "type='hidden'" in html or 'hidden' in html.lower()
+
+    @pytest.mark.asyncio
+    async def test_form_csrf_matches_cookie_on_get_then_post(self, monkeypatch):
+        """Form hidden field must equal Set-Cookie pyweber_csrf (double-submit)."""
+        monkeypatch.setenv('PYWEBER_CSRF_ENABLED', 'true')
+        monkeypatch.setenv('PYWEBER_SECRET_KEY', 'csrf-form-match-secret-key-32b!')
+        app = Pyweber()
+
+        @app.route('/login', methods=['GET', 'POST'])
+        def login(request: Request):
+            if request.method == 'GET':
+                return Form(method='POST', action='/login', id='login').to_html()
+            return 'ok'
+
+        get_resp = await app.get_response(
+            Request(headers='GET /login HTTP/1.1\r\nHost: localhost\r\n\r\n', body=b'')
+        )
+        assert get_resp.status_code == 200
+        html = get_resp.response_content.decode('utf-8', errors='ignore')
+        set_cookies = get_resp.headers.get('Set-Cookie') or {}
+        cookie_line = set_cookies.get(CSRF_COOKIE_NAME) if isinstance(set_cookies, dict) else None
+        assert cookie_line
+        cookie_token = cookie_line.split(';', 1)[0].split('=', 1)[1]
+        assert f'name="{CSRF_FORM_FIELD}"' in html or f"name='{CSRF_FORM_FIELD}'" in html
+        assert cookie_token in html
+
+        body = f'{CSRF_FORM_FIELD}={cookie_token}'.encode()
+        post = await app.get_response(
+            Request(
+                headers=(
+                    'POST /login HTTP/1.1\r\nHost: localhost\r\n'
+                    f'Cookie: {CSRF_COOKIE_NAME}={cookie_token}\r\n'
+                    'Content-Type: application/x-www-form-urlencoded\r\n'
+                    f'Content-Length: {len(body)}\r\n\r\n'
+                ),
+                body=body,
+            )
+        )
+        assert post.status_code == 200
+        assert b'ok' in post.response_content
 
 
 class TestProductionErrors:

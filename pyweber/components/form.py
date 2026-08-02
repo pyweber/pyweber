@@ -5,7 +5,7 @@ from typing import Callable, Literal
 from pyweber.utils.security import (
     CSRF_FORM_FIELD,
     csrf_enabled,
-    generate_csrf_token,
+    get_csrf_token,
 )
 
 
@@ -53,7 +53,9 @@ class Form(Element):
         self.attrs = {}
 
         if csrf_enabled() and method and str(method).upper() == 'POST':
-            token = csrf_token or generate_csrf_token()
+            # Must match cookie ``pyweber_csrf`` (double-submit); do not mint a
+            # fresh token here or POST will 403 after a normal GET that set the cookie.
+            token = csrf_token or get_csrf_token()
             self.childs.append(
                 InputHidden(name=CSRF_FORM_FIELD, value=token, id=f'{id or "form"}_csrf')
             )

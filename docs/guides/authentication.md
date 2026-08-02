@@ -105,6 +105,31 @@ print(user_permissions())  # expanded set for current_user()
 
 Extra one-off grants without a role: `login_user(id, roles=[...], data={'permissions': ['billing:view']})`.
 
+## CSRF on login / POST forms
+
+POST/PUT/PATCH/DELETE require a CSRF token (enabled by default). This is **double-submit**:
+
+1. On any response the server sets cookie `pyweber_csrf` (automatic).
+2. The **same** value must be sent back as form field `_csrf` or header `X-CSRF-Token`.
+
+The browser does **not** invent this on submit. Use `Form(method='POST')` (injects `_csrf` via `get_csrf_token()`), or embed it yourself:
+
+```python
+from pyweber.auth import ...
+from pyweber import get_csrf_token
+
+@app.route('/login', methods=['GET', 'POST'])
+def login(request):
+    if request.method == 'GET':
+        token = get_csrf_token()
+        return f'<form method="post"><input type="hidden" name="_csrf" value="{token}">...</form>'
+    ...
+```
+
+JSON APIs: send header `X-CSRF-Token` (and the cookie). Or disable with `PYWEBER_CSRF_ENABLED=false` / `[security] csrf_enabled = false` (not for browser form apps in production).
+
+> **Note:** browsers often send `Content-Type: application/x-www-form-urlencoded; charset=UTF-8`. PyWeber strips parameters via `request.media_type` / `request.is_media(...)` so form fields (including `_csrf`) still parse.
+
 ## API
 
 | Helper | Role |

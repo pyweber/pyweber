@@ -63,3 +63,64 @@ class TestRequestAsgi:
         assert request.method == 'POST'
         assert request.path == '/submit'
         assert request.body == {'ok': True}
+
+
+class TestContentTypeCharset:
+    """Browsers append ``; charset=UTF-8`` — must not break body / CSRF parsing."""
+
+    def test_form_urlencoded_with_charset(self):
+        headers = (
+            'POST /login HTTP/1.1\r\n'
+            'Host: localhost\r\n'
+            'Content-Type: application/x-www-form-urlencoded; charset=UTF-8\r\n\r\n'
+        )
+        request = Request(
+            headers=headers,
+            body=b'_csrf=tok&user=alice',
+            client_info=ClientInfo(host='127.0.0.1', port=0),
+        )
+        assert request.content_type == 'application/x-www-form-urlencoded; charset=UTF-8'
+        assert request.media_type == 'application/x-www-form-urlencoded'
+        assert request.is_media(ContentTypes.form_encode)
+        assert request.body['_csrf'] == 'tok'
+        assert request.body['user'] == 'alice'
+
+    def test_json_with_charset(self):
+        headers = (
+            'POST /api HTTP/1.1\r\n'
+            'Host: localhost\r\n'
+            'Content-Type: application/json; charset=UTF-8\r\n\r\n'
+        )
+        request = Request(
+            headers=headers,
+            body=json.dumps({'a': 1}).encode(),
+            client_info=ClientInfo(host='127.0.0.1', port=0),
+        )
+        assert request.is_media('application/json', ContentTypes.json)
+        assert request.body == {'a': 1}
+
+    @pytest.mark.asyncio
+    async def test_csrf_post_with_charset_content_type(self, monkeypatch):
+        monkeypatch.setenv('PYWEBER_CSRF_ENABLED', 'true')
+        monkeypatch.setenv('PYWEBER_SECRET_KEY', 'charset-csrf-secret-key-32bytes!!')
+        from pyweber.pyweber.pyweber import Pyweber
+        from pyweber.utils.security import CSRF_COOKIE_NAME, CSRF_FORM_FIELD, generate_csrf_token
+
+        app = Pyweber()
+
+        @app.route('/login', methods=['POST'])
+        def login():
+            return 'ok'
+
+        token = generate_csrf_token()
+        body = f'{CSRF_FORM_FIELD}={token}&user=x'.encode()
+        headers = (
+            'POST /login HTTP/1.1\r\n'
+            'Host: localhost\r\n'
+            'Content-Type: application/x-www-form-urlencoded; charset=UTF-8\r\n'
+            f'Cookie: {CSRF_COOKIE_NAME}={token}\r\n'
+            f'Content-Length: {len(body)}\r\n\r\n'
+        )
+        resp = await app.get_response(Request(headers=headers, body=body))
+        assert resp.status_code == 200
+        assert b'ok' in resp.response_content

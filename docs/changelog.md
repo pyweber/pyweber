@@ -4,6 +4,12 @@ This page summarizes recent releases in plain language. For the full history, se
 
 ---
 
+## 1.5.2 — Unreleased
+
+### Fixed
+
+- **Inline `<script>` / `<style>`** — bodies are no longer HTML-escaped when `sanitize=True` (JS/CSS in head/body stay valid). Other tags still escape by default.
+
 ## 1.5.0.dev3 — Unreleased
 
 ### New
@@ -30,6 +36,7 @@ This page summarizes recent releases in plain language. For the full history, se
 ### Fixed
 
 - Landing pages with CDN CSS no longer lose Bootstrap/Fonts because of CSP
+- **Form POSTs with `Content-Type: …; charset=UTF-8`** — body/`_csrf` parse correctly (`request.media_type`)
 - Static pages no longer get a reactive WS client that rewrites the document and breaks layout
 - Client never does `document.documentElement.innerHTML = …` on root diffs
 - OpenAPI `int | None` on Python 3.10 (`types.UnionType`)

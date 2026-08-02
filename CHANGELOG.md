@@ -1,6 +1,12 @@
 # PyWeber Changelog
 
-## [1.5.0] - Unreleased
+## [1.5.2] - Unreleased
+
+### Fixed
+
+- **`<script>` / `<style>` bodies are not HTML-escaped** under `sanitize=True`. Escaping turned `>`/`&`/`<` into entities and broke inline JS/CSS in `<head>` and `<body>` (e.g. `if (n > 0)` → `if (n &gt; 0)`). Attribute values on those tags are still escaped. Other elements keep default XSS escaping.
+
+## [1.5.1] - Unreleased
 
 ### Added
 
@@ -34,6 +40,7 @@
 
 ### Fixed
 
+- **`Content-Type: …; charset=UTF-8`** — request body sniffing uses `Request.media_type` / `is_media()` (strips parameters). Without this, form POSTs from browsers miss `_csrf` and look like CSRF failures.
 - **Layout break with CDN CSS** — CSP no longer refuses stylesheets from `cdn.jsdelivr.net` / `fonts.googleapis.com` by default.
 - **Static pages + WebSocket** — with `include_uuid=False`, the WS client is not injected; handoff is skipped; client `outerHTML` with invented UUIDs does not overwrite the server template.
 - **Client DOM safety** — `applyDifferences` never rewrites `document.documentElement.innerHTML` (that destroyed CSS/Bootstrap). Missing UUID targets are ignored; `stampMissingUuids` only runs when stable UUIDs already exist on the page.
@@ -54,6 +61,7 @@
 - **CORS is closed by default.** Responses no longer reflect arbitrary `Origin` with credentials. Configure `security.allowed_origins` (or `PYWEBER_ALLOWED_ORIGINS`) to opt in.
 - **HTML auto-escape is on by default** (`sanitize=True` on `Element`). Attribute values, content, id/class/style are escaped via `html.escape` at serialize time. Pass `sanitize=False` only for trusted markup.
 - **CSRF protection** for POST/PUT/PATCH/DELETE (double-submit cookie + `X-CSRF-Token` / `_csrf`). Disable with `security.csrf_enabled = false` or `PYWEBER_CSRF_ENABLED=false`. Framework routes under `/_pyweber/` are exempt.
+- **`get_csrf_token()`** — returns the token that matches cookie `pyweber_csrf`; `Form(method='POST')` uses it for the hidden `_csrf` field (avoids minting a mismatched token).
 - **WebSocket sessions** bind to signed HttpOnly cookie `pyweber_sid` (HMAC with `session.secret_key`). Client-supplied `sessionId` alone is no longer trusted.
 - **Static file path traversal** blocked via `realpath`/`commonpath` jail under registered static roots.
 - **Production 500 pages** hide exception details when `session.env` / `PYWEBER_ENV` is `production`/`prod`.

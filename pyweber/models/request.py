@@ -149,12 +149,46 @@ class Request:
         return self.__parse_headers_wsgi()
 
     @property
+    def media_type(self) -> str:
+        """MIME type only — strips parameters such as ``charset=UTF-8``.
+
+        Browsers often send
+        ``Content-Type: application/x-www-form-urlencoded; charset=UTF-8``.
+        Comparing the raw header to ``ContentTypes.*.value`` would miss the body
+        (and CSRF ``_csrf``). Always use this (or ``is_media``) for sniffing.
+        """
+        return (self.content_type or '').split(';', 1)[0].strip().lower()
+
+    def is_media(self, *types: str | ContentTypes) -> bool:
+        """True if ``media_type`` equals any of the given MIME types / enums."""
+        media = self.media_type
+        for t in types:
+            value = t.value if isinstance(t, ContentTypes) else str(t)
+            if media == value.strip().lower():
+                return True
+        return False
+
+    @property
     def body(self) -> Union[dict[str, Union[list[File], str]]]:
-        if self.content_type == ContentTypes.json.value:
+        if self.is_media(ContentTypes.json):
             return json.loads(self.__raw_body)
-        elif self.content_type == ContentTypes.form_encode.value:
-            return {key.decode(): '; '.join([v.decode() for v in value]) for key, value in parse_qs(self.__raw_body).items()}
-        elif ContentTypes.form_data.value in self.content_type:
+        if self.is_media(ContentTypes.form_encode):
+            raw = self.__raw_body
+            if isinstance(raw, bytes):
+                parsed = parse_qs(raw)
+                return {
+                    key.decode(): '; '.join([v.decode() for v in value])
+                    for key, value in parsed.items()
+                }
+            parsed = parse_qs(raw)
+            return {
+                str(key): '; '.join([str(v) for v in value])
+                for key, value in parsed.items()
+            }
+        # multipart keeps parameters (boundary=…); match on media type prefix
+        if self.media_type == ContentTypes.form_data.value or (
+            self.content_type or ''
+        ).lower().startswith(ContentTypes.form_data.value):
             return self.__parse_form_data()
         return {'body': self.__raw_body}
 

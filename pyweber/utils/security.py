@@ -86,6 +86,39 @@ def generate_csrf_token(*, key: str | None = None) -> str:
     return sign_value(raw, key=key)
 
 
+def _csrf_value_from_set_cookie(raw: str | None) -> str | None:
+    """Extract bare token from a ``Set-Cookie`` line stored by CookieManager."""
+    if not raw:
+        return None
+    first = raw.split(';', 1)[0]
+    if '=' not in first:
+        return None
+    return first.split('=', 1)[1]
+
+
+def get_csrf_token(*, key: str | None = None) -> str:
+    """CSRF token for the current request (must match cookie ``pyweber_csrf``).
+
+    Prefer the request cookie, then the pending response ``Set-Cookie`` from
+    ``_ensure_csrf_cookie``, otherwise mint a new signed token.
+    """
+    from pyweber.models.context import get_cookie_manager, get_current_request
+
+    request = get_current_request()
+    if request is not None:
+        existing = request.cookies.get(CSRF_COOKIE_NAME)
+        if existing and unsign_value(existing, key=key) is not None:
+            return existing
+
+    cm = get_cookie_manager()
+    if cm is not None:
+        pending = _csrf_value_from_set_cookie(cm.cookies.get(CSRF_COOKIE_NAME))
+        if pending and unsign_value(pending, key=key) is not None:
+            return pending
+
+    return generate_csrf_token(key=key)
+
+
 def verify_csrf_token(token: str, cookie_token: str | None = None, *, key: str | None = None) -> bool:
     if not token:
         return False
