@@ -259,8 +259,8 @@ class TestSecurityHelpersExtra:
     def test_safe_join_absolute_escape(self, tmp_path: Path):
         base = tmp_path / 'root'
         base.mkdir()
-        assert safe_join(str(base), 'C:\\Windows\\system32') is None or \
-            safe_join(str(base), '/etc/passwd') is None
+        assert safe_join(str(base), 'C:\\Windows\\system32') is None
+        assert safe_join(str(base), '/etc/passwd') is None
 
     @pytest.mark.asyncio
     async def test_session_cookie_issued_on_get(self):

@@ -155,16 +155,20 @@ def safe_join(base_dir: str, *paths: str) -> str | None:
     if not base_dir:
         return None
     base = os.path.realpath(base_dir)
-    relative = os.path.join(*paths) if paths else ''
-    # Disallow absolute / drive-letter escapes in relative segments
+    # Reject absolute / drive / UNC segments outright (do not silently re-root them)
     for part in paths:
         if not part:
             continue
         normalized = part.replace('\\', '/')
-        if os.path.isabs(part) or normalized.startswith('/') or re.match(r'^[A-Za-z]:', part):
-            # Treat as relative by stripping drive/root noise
-            relative = os.path.join(*(p.lstrip('/\\') for p in paths if p))
-            break
+        if (
+            os.path.isabs(part)
+            or normalized.startswith('/')
+            or re.match(r'^[A-Za-z]:', part)
+            or normalized.startswith('//')
+        ):
+            return None
+
+    relative = os.path.join(*paths) if paths else ''
     target = os.path.realpath(os.path.join(base, relative.lstrip('/\\')))
     try:
         if os.path.commonpath([base, target]) != base:

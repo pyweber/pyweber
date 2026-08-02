@@ -1,5 +1,6 @@
 import re
 import inspect
+import types
 from typing import Any, Callable, Union, get_args, get_origin
 import dataclasses
 import sys
@@ -28,8 +29,15 @@ _PRIMITIVE_TYPE_MAP: dict[str, type] = {
     'bytes': bytes,
     'bytearray': bytearray,
     'None': type(None),
-    'NoneType': type(None),
 }
+
+
+def _is_union_origin(origin: Any) -> bool:
+    """True for typing.Union and PEP 604 ``X | Y`` (types.UnionType on 3.10+)."""
+    if origin is Union:
+        return True
+    union_type = getattr(types, 'UnionType', None)
+    return union_type is not None and origin is union_type
 
 
 @dataclasses.dataclass
@@ -209,8 +217,8 @@ class OpenApiProcessor:
 
         origin = get_origin(annotation)
         if origin is not None:
-            # Union / Optional → prefer first non-None arg's name
-            if origin is getattr(__import__('typing'), 'Union', None) or str(origin) == 'typing.Union':
+            # Union / Optional / PEP 604 (int | None) → prefer first non-None arg's name
+            if _is_union_origin(origin):
                 args = [a for a in get_args(annotation) if a is not type(None)]
                 if args:
                     return cls.annotation_type_name(args[0])
@@ -664,8 +672,8 @@ class OpenApiProcessor:
         origin = get_origin(annotation)
         args = get_args(annotation)
 
-        # Union / Optional
-        if origin is Union or str(origin) == 'typing.Union':
+        # Union / Optional / PEP 604 (int | None)
+        if _is_union_origin(origin):
             non_none = [a for a in args if a is not type(None)]
             has_none = len(non_none) != len(args)
             if not non_none:
