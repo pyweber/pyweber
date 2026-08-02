@@ -1,8 +1,6 @@
 import os
 import re
 from uuid import uuid4
-import lxml.html as HTMLPARSER
-from lxml.html import fromstring
 from typing import Union, Any, Literal
 from pyweber.utils.loads import LoadStaticFiles
 from pyweber.utils.types import HTMLTag, GetBy
@@ -12,6 +10,7 @@ from pyweber.models.element import (
     TemplateEvents,
     ChildElements
 )
+from pyweber.core.html_parser import ParsedNode, parse_html
 
 SEARCH_MODE = Literal['exact', 'regex', 'contains', 'startswith', 'endswith']
 
@@ -327,18 +326,20 @@ class Element(ElementConstrutor):
 
     @classmethod
     def from_html(cls, html: str, include_uuid: bool = True, **kwargs):
-        HtmlElement = fromstring(cls.read_file(html).strip())
-        return cls._create_element(HTMLElement=HtmlElement, parent=None, include_uuid=include_uuid, **kwargs)
+        root = parse_html(cls.read_file(html).strip())
+        return cls._create_element(HTMLElement=root, parent=None, include_uuid=include_uuid, **kwargs)
 
     @classmethod
-    def _create_element(cls, HTMLElement, parent=None, include_uuid: bool = True, **kwargs):
+    def _create_element(cls, HTMLElement: ParsedNode, parent=None, include_uuid: bool = True, **kwargs):
 
         def gettail(val):
-            try: return val.strip()
-            except: return val
+            try:
+                return val.strip()
+            except Exception:
+                return val
 
-        name = 'comment' if isinstance(HTMLElement, HTMLPARSER.HtmlComment) else HTMLElement.tag
-        attrib = HTMLElement.attrib
+        name = 'comment' if HTMLElement.is_comment else HTMLElement.tag
+        attrib = dict(HTMLElement.attrib)
 
         id_ = cls.render_dynamic_values(attrib.pop('id', None), **kwargs)
         class_str = cls.render_dynamic_values(attrib.pop('class', None), **kwargs)
@@ -360,7 +361,8 @@ class Element(ElementConstrutor):
         events_dict = {k[1:]: attrib.pop(k) for k in list(attrib) if k.startswith('_on')}
         event_obj = TemplateEvents()
         for key, event in events_dict.items():
-            if hasattr(event_obj, key): setattr(event_obj, key, event)
+            if hasattr(event_obj, key):
+                setattr(event_obj, key, event)
 
         attrs = {
             cls.render_dynamic_values(c, **kwargs): cls.render_dynamic_values(v, **kwargs)
@@ -406,8 +408,10 @@ class Element(ElementConstrutor):
                 )
 
         if element.tag == 'select' and element.childs:
-            try: element.value = __xyza
-            except: pass
+            try:
+                element.value = __xyza
+            except Exception:
+                pass
         return element
 
     @classmethod

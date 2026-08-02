@@ -39,6 +39,22 @@ from .models.strem_stats import (
     AdaptiveController,
     StreamStats
 )
+from .models.openapi import (
+    OpenApiProcessor,
+    OpenAPIConfig,
+    OpenAPIBuilder,
+    HTTPBearer,
+    HTTPBasic,
+    APIKeyHeader,
+    APIKeyQuery,
+    APIKeyCookie,
+)
+from .models.security import (
+    AuthContext,
+    SecurityEnforcer,
+    SecurityError,
+    ForbiddenError,
+)
 
 # pyweber events
 from .core.events import (
@@ -198,6 +214,18 @@ __all__ = [
     'InvalidTemplateError',
     'RouteNotFoundError',
     'RouterError',
+    'OpenApiProcessor',
+    'OpenAPIConfig',
+    'OpenAPIBuilder',
+    'HTTPBearer',
+    'HTTPBasic',
+    'APIKeyHeader',
+    'APIKeyQuery',
+    'APIKeyCookie',
+    'AuthContext',
+    'SecurityEnforcer',
+    'SecurityError',
+    'ForbiddenError',
     'Icon',
     'Style',
     'Script',

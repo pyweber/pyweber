@@ -40,6 +40,18 @@ class TestRoutesApi:
         with pytest.raises(RouteAlreadyExistError):
             self.rm.add_route(route='/dup', template='b', methods=['GET'])
 
+    def test_same_path_different_methods_allowed(self):
+        self.rm.add_route(route='/api', template='get', methods=['GET'], name='api-get')
+        self.rm.add_route(route='/api', template='post', methods=['POST'], name='api-post')
+
+        assert self.rm.exists('/api')
+        assert set(self.rm.get_allowed_methods('/api')) == {'GET', 'POST'}
+        assert self.rm.get_route_by_path('/api', method='GET') is not None
+        assert self.rm.get_route_by_path('/api', method='POST') is not None
+        assert self.rm.get_route_by_name('api-get') is not None
+        assert self.rm.get_route_by_name('api-post') is not None
+        assert len(self.rm.get_routes_by_path('/api')) == 2
+
     def test_redirect_unknown_target(self):
         with pytest.raises(RouteNotFoundError):
             self.rm.redirect(from_route='/x', target='/missing')

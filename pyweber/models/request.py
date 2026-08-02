@@ -47,6 +47,7 @@ class Request:
             raise TypeError('Request type does not valid')
 
         self.client_info = client_info
+        self.auth = None
         self.__additions_headers()
 
     @property

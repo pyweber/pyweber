@@ -145,3 +145,47 @@ def test_prepare_callback_kwargs(openapi):
     response_user_keys = ['id', 'user_1', 'user_2', 'user_3', 'user_4']
 
     assert list(openapi.prepare_callback_kwargs(example_func, **kwargs).keys()) == response_user_keys
+
+
+def test_normalize_string_annotations(openapi):
+    assert openapi.normalize_annotation('str') is str
+    assert openapi.normalize_annotation('int') is int
+    assert openapi.normalize_annotation('"float"') is float
+    assert openapi.normalize_annotation('int | None') is int
+    assert openapi.normalize_annotation('Optional[str]') is str
+    assert openapi.normalize_annotation('list[str]') is list
+    assert openapi.annotation_type_name('str') == 'str'
+    assert openapi.annotation_type_name('UnknownModel') == 'str'
+
+
+def test_swagger_type_from_string_annotation(openapi):
+    assert openapi.get_swagger_type('str')['type']['type'] == 'string'
+    assert openapi.get_swagger_type('int')['type']['type'] == 'integer'
+    assert openapi.get_swagger_type('bool')['type']['type'] == 'boolean'
+
+
+def test_callback_with_string_annotations_does_not_crash(openapi):
+    def example_func(id, name):
+        pass
+
+    example_func.__annotations__ = {'id': 'int', 'name': 'str'}
+
+    params = openapi.get_callback_parameters(example_func)
+    assert openapi.annotation_type_name(params['id'].annotation) == 'int'
+    assert openapi.annotation_type_name(params['name'].annotation) == 'str'
+
+    spec = openapi.get_route_spec('/users/{id}/{name}', example_func)
+    assert spec['id']['schema']['type'] == 'integer'
+    assert spec['name']['schema']['type'] == 'string'
+
+    body = openapi.get_body_spec('/users/{id}', example_func)
+    assert isinstance(body, dict)
+
+
+def test_resolve_class_type_with_string_primitive(openapi):
+    def example_func(arg):
+        pass
+
+    example_func.__annotations__ = {'arg': 'str'}
+    param = openapi.get_callback_parameters(example_func)['arg']
+    assert openapi.resolve_class_type(param) == 'primitive'

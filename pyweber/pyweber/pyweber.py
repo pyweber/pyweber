@@ -36,7 +36,8 @@ from pyweber.models.routes import (
     RouteManager,
 )
 
-from pyweber.models.openapi import OpenApiProcessor
+from pyweber.models.openapi import OpenApiProcessor, OpenAPIConfig, OpenAPIBuilder
+from pyweber.models.security import SecurityEnforcer, normalize_security_requirements
 from pyweber.core.events import WindowBookEvents
 
 from pyweber.utils.utils import PrintLine
@@ -115,7 +116,9 @@ class Pyweber(
         CookieManager.__init__(self)
         ErrorPages.__init__(self)
         self.__update_handler: Callable = data.pop('update_handler', None)
+        self.openapi: OpenAPIConfig = data.pop('openapi', None) or OpenAPIConfig()
         self.__add_framework_routes()
+        self._setup_openapi_routes()
         self.data = data
         self.__cache_templates: dict[str, tuple[ContentResult, TemplateResult]] = {}
         self.__static_directories: set[str] = set(assets_directories)
@@ -218,9 +221,6 @@ class Pyweber(
         self.cookies.clear()
 
         try:
-            if re.search(r'^/_pyweber/(?:\w{8}-\w{4}-\w{4}-\w{4}-\w{12})/openapi.json$', request.path):
-                await self.__add_openapi_route()
-
             _route, _ = self.resolve_path(route=request.path)
             title = None
             _route_method = f"{_route}_{request.method}"
@@ -435,10 +435,16 @@ class Pyweber(
         )
 
         if self.exists(route=path):
-            _route = self.get_route_by_path(route=path)
+            _route = self.get_route_by_path(route=path, method=method)
 
-            if method not in _route.methods:
-                allowed = ', '.join(_route.methods)
+            if _route is None:
+                allowed_list = self.get_allowed_methods(path)
+                # Redirect targets: resolve without method filter for method checks
+                if not allowed_list and self.is_redirected(route=path):
+                    target = self.get_route_by_path(route=path)
+                    allowed_list = list(target.methods) if target else []
+
+                allowed = ', '.join(allowed_list)
                 state_result.update(
                     template=Template(
                         template=(
@@ -454,7 +460,28 @@ class Pyweber(
                     redirect_path=path,
                 )
                 result = await self._process_templates(state_result=state_result)
-                result.allowed_methods = list(_route.methods)
+                result.allowed_methods = list(allowed_list)
+                return result
+
+            if method not in _route.methods:
+                allowed_list = self.get_allowed_methods(path) or list(_route.methods)
+                allowed = ', '.join(allowed_list)
+                state_result.update(
+                    template=Template(
+                        template=(
+                            f'<h1>405 Method Not Allowed</h1>'
+                            f'<p>Method {method} is not allowed for {path}.</p>'
+                            f'<p>Allowed: {allowed}</p>'
+                        ),
+                        status_code=HTTPStatusCode.METHOD_NOT_ALLOWED.code,
+                    ),
+                    status_code=HTTPStatusCode.METHOD_NOT_ALLOWED.code,
+                    process_response=False,
+                    content_type=ContentTypes.html,
+                    redirect_path=path,
+                )
+                result = await self._process_templates(state_result=state_result)
+                result.allowed_methods = list(allowed_list)
                 return result
 
             if self.is_redirected(route=path):
@@ -479,6 +506,30 @@ class Pyweber(
                     callback=_route.callback,
                     kwargs=kwargs
                 )
+
+            # OpenAPI security enforcement (docs + runtime)
+            request = get_current_request()
+            if request is not None and not self.is_redirected(route=path):
+                requirements = normalize_security_requirements(getattr(_route, 'security', None))
+                if requirements is None:
+                    requirements = self.openapi.normalized_security()
+
+                challenge = SecurityEnforcer(self.openapi.security_schemes or {}).enforce(
+                    request=request,
+                    requirements=requirements,
+                )
+                if not challenge.ok:
+                    state_result.update(
+                        template={'detail': challenge.detail},
+                        status_code=challenge.status_code,
+                        content_type=ContentTypes.json,
+                        process_response=False,
+                        callback=None,
+                        redirect_path=path,
+                    )
+                    return await self._process_templates(state_result=state_result)
+
+                request.auth = challenge.auth
 
             if _route.middlewares:
                 middleware_result = await self.process_route_middleware(
@@ -668,7 +719,9 @@ class Pyweber(
                     title='Get File Chunks',
                     process_response=False,
                     methods=['post'],
-                    content_type=ContentTypes.json
+                    content_type=ContentTypes.json,
+                    security=[],
+                    include_in_schema=False,
                 ),
                 Route(
                     route='/_pyweber/check-cookies',
@@ -676,80 +729,83 @@ class Pyweber(
                     methods=['get'],
                     title='Get Cookies',
                     process_response=False,
-                    content_type=ContentTypes.json
-                ),
-                Route(
-                    route='/docs',
-                    template=StaticFilePath.pyweber_docs.value,
-                    title='Pyweber Documentation'
+                    content_type=ContentTypes.json,
+                    security=[],
+                    include_in_schema=False,
                 ),
                 Route(
                     route='/_pyweber/static/favicon.ico',
                     template=str(StaticFilePath.favicon_path.value.joinpath('favicon.ico')),
-                    content_type=ContentTypes.ico
+                    content_type=ContentTypes.ico,
+                    security=[],
+                    include_in_schema=False,
                 ),
                 Route(
                     route='/_pyweber/static/{uuid}/.css',
                     template=str(StaticFilePath.pyweber_css.value),
-                    content_type=ContentTypes.css
+                    content_type=ContentTypes.css,
+                    security=[],
+                    include_in_schema=False,
                 ),
                 Route(
                     route='/_pyweber/static/{uuid}/.js',
                     template=str(StaticFilePath.js_base.value),
-                    content_type=ContentTypes.js
+                    content_type=ContentTypes.js,
+                    security=[],
+                    include_in_schema=False,
                 )
             ]
         )
 
-    async def __add_openapi_route(self):
-        route = '/_pyweber/{uuid}/openapi.json'
+    def _setup_openapi_routes(self):
+        """Register /docs and openapi.json from OpenAPIConfig (callable schema)."""
+        config = self.openapi or OpenAPIConfig()
+        routes: list[Route] = []
 
-        if route not in self._RouteManager__routes:
-            self.add_group_routes([
+        if config.docs_url:
+            routes.append(
                 Route(
-                    route=route,
-                    template=self.__get_routes(),
-                    content_type=ContentTypes.json
+                    route=config.docs_url,
+                    template=StaticFilePath.pyweber_docs.value,
+                    title='Pyweber Documentation',
+                    security=[],
+                    include_in_schema=False,
                 )
-            ])
+            )
+
+        if config.openapi_url:
+            routes.append(
+                Route(
+                    route=config.openapi_url,
+                    template=self.get_openapi_schema,
+                    content_type=ContentTypes.json,
+                    process_response=False,
+                    security=[],
+                    include_in_schema=False,
+                    title='OpenAPI Schema',
+                )
+            )
+            # Backward-compatible alias used by older docs.html clients
+            routes.append(
+                Route(
+                    route='/_pyweber/{uuid}/openapi.json',
+                    template=self.get_openapi_schema,
+                    content_type=ContentTypes.json,
+                    process_response=False,
+                    security=[],
+                    include_in_schema=False,
+                    title='OpenAPI Schema',
+                )
+            )
+
+        if routes:
+            self.add_group_routes(routes)
+
+    def get_openapi_schema(self, **kwargs):
+        return OpenAPIBuilder(self).build()
 
     def __get_routes(self):
-        list_routes = [self.get_route_by_path(route) for route in self.list_routes if route not in ['/docs']]
-        schema = {
-            "openapi": "3.0.0",
-            "info": {
-                "title": "Pyweber Documentation",
-                "version": "1.0.0"
-            },
-            "paths": {}
-        }
-
-        for route in list_routes:
-            if isinstance(route, Route):
-                schema['paths'][route.route] = {}
-
-                for method in route.methods:
-                    schema['paths'][route.route][method.lower()] = {
-                        "summary": route.title or 'Pyweber Route',
-                        "parameters": [
-                            v for _, v in OpenApiProcessor.get_route_spec(route.route_with_params, route.callback).items()
-                        ],
-                        "responses": {
-                            str(route.status_code): {
-                                "description": HTTPStatusCode.search_name_by_code(route.status_code)
-                            },
-                            str(500): {
-                                'description': HTTPStatusCode.search_name_by_code(500)
-                            }
-                        }
-                    }
-
-                    request_body = OpenApiProcessor.get_body_spec(route.route_with_params, route.callback)
-
-                    if request_body.get('content') and route.callback.__name__ != '<lambda>':
-                        schema['paths'][route.route][method.lower()]['requestBody'] = request_body
-
-        return schema
+        return self.get_openapi_schema()
 
     async def clone_template(self, route: str):
         template_result = await self.get_template(route=route)

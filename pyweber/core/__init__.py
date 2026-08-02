@@ -6,6 +6,11 @@ from .events import (
     WindowEvents,
     TemplateEvents
 )
+from .html_parser import (
+    get_html_parser_backend,
+    set_html_parser_backend,
+    reset_html_parser_backend,
+)
 
 __all__ = [
     'Element',
@@ -13,5 +18,8 @@ __all__ = [
     'window',
     'EventHandler',
     'WindowEvents',
-    'TemplateEvents'
+    'TemplateEvents',
+    'get_html_parser_backend',
+    'set_html_parser_backend',
+    'reset_html_parser_backend',
 ]

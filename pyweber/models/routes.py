@@ -77,6 +77,14 @@ class Route:
         title: str = '',
         process_response: bool = True,
         callback: Callable[..., Any] = None,
+        tags: list[str] = None,
+        description: str = None,
+        responses: dict = None,
+        response_model: Any = None,
+        security: list = None,
+        deprecated: bool = False,
+        include_in_schema: bool = True,
+        operation_id: str = None,
         **kwargs
     ):
         self.group = group
@@ -90,6 +98,14 @@ class Route:
         self.title = title
         self.process_response = process_response
         self.callback = callback
+        self.tags = list(tags) if tags else []
+        self.description = description
+        self.responses = dict(responses) if responses else {}
+        self.response_model = response_model
+        self.security = security  # None inherits global; [] = public
+        self.deprecated = bool(deprecated)
+        self.include_in_schema = include_in_schema if include_in_schema is not None else True
+        self.operation_id = operation_id
         self.kwargs = kwargs
 
     @property
@@ -343,9 +359,11 @@ class Route:
 
 class RouteManager:
     def __init__(self):
-        self.__routes: dict[str, Route] = {}
+        # path -> list of Route (same path may have different HTTP methods)
+        self.__routes: dict[str, list[Route]] = {}
         self.__redirects: dict[str, RedirectRoute] = {}
-        self.__route_names: dict[str, str] = {}
+        # name -> (path, methods)
+        self.__route_names: dict[str, tuple[str, tuple[str, ...]]] = {}
         self.groups: list[str] = []
 
     def is_redirected(self, route: str) -> bool:
@@ -356,7 +374,10 @@ class RouteManager:
 
     @property
     def list_routes(self) -> list[str]:
-        return [route.full_route for route in self.__routes.values() if '_pyweber' not in str(route.route)]
+        return [
+            path for path, routes in self.__routes.items()
+            if routes and '_pyweber' not in str(routes[0].route)
+        ]
 
     @property
     def list_redirected_routes(self) -> list[str]:
@@ -368,11 +389,36 @@ class RouteManager:
     def clear_routes(self):
         """Remove all public routes. Routes that starts with __ are not removed"""
         keys_to_remove = [
-            key for key, value in self.__routes.items()
-            if value.group and not str(value.group).startswith('__')
+            key for key, routes in self.__routes.items()
+            if routes and routes[0].group and not str(routes[0].group).startswith('__')
         ]
         for key in keys_to_remove:
             del self.__routes[key]
+
+    def get_allowed_methods(self, route: str) -> list[str]:
+        """Return all HTTP methods registered for a resolved path."""
+        path, _ = self.resolve_path(route=route)
+        methods: list[str] = []
+        for registered in self.__routes.get(path, []):
+            methods.extend(registered.methods)
+        return methods
+
+    def get_routes_by_path(self, route: str, follow_redirect: bool = True) -> list[Route]:
+        """Return all Route objects registered for a path."""
+        path, _ = self.resolve_path(route=route)
+
+        if follow_redirect in [True, 1] and self.is_redirected(route=path):
+            redirect_route = self.get_redirected_route(route=path)
+            return [redirect_route.route] if redirect_route else []
+
+        return list(self.__routes.get(path, []))
+
+    def _method_overlap(self, existing: list[Route], methods: list[str]) -> list[str]:
+        wanted = {m.upper() for m in methods}
+        overlap: list[str] = []
+        for registered in existing:
+            overlap.extend(sorted(wanted & {m.upper() for m in registered.methods}))
+        return overlap
 
     def is_redirect_status_code(self, status_code: int):
         return status_code in RedirectRoute.redirected_status_code()
@@ -423,7 +469,15 @@ class RouteManager:
         status_code: int = None,
         content_type: ContentTypes = None,
         title: str = None,
-        process_response: bool = True
+        process_response: bool = True,
+        tags: list[str] = None,
+        description: str = None,
+        responses: dict = None,
+        response_model: Any = None,
+        security: list = None,
+        deprecated: bool = False,
+        include_in_schema: bool = True,
+        operation_id: str = None,
     ):
         def decorator(handler: Callable[..., Union[Template, Element, str, dict, list]]):
             async def wrapper(**kwargs):
@@ -446,7 +500,15 @@ class RouteManager:
                 content_type=content_type,
                 title=title,
                 process_response=process_response,
-                callback=handler
+                callback=handler,
+                tags=tags,
+                description=description,
+                responses=responses,
+                response_model=response_model,
+                security=security,
+                deprecated=deprecated,
+                include_in_schema=include_in_schema,
+                operation_id=operation_id,
             )
             return wrapper
         return decorator
@@ -463,15 +525,20 @@ class RouteManager:
         content_type: ContentTypes = None,
         title: str = None,
         process_response: bool = True,
+        tags: list[str] = None,
+        description: str = None,
+        responses: dict = None,
+        response_model: Any = None,
+        security: list = None,
+        deprecated: bool = False,
+        include_in_schema: bool = True,
+        operation_id: str = None,
         **kwargs
     ):
 
         group = self.get_group(group=group)
-        if self.full_route(route=route, group=group) in self.__routes:
-            raise RouteAlreadyExistError(route=route)
-
-        if self.get_route_by_name(name=name):
-            raise RouteNameAlreadyExistError(name=name)
+        full = self.full_route(route=route, group=group)
+        existing = self.__routes.get(full, [])
 
         if not callable(template):
             template = (lambda static: lambda **kwargs: static)(template)
@@ -490,10 +557,26 @@ class RouteManager:
             title=title,
             process_response=process_response,
             callback=handler,
+            tags=tags,
+            description=description,
+            responses=responses,
+            response_model=response_model,
+            security=security,
+            deprecated=deprecated,
+            include_in_schema=include_in_schema,
+            operation_id=operation_id,
         )
 
-        self.__routes[_route.full_route] = _route
-        if name: self.__route_names[name] = _route.full_route
+        overlap = self._method_overlap(existing, _route.methods)
+        if overlap:
+            raise RouteAlreadyExistError(route=route, methods=overlap)
+
+        if name and self.get_route_by_name(name=name):
+            raise RouteNameAlreadyExistError(name=name)
+
+        self.__routes.setdefault(full, []).append(_route)
+        if name:
+            self.__route_names[name] = (full, tuple(_route.methods))
 
     def add_group_routes(self, routes: list[Route], group: str = None):
         group = self.get_group(group=group)
@@ -503,11 +586,22 @@ class RouteManager:
 
         for route in routes:
             route.group = group
-            self.__routes[route.full_route] = route
+            full = route.full_route
+            existing = self.__routes.get(full, [])
+            overlap = self._method_overlap(existing, route.methods)
+            if overlap:
+                # Internal re-registration replaces entries that share methods.
+                self.__routes[full] = [
+                    r for r in existing
+                    if not (set(r.methods) & set(route.methods))
+                ]
+            self.__routes.setdefault(full, []).append(route)
+            if route.name:
+                self.__route_names[route.name] = (full, tuple(route.methods))
 
-    def update_route(self, route: str, group: str=None, **kwargs):
+    def update_route(self, route: str, group: str=None, method: str = None, **kwargs):
         full_route = self.full_route(route=route, group=group)
-        _route = self.get_route_by_path(route=full_route)
+        _route = self.get_route_by_path(route=full_route, method=method)
         _kwargs = {}
 
         if not _route:
@@ -521,25 +615,43 @@ class RouteManager:
         for key, value in kwargs.items():
             if not hasattr(_route, key):
                 _kwargs[key] = value
+                continue
 
-            if value:
+            if value is not None and value != '':
                 setattr(_route, key, value)
 
         if _kwargs:
-            setattr(_route, kwargs, _kwargs)
+            for key, value in _kwargs.items():
+                setattr(_route, key, value)
 
-    def remove_route(self, route: str, group: str = None):
+    def remove_route(self, route: str, group: str = None, methods: list[str] = None):
         group = self.get_group(group=group)
+        full = self.full_route(route=route, group=group)
+        registered = self.__routes.get(full)
 
-        _r = self.__routes.get(self.full_route(route=route, group=group))
+        if not registered:
+            return
 
-        if _r and '_pyweber' not in str(_r.route):
-            del self.__routes[self.full_route(route=route, group=group)]
+        if '_pyweber' in str(registered[0].route):
+            return
+
+        if methods:
+            wanted = {m.upper() for m in methods}
+            remaining = [
+                r for r in registered
+                if not (set(r.methods) & wanted)
+            ]
+            if remaining:
+                self.__routes[full] = remaining
+            else:
+                del self.__routes[full]
+        else:
+            del self.__routes[full]
 
     def remove_group(self, group: str):
         keys_to_remove = [
-            key for key, value in self.__routes.items()
-            if group != self.default_group and group == value.group
+            key for key, routes in self.__routes.items()
+            if routes and group != self.default_group and group == routes[0].group
         ]
         for key in keys_to_remove:
             del self.__routes[key]
@@ -548,27 +660,52 @@ class RouteManager:
         if route in self.__redirects:
             del self.__redirects[route]
 
-    def get_route_by_path(self, route: str, follow_redirect: bool = True):
+    def get_route_by_path(self, route: str, follow_redirect: bool = True, method: str = None):
         path, _ = self.resolve_path(route=route)
 
         if follow_redirect in [True, 1] and self.is_redirected(route=path):
             redirect_route = self.get_redirected_route(route=path)
-            return redirect_route.route
+            return redirect_route.route if redirect_route else None
 
-        return self.__routes.get(path)
+        routes = self.__routes.get(path, [])
+        if not routes:
+            return None
+
+        if method:
+            method = str(method).upper()
+            for registered in routes:
+                if method in registered.methods:
+                    return registered
+            return None
+
+        return routes[0]
 
     def get_route_by_name(self, name: str):
-        return self.__routes[self.__route_names[name]] if name in self.__route_names else None
+        if not name or name not in self.__route_names:
+            return None
+
+        path, methods = self.__route_names[name]
+        routes = self.__routes.get(path, [])
+        method_set = set(methods)
+        for registered in routes:
+            if method_set & set(registered.methods):
+                return registered
+        return routes[0] if routes else None
 
     def get_group_routes(self, group: str = None):
         group = self.get_group(group=group)
-        return [value for _, value in self.__routes.items() if group == value.group]
+        return [
+            route
+            for routes in self.__routes.values()
+            for route in routes
+            if group == route.group
+        ]
 
     def get_group_by_route(self, route: str):
-        if route in self.__routes:
-            for key, value in self.__routes.items():
-                if key == route:
-                    return value.group
+        routes = self.__routes.get(route)
+        if routes:
+            return routes[0].group
+        return None
 
     def get_redirected_route(self, route: str):
         path, _ = self.resolve_path(route=route)
@@ -599,7 +736,7 @@ class RouteManager:
         return path, kwargs
 
     @staticmethod
-    def __resolve_path__(route: str, list_routes: dict[str, Route | RedirectRoute]):
+    def __resolve_path__(route: str, list_routes: dict):
         kwargs: dict[str, str] = {}
 
         # Separa path dos query params antes de qualquer processamento

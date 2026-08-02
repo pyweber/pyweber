@@ -97,7 +97,52 @@ app.redirect('/old-home', 'home', status_code=301)
 
 ## OpenAPI / Swagger
 
-Interactive docs are available at **`/docs`** when the app is running. Schemas are generated from route signatures and type hints.
+Interactive docs are available at **`/docs`** (schema at **`/openapi.json`**) when the app is running.
+
+### Configure the document
+
+```python
+import pyweber as pw
+
+def verify_token(credentials: str):
+    return credentials == "secret"  # or return a user object
+
+app = pw.Pyweber(
+    openapi=pw.OpenAPIConfig(
+        title="My API",
+        version="1.0.0",
+        description="Demo API",
+        servers=[{"url": "http://localhost:8080"}],
+        security_schemes={
+            "BearerAuth": pw.HTTPBearer(verify=verify_token),
+            "ApiKeyAuth": pw.APIKeyHeader(name="X-API-Key", verify=lambda credentials: credentials == "k"),
+        },
+        security=["BearerAuth"],  # global default (routes inherit unless overridden)
+        # docs_url=None, openapi_url=None  # disable in production
+    )
+)
+```
+
+### Per-route metadata
+
+```python
+@app.route(
+    "/users/{user_id}",
+    methods=["GET"],
+    title="Get user",
+    tags=["users"],
+    response_model=UserOut,
+    responses={404: {"description": "Not found"}},
+    security=["BearerAuth"],  # or security=[] to make the route public
+    content_type=pw.ContentTypes.json,
+)
+def get_user(user_id: int, request: pw.Request) -> UserOut:
+    """Fetch a user by id."""
+    user = request.auth.user  # set after successful verification
+    ...
+```
+
+Schemas are generated from route signatures, type hints, `response_model` / return annotations, and `OpenAPIConfig`. Declared security schemes are enforced at runtime (missing/invalid credentials → 401; `ForbiddenError` from `verify` → 403).
 
 ## Next steps
 

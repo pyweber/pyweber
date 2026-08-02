@@ -15,8 +15,17 @@ class GroupRouteNotFoundError(RouterError):
         super().__init__(f'The group {group} that you want to update does not existe. Please, create it before')
 
 class RouteAlreadyExistError(RouterError):
-    def __init__(self, route: str):
-        super().__init__(f'The route {route} already exists in this group routes. Use update_route to edit it.')
+    def __init__(self, route: str, methods: list[str] | None = None):
+        if methods:
+            joined = ', '.join(methods)
+            super().__init__(
+                f'The route {route} already exists for method(s) [{joined}]. '
+                f'Use different HTTP methods or update_route to edit it.'
+            )
+        else:
+            super().__init__(
+                f'The route {route} already exists in this group routes. Use update_route to edit it.'
+            )
 
 class RouteNameAlreadyExistError(RouterError):
     def __init__(self, name: str):

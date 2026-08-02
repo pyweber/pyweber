@@ -94,9 +94,32 @@ class TestMultiMethodRoutes:
 
         assert resp.status_code == 200
 
-    def test_cannot_register_duplicate_path_for_different_methods(self):
+    def test_can_register_same_path_with_different_methods(self):
+        app = Pyweber()
+        app.add_route(route='/resource', template='a', methods=['GET', 'POST'])
+        app.add_route(route='/resource', template='b', methods=['DELETE'])
+
+        assert set(app.get_allowed_methods('/resource')) == {'GET', 'POST', 'DELETE'}
+        assert app.get_route_by_path('/resource', method='DELETE').template is not None
+
+    def test_overlapping_methods_still_raise(self):
         app = Pyweber()
         app.add_route(route='/resource', template='a', methods=['GET', 'POST'])
 
         with pytest.raises(RouteAlreadyExistError):
-            app.add_route(route='/resource', template='b', methods=['DELETE'])
+            app.add_route(route='/resource', template='b', methods=['POST', 'DELETE'])
+
+    @pytest.mark.asyncio
+    async def test_separate_method_handlers_dispatch_correctly(self):
+        app = Pyweber()
+        app.add_route(route='/resource', template=lambda **kw: 'get', methods=['GET'])
+        app.add_route(route='/resource', template=lambda **kw: 'post', methods=['POST'])
+
+        get_resp = await app.get_response(_request('GET', '/resource'))
+        post_resp = await app.get_response(_request('POST', '/resource'))
+        delete_resp = await app.get_response(_request('DELETE', '/resource'))
+
+        assert get_resp.status_code == 200
+        assert post_resp.status_code == 200
+        assert delete_resp.status_code == 405
+        assert set(delete_resp.headers['Allow'].replace(' ', '').split(',')) == {'GET', 'POST'}

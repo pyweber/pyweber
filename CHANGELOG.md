@@ -1,5 +1,33 @@
 # PyWeber Changelog
 
+## [1.4.0.dev0] - Unreleased
+
+### Changed
+
+- **HTML parser is now pluggable.** Default backend is the stdlib `html.parser` (pure Python, Vercel/serverless friendly). `lxml` is no longer a required dependency.
+- Optional extra: `pip install 'pyweber[fast-html]'` to enable the `lxml` backend.
+- Select backend with `set_html_parser_backend('stdlib'|'lxml')` or env `PYWEBER_HTML_PARSER=stdlib|lxml`.
+- **Same path, different HTTP methods** — you can register separate handlers for the same path when methods do not overlap (e.g. `@app.route('/x', methods=['GET'])` and `@app.route('/x', methods=['POST'])`). Overlapping methods still raise `RouteAlreadyExistError`.
+- **OpenAPI 3.0 overhaul** — `OpenAPIConfig`, live `/openapi.json`, typed responses / `response_model`, tags, description, `operationId`, `components.schemas` (`$ref`), security schemes in Swagger, and optional disabling of `/docs`.
+
+### Added
+
+- Security helpers: `HTTPBearer`, `HTTPBasic`, `APIKeyHeader`, `APIKeyQuery`, `APIKeyCookie`.
+- Runtime **security enforcement** for schemes declared on routes / global config (`request.auth`, 401/403).
+- Route OpenAPI fields: `tags`, `description`, `responses`, `response_model`, `security`, `deprecated`, `include_in_schema`, `operation_id`.
+
+### Fixed
+
+- **OpenAPI / Swagger** — string and postponed annotations (`"str"`, `"int | None"`, `from __future__ import annotations`, common AI-generated type strings) no longer crash schema generation (`'str' object has no attribute '__name__'`).
+- OpenAPI paths now use `full_route` (group prefix included).
+
+### Notes for upgraders
+
+- If you relied on `lxml` being installed transitively via Pyweber, install `pyweber[fast-html]` (or `lxml` yourself) and set `PYWEBER_HTML_PARSER=lxml`.
+- Duplicate registration of the **same** path + method still raises `RouteAlreadyExistError`; different methods on the same path are allowed.
+- Swagger UI loads `/openapi.json` (pinned `swagger-ui-dist@5.17.14`). Set `OpenAPIConfig(docs_url=None, openapi_url=None)` to disable docs in production.
+- Global `security=` on `OpenAPIConfig` applies to all routes unless a route sets `security=[]` (public) or its own schemes.
+- `HTTPStatusCode.FORBIDDEN` is corrected to **403** (was wrongly 402); `PAYMENT_REQUIRED` (402) was added.
 ## [1.3.0] - 2026-06-09
 
 ### Added
@@ -24,7 +52,7 @@
 
 ### Notes for upgraders
 
-- You **cannot** register two routes on the same path with different methods. Use one route with `methods=['GET', 'POST', 'DELETE']` or `app.update_route('/path', methods=[...])`.
+- You **can** register two routes on the same path with different methods (as of 1.4.0). Overlapping methods still raise `RouteAlreadyExistError`. You may also use one route with `methods=['GET', 'POST', 'DELETE']` or `app.update_route('/path', methods=[...])`.
 - `clone_template()` remains as a fallback when handoff token is missing or expired (5 minute TTL, single use).
 
 ## [1.2.0] - 2026-03-06
