@@ -131,12 +131,20 @@ class Request:
 
     @property
     def accept_control_request_headers(self):
-        return self.headers.get('Access-Control-Request-Headers', '')
+        # Headers are normalized to lowercase (WSGI parse + ASGI)
+        return (
+            self.headers.get('access-control-request-headers')
+            or self.headers.get('Access-Control-Request-Headers')
+            or ''
+        )
 
     @property
     def headers(self):
         if self.request_mode.value == 'asgi':
-            return {header[0].decode(): header[1].decode() for header in self.__raw_headers}
+            return {
+                header[0].decode().lower(): header[1].decode()
+                for header in self.__raw_headers
+            }
 
         return self.__parse_headers_wsgi()
 

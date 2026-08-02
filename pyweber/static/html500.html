@@ -3,45 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Server Error | 500</title>
+    <title>500 Server Error</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --ink: #1a1f2e;
+            --muted: #5c6578;
+            --accent: #b33a3a;
+            --accent-hover: #932e2e;
+            --glow: rgba(179, 58, 58, 0.12);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f7f7f7;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "DM Sans", system-ui, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(ellipse 75% 55% at 50% 0%, var(--glow), transparent 55%),
+                radial-gradient(ellipse 50% 40% at 100% 100%, rgba(45, 90, 120, 0.08), transparent 45%),
+                linear-gradient(165deg, #f3ebe8 0%, #e8e4ea 50%, #e0e5eb 100%);
+            padding: 1.5rem;
+        }
+        main {
+            max-width: 32rem;
             text-align: center;
-            margin-top: 100px;
+            animation: rise 0.55s ease-out both;
+        }
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .code {
+            font-family: "Instrument Serif", Georgia, serif;
+            font-size: clamp(5rem, 18vw, 7.5rem);
+            line-height: 0.9;
+            letter-spacing: -0.03em;
+            color: var(--accent);
+            animation: softPulse 3.2s ease-in-out infinite;
+        }
+        @keyframes softPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.82; }
         }
         h1 {
-            color: #e74c3c;
-            font-size: 100px;
+            margin-top: 0.75rem;
+            font-size: 1.35rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
         }
         p {
-            color: #333;
-            font-size: 18px;
+            margin-top: 0.5rem;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.5;
         }
-        .error-container {
-            background-color: #ffffff;
-            padding: 50px;
-            border-radius: 10px;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-            width: 60%;
-            margin: 0 auto;
+        .detail {
+            margin-top: 1.25rem;
+            padding: 0.85rem 1rem;
+            font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+            font-size: 0.85rem;
+            color: var(--ink);
+            background: rgba(255, 252, 248, 0.75);
+            border: 1px solid rgba(26, 31, 46, 0.08);
+            border-radius: 2px;
+            text-align: left;
+            word-break: break-word;
+            white-space: pre-wrap;
+            max-height: 10rem;
+            overflow: auto;
         }
-        .error-container a {
-            color: #3498db;
+        a.cta {
+            display: inline-block;
+            margin-top: 1.75rem;
+            padding: 0.7rem 1.4rem;
+            background: var(--accent);
+            color: #fff;
             text-decoration: none;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 0.95rem;
+            border-radius: 2px;
+            transition: background 0.2s ease, transform 0.2s ease;
         }
-        .error-container a:hover {
-            text-decoration: underline;
+        a.cta:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+        .brand {
+            margin-top: 2.5rem;
+            font-size: 0.75rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            opacity: 0.7;
         }
     </style>
 </head>
 <body>
-    <div class="error-container">
-        <h1>500</h1>
-        <p class="error-content">{{error}}</p>
-        <p><a href="/">Back to home page</a></p>
-    </div>
+    <main>
+        <div class="code" aria-hidden="true">500</div>
+        <h1>Something went wrong</h1>
+        <p>An unexpected error occurred while processing your request.</p>
+        <pre class="detail">{{error}}</pre>
+        <a class="cta" href="/">Back home</a>
+        <p class="brand">PyWeber</p>
+    </main>
 </body>
 </html>

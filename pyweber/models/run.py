@@ -86,14 +86,18 @@ def run(
 
     CreateApp(target=target, **kwargs).run()
 
-def encode_header(headers: dict[str, Any], /,*ignore_headers: str):
+def encode_header(headers: dict[str, Any], /, *ignore_headers: str):
+    """Encode response headers for ASGI, skipping internal bookkeeping keys."""
+    from pyweber.models.response import INTERNAL_RESPONSE_HEADERS
+
+    ignored = {h.strip().lower() for h in ignore_headers} | set(INTERNAL_RESPONSE_HEADERS)
     byte_headers: list[tuple[bytes, bytes]] = []
 
     for header, value in headers.items():
-        header = header.strip().lower()
-
-        if header not in set(map(lambda el: el.strip().lower(), ignore_headers)):
-            byte_headers.append((header.encode(), str(value).encode()))
+        key = header.strip().lower()
+        if key in ignored:
+            continue
+        byte_headers.append((key.encode(), str(value).encode()))
 
     return byte_headers
 

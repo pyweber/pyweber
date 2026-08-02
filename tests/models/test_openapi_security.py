@@ -5,6 +5,7 @@ import pytest
 
 from pyweber.pyweber.pyweber import Pyweber
 from pyweber.models.request import Request, ClientInfo
+from pyweber.models.response import Response
 from pyweber.models.openapi import OpenAPIConfig, OpenAPIBuilder, OpenApiProcessor
 from pyweber.models.security import (
     HTTPBearer,
@@ -153,6 +154,19 @@ class TestSecurityEnforcement:
 
         resp = await app.get_response(_request('GET', '/secure'))
         assert resp.status_code == 401
+        assert resp.headers.get('WWW-Authenticate') == 'Bearer'
+
+    @pytest.mark.asyncio
+    async def test_plain_401_has_no_www_authenticate(self):
+        app = Pyweber()
+
+        @app.route('/denied', methods=['GET'], content_type=ContentTypes.json)
+        def denied():
+            return Response.json({'detail': 'no'}, status=401)
+
+        resp = await app.get_response(_request('GET', '/denied'))
+        assert resp.status_code == 401
+        assert 'WWW-Authenticate' not in resp.headers
 
     @pytest.mark.asyncio
     async def test_bearer_valid_returns_200_and_sets_auth(self):

@@ -5,13 +5,16 @@
 ### Added
 
 - **Deprecation framework** (`pyweber.utils.deprecation`) — one-shot `DeprecationWarning`s; removals targeted at **2.0**. See [deprecations guide](docs/guides/deprecations.md).
-- **Onion middleware**: `@app.middleware` with `(request, call_next)`. Legacy single-arg `before_request`/`after_request` still works (deprecated).
+- **Onion middleware**: `@app.middleware` with `(request, call_next)`.
+- **Flask-style hooks**: `@app.before_request` / `@app.after_request` (with or without `()`), plus `add_before_request` / `add_after_request`.
+- **`Response.json` / `.text` / `.html`** and ergonomic constructor (`content=`, `status=`, optional `request`, `headers=`).
 - **`pyweber.testing.TestClient`** — in-process HTTP client (`get`/`post`/…, cookies, CSRF helpers).
 - **Rate limiting** (opt-in): `[security] rate_limit_enabled` / `rate_limit_rpm` (or env). Returns **429** + `Retry-After`.
 - **ETag / 304** for static assets; **gzip** compression when `Accept-Encoding: gzip` (configurable).
 - **Upload MIME sniffing**: `File.validate()` / `pyweber.utils.mime.validate_upload`.
 - Preferred module `pyweber.models.stream_stats` (re-exports `strem_stats`).
 - `Icons` moved to `pyweber.utils.icons` (still importable from `types` with a deprecation warning).
+- Redesigned default **404 / 401 / 500** error pages.
 
 ### Changed
 
@@ -19,6 +22,8 @@
 - `update_route` only sets known `Route` attributes; unknown keys merge into `route.kwargs`.
 - `/docs` and `/openapi.json` are **auto-disabled in production** unless `OpenAPIConfig(expose_in_production=True)`.
 - Typo fixes with aliases: `DoubleFormat` (`DoubleFormnat` deprecated), `normalize_path` (`normaize_path`), `CreateApp` (`CreatApp`), `toggle_class` (`toogle_class`).
+- **`WWW-Authenticate` is no longer auto-added on every 401.** Set it via `Response(..., headers=...)` / `set_header`, or let OpenAPI schemes (`HTTPBasic` / `HTTPBearer`) attach it when that scheme rejects the request.
+- **CORS on uvicorn/ASGI**: internal bookkeeping headers stripped from the wire; `Access-Control-Request-Headers` lookup is case-insensitive; whitelisted `OPTIONS` preflight returns **204** with CORS headers early.
 
 ## [1.4.0.dev0] - Unreleased
 

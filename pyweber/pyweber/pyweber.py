@@ -73,6 +73,7 @@ class StateResult:
     process_response: bool
     kwargs: dict[str, Any]
     callback: Callable[..., Any]
+    response_headers: dict[str, str] | None = None
 
     def update(
         self,
@@ -82,7 +83,8 @@ class StateResult:
         redirect_path = None,
         process_response = None,
         callback = None,
-        kwargs = {}
+        kwargs = {},
+        response_headers = None,
     ):
         self.template = template if template else self.template
         self.status_code = status_code if status_code else self.status_code
@@ -91,6 +93,8 @@ class StateResult:
         self.process_response = process_response if process_response is not None else self.process_response
         self.callback = callback if callback is not None else self.callback
         self.kwargs = kwargs if kwargs else self.kwargs
+        if response_headers is not None:
+            self.response_headers = response_headers
 
         return self
 
@@ -102,6 +106,7 @@ class TemplateResult:
     process_response: bool
     template: Union[Template, Element, dict, list, str]
     allowed_methods: list[str] = None
+    response_headers: dict[str, str] | None = None
 
 @dataclass
 class ContentResult:
@@ -245,6 +250,10 @@ class Pyweber(
             if rate_limited is not None:
                 return rate_limited
 
+            cors_preflight = self._cors_preflight_response(request)
+            if cors_preflight is not None:
+                return cors_preflight
+
             self._ensure_session_cookie(request)
             self._ensure_csrf_cookie(request)
 
@@ -330,7 +339,12 @@ class Pyweber(
             cookies=dict(self.cookies),
             route=template_result.redirect_path,
             allowed_methods=template_result.allowed_methods,
+            headers=getattr(template_result, 'response_headers', None),
         ) if not isinstance(content_result, Response) else content_result
+
+        if isinstance(content_result, Response) and getattr(template_result, 'response_headers', None):
+            for key, value in template_result.response_headers.items():
+                response.set_header(key, value)
 
         response = self._apply_static_etag(request, response, template_result)
 
@@ -788,14 +802,31 @@ class Pyweber(
                     requirements=requirements,
                 )
                 if not challenge.ok:
-                    state_result.update(
-                        template={'detail': challenge.detail},
-                        status_code=challenge.status_code,
-                        content_type=ContentTypes.json,
-                        process_response=False,
-                        callback=None,
-                        redirect_path=path,
-                    )
+                    extra_headers = {}
+                    if challenge.www_authenticate:
+                        extra_headers['WWW-Authenticate'] = challenge.www_authenticate
+
+                    prefers_html = self._prefers_html(request)
+                    if prefers_html and challenge.status_code == 401:
+                        state_result.update(
+                            template=self.page_unauthorized,
+                            status_code=challenge.status_code,
+                            content_type=ContentTypes.html,
+                            process_response=False,
+                            callback=None,
+                            redirect_path=path,
+                            response_headers=extra_headers or None,
+                        )
+                    else:
+                        state_result.update(
+                            template={'detail': challenge.detail},
+                            status_code=challenge.status_code,
+                            content_type=ContentTypes.json,
+                            process_response=False,
+                            callback=None,
+                            redirect_path=path,
+                            response_headers=extra_headers or None,
+                        )
                     return await self._process_templates(state_result=state_result)
 
                 request.auth = challenge.auth
@@ -956,7 +987,35 @@ class Pyweber(
             content_type=state_result.content_type,
             redirect_path=state_result.redirect_path,
             process_response=state_result.process_response,
-            template=template
+            template=template,
+            response_headers=state_result.response_headers,
+        )
+
+    def _prefers_html(self, request: Request) -> bool:
+        accept = (request.headers.get('accept') or '').lower()
+        if 'text/html' not in accept:
+            return False
+        if 'application/json' not in accept:
+            return True
+        return accept.find('text/html') <= accept.find('application/json')
+
+    def _cors_preflight_response(self, request: Request) -> Response | None:
+        """Early OPTIONS 204 with CORS headers when Origin is whitelisted."""
+        method = (request.method or '').upper()
+        if method != 'OPTIONS':
+            return None
+        origin = request.origin
+        from pyweber.utils.security import get_allowed_origins
+        allowed = get_allowed_origins()
+        if not origin or origin.rstrip('/') not in allowed:
+            return None
+        return Response(
+            content=b'',
+            status=204,
+            request=request,
+            cookies={},
+            content_type=ContentTypes.txt,
+            route=request.path or '/',
         )
 
     async def process_route_middleware(self, resp: str, middlewares: list[Callable], status_code: int):

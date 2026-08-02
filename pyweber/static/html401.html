@@ -3,57 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Not Authorized</title>
+    <title>401 Unauthorized</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+        :root {
+            --ink: #1a1f2e;
+            --muted: #5c6578;
+            --accent: #2d5a78;
+            --accent-hover: #234860;
+            --glow: rgba(45, 90, 120, 0.14);
         }
-        .error-container {
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "DM Sans", system-ui, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(ellipse 80% 60% at 80% 15%, var(--glow), transparent 55%),
+                radial-gradient(ellipse 60% 40% at 10% 85%, rgba(196, 92, 38, 0.08), transparent 50%),
+                linear-gradient(160deg, #e8eef3 0%, #e4e8ef 45%, #f0ebe3 100%);
+            padding: 1.5rem;
+        }
+        main {
+            max-width: 28rem;
             text-align: center;
-            background-color: #fff;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            animation: rise 0.55s ease-out both;
+        }
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .code {
+            font-family: "Instrument Serif", Georgia, serif;
+            font-size: clamp(5rem, 18vw, 7.5rem);
+            line-height: 0.9;
+            letter-spacing: -0.03em;
+            color: var(--accent);
+            animation: softPulse 3.2s ease-in-out infinite;
+        }
+        @keyframes softPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.82; }
         }
         h1 {
-            font-size: 48px;
-            margin: 0;
-            color: #d9534f;
+            margin-top: 0.75rem;
+            font-size: 1.35rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
         }
         p {
-            font-size: 18px;
-            margin: 20px 0;
+            margin-top: 0.5rem;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.5;
         }
-        .login-button {
-            display: flex;
-            justify-content: center;
-            padding: 10px 20px;
-            font-size: 16px;
+        a.cta {
+            display: inline-block;
+            margin-top: 1.75rem;
+            padding: 0.7rem 1.4rem;
+            background: var(--accent);
             color: #fff;
-            background-color: #5bc0de;
-            border: none;
-            border-radius: 5px;
             text-decoration: none;
-            transition: background-color 0.3s ease;
+            font-weight: 600;
+            font-size: 0.95rem;
+            border-radius: 2px;
+            transition: background 0.2s ease, transform 0.2s ease;
         }
-        .login-button:hover {
-            background-color: #31b0d5;
-            text-decoration: none;
+        a.cta:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+        .brand {
+            margin-top: 2.5rem;
+            font-size: 0.75rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            opacity: 0.7;
         }
     </style>
 </head>
 <body>
-    <div class="error-container">
-        <h1>401</h1>
-        <p>You're not authorized to acess this page.<br>Clear cookies and try again</p>
-        <a href="/login" class="login-button">Try Again</a>
-    </div>
+    <main>
+        <div class="code" aria-hidden="true">401</div>
+        <h1>Unauthorized</h1>
+        <p>You do not have permission to view this page. Sign in and try again.</p>
+        <a class="cta" href="/">Back home</a>
+        <p class="brand">PyWeber</p>
+    </main>
 </body>
 </html>

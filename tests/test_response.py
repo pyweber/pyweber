@@ -5,22 +5,24 @@ from pyweber.models.response import Response
 from pyweber.models.request import Request
 from pyweber.utils.types import ContentTypes, HTTPStatusCode
 
+
+@pytest.fixture
+def mock_request():
+    """Mock do objeto Request para os testes"""
+    request = Mock(spec=Request)
+    request.method = "GET"
+    request.scheme = "HTTP/1.1"
+    request.path = "/test"
+    request.first_line = "GET /test HTTP/1.1"
+    request.full_path = "/test"
+    request.origin = "http://localhost"
+    request.host = "localhost"
+    request.accept_control_request_headers = ""
+    return request
+
+
 class TestResponse:
     """Testes para a classe Response"""
-
-    @pytest.fixture
-    def mock_request(self):
-        """Mock do objeto Request para os testes"""
-        request = Mock(spec=Request)
-        request.method = "GET"
-        request.scheme = "HTTP/1.1"
-        request.path = "/test"
-        request.first_line = "GET /test HTTP/1.1"
-        request.full_path = "/test"
-        request.origin = "http://localhost"
-        request.host = "localhost"
-        request.accept_control_request_headers = ""
-        return request
 
     @pytest.fixture
     def sample_cookies(self):
@@ -397,6 +399,40 @@ class TestResponseIntegration:
             assert isinstance(final_response, bytes)
             assert b"HTTP/1.1" in final_response
             assert b"application/json" in final_response
+
+
+class TestResponseErgonomics:
+    def test_json_classmethod(self):
+        resp = Response.json({'hello': 'world'}, status=201)
+        assert resp.status_code == 201
+        assert b'hello' in resp.response_content
+        assert 'application/json' in resp.response_type
+
+    def test_text_and_html_classmethods(self):
+        text = Response.text('plain')
+        assert 'text/plain' in text.response_type
+        html = Response.html('<p>hi</p>')
+        assert 'text/html' in html.response_type
+
+    def test_minimal_constructor(self):
+        resp = Response({'ok': True})
+        assert resp.status_code == 200
+        assert b'ok' in resp.response_content
+
+    def test_401_does_not_auto_www_authenticate(self, mock_request):
+        resp = Response(content=b'no', status=401, request=mock_request, response_type=ContentTypes.json, route='/')
+        assert 'WWW-Authenticate' not in resp.headers
+
+    def test_manual_www_authenticate_via_headers(self, mock_request):
+        resp = Response(
+            content=b'no',
+            status=401,
+            request=mock_request,
+            response_type=ContentTypes.json,
+            route='/',
+            headers={'WWW-Authenticate': 'Bearer'},
+        )
+        assert resp.headers['WWW-Authenticate'] == 'Bearer'
 
 
 if __name__ == "__main__":

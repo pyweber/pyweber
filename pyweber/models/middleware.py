@@ -33,29 +33,130 @@ class MiddlewareManager:
     def get_onion_middlewares(self):
         return self.__onion
 
-    def before_request(self, status_code: int = 200, process_response: bool = True, order: int = -1):
-        def wrapper(middleware: Callable[..., Template | Element | str | None]):
-            self.__before_request.insert(order, self.set_middleware(
-                    status_code=status_code,
-                    middleware=middleware,
-                    order=order,
-                    process_response=process_response
-                )
-            )
-            return middleware
-        return wrapper
+    def before_request(
+        self,
+        fn: Callable | None = None,
+        *,
+        status_code: int = 200,
+        process_response: bool = True,
+        order: int = -1,
+    ):
+        """Flask-style hook: ``(request) -> None | body``.
 
-    def after_request(self, status_code: int = None, process_response: bool = True, order: int = -1):
-        def wrapper(middleware: Callable[..., Response | None]):
-            self.__after_request.insert(order, self.set_middleware(
-                    status_code=status_code,
-                    middleware=middleware,
-                    order=order,
-                    process_response=process_response
-                )
+        Use as ``@app.before_request`` or ``@app.before_request()``.
+        Returning ``None`` continues; any other value short-circuits the route.
+        """
+        if status_code != 200 or process_response is not True:
+            warn_deprecated(
+                'before_request(status_code=..., process_response=...)',
+                alternative='return a Response/Template with the desired status from the hook',
+                removal='2.0',
+            )
+
+        def register(middleware: Callable[..., Any]):
+            self.add_before_request(
+                middleware,
+                status_code=status_code,
+                process_response=process_response,
+                order=order,
             )
             return middleware
-        return wrapper
+
+        if fn is not None and callable(fn):
+            return register(fn)
+        return register
+
+    def after_request(
+        self,
+        fn: Callable | None = None,
+        *,
+        status_code: int = None,
+        process_response: bool = True,
+        order: int = -1,
+    ):
+        """Flask-style hook: ``(response) -> Response``.
+
+        Use as ``@app.after_request`` or ``@app.after_request()``.
+        Returning ``None`` keeps the previous response.
+        """
+        if status_code is not None or process_response is not True:
+            warn_deprecated(
+                'after_request(status_code=..., process_response=...)',
+                alternative='mutate and return the Response from the hook',
+                removal='2.0',
+            )
+
+        def register(middleware: Callable[..., Any]):
+            self.add_after_request(
+                middleware,
+                status_code=status_code,
+                process_response=process_response,
+                order=order,
+            )
+            return middleware
+
+        if fn is not None and callable(fn):
+            return register(fn)
+        return register
+
+    def add_before_request(
+        self,
+        middleware: Callable[..., Any],
+        *,
+        status_code: int = 200,
+        process_response: bool = True,
+        order: int = -1,
+    ):
+        """Register a before_request hook (Flask-style ``add_before_request``)."""
+        entry = self.set_middleware(
+            status_code=status_code,
+            middleware=middleware,
+            order=order,
+            process_response=process_response,
+        )
+        if order < 0 or order >= len(self.__before_request):
+            self.__before_request.append(entry)
+        else:
+            self.__before_request.insert(order, entry)
+        return middleware
+
+    def add_after_request(
+        self,
+        middleware: Callable[..., Any],
+        *,
+        status_code: int = None,
+        process_response: bool = True,
+        order: int = -1,
+    ):
+        """Register an after_request hook (Flask-style ``add_after_request``)."""
+        entry = self.set_middleware(
+            status_code=status_code,
+            middleware=middleware,
+            order=order,
+            process_response=process_response,
+        )
+        if order < 0 or order >= len(self.__after_request):
+            self.__after_request.append(entry)
+        else:
+            self.__after_request.insert(order, entry)
+        return middleware
+
+    # Docs / older aliases
+    def add_before_request_middleware(self, middleware: Callable[..., Any], **kwargs):
+        warn_deprecated(
+            'add_before_request_middleware',
+            alternative='add_before_request',
+            removal='2.0',
+        )
+        return self.add_before_request(middleware, **kwargs)
+
+    def add_after_request_middleware(self, middleware: Callable[..., Any], **kwargs):
+        warn_deprecated(
+            'add_after_request_middleware',
+            alternative='add_after_request',
+            removal='2.0',
+        )
+        return self.add_after_request(middleware, **kwargs)
 
     def middleware(self, order: int = -1):
         """Register onion middleware: ``async def mw(request, call_next)``."""
@@ -88,7 +189,7 @@ class MiddlewareManager:
         resp: Union[Request, Response, str],
         middlewares: list[dict[str, Union[int, Callable, bool]]]
     ):
-        response, status_code, process_response = None, None, None
+        response, status_code, process_response = None, 200, True
 
         for middle_dict in middlewares:
             status_code, middle, _, process_response = middle_dict.values()
@@ -112,21 +213,36 @@ class MiddlewareManager:
                 break
 
         if not isinstance(resp, Response) and response:
+            # Prefer Response.status_code; otherwise decorator status_code (Flask-compat)
+            resolved_status = status_code if status_code is not None else 200
+            if isinstance(response, Response):
+                resolved_status = response.status_code
+            elif isinstance(response, Template) and (status_code is None or status_code == 200):
+                tmpl_code = getattr(response, 'status_code', None) or getattr(response, 'code', None)
+                if tmpl_code:
+                    resolved_status = tmpl_code
+
             return MiddlewareResult(
-                status_code=status_code,
-                process_response=process_response,
+                status_code=resolved_status,
+                process_response=process_response if process_response is not None else True,
                 content=response
             )
 
         if isinstance(resp, Response):
-            if middlewares and not isinstance(response, Response):
-                raise TypeError(f'All after request middleware need return Response instances, but got {type(response).__name__}')
+            # after_request: None keeps previous response (tolerant)
+            if response is not None and not isinstance(response, Response):
+                raise TypeError(
+                    f'All after request middleware need return Response instances, '
+                    f'but got {type(response).__name__}'
+                )
 
             return MiddlewareResult(
-                content=response or resp,
+                content=response if isinstance(response, Response) else resp,
                 status_code=resp.status_code,
                 process_response=None
             )
+
+        return None
 
     async def run_onion(
         self,
@@ -184,13 +300,6 @@ class MiddlewareManager:
             raise TypeError(
                 f"Use @app.middleware for onion-style (request, call_next) handlers; "
                 f"{middleware.__name__} has {len(params)} parameters"
-            )
-
-        if len(params) == 1:
-            warn_deprecated(
-                'single-parameter middleware',
-                alternative='@app.middleware with (request, call_next)',
-                removal='2.0',
             )
 
         if params and not all(

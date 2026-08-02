@@ -54,6 +54,40 @@ class TestMiddlewareManager:
         manager.clear_before_request_middleware()
         assert manager.get_before_request_middlewares == []
 
+    def test_before_request_bare_decorator(self, manager):
+        @manager.before_request
+        def bare(req: Request):
+            return None
+
+        assert len(manager.get_before_request_middlewares) == 1
+
+    def test_add_before_and_after_request(self, manager, http_request):
+        def log_req(req: Request):
+            return None
+
+        def touch(resp: Response):
+            resp.set_header('X-Touched', '1')
+            return resp
+
+        manager.add_before_request(log_req)
+        manager.add_after_request(touch)
+        assert len(manager.get_before_request_middlewares) == 1
+        assert len(manager.get_after_request_middlewares) == 1
+
+    @pytest.mark.asyncio
+    async def test_after_request_none_keeps_response(self, manager, http_request):
+        base = Response(content=b'ok', status=200, request=http_request, route='/')
+
+        @manager.after_request()
+        def noop(resp: Response):
+            return None
+
+        result = await manager.process_middleware(
+            resp=base,
+            middlewares=manager.get_after_request_middlewares,
+        )
+        assert result.content is base
+
     def test_invalid_middleware_signature_raises(self, manager):
         with pytest.raises(TypeError):
             manager.set_middleware(

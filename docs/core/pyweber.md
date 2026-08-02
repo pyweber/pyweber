@@ -339,22 +339,25 @@ def api_data():
 
 ### Middleware Integration
 ```python
+@app.before_request
 def auth_middleware(request):
-    if not request.headers.get("Authorization"):
-        return Response(
-            content="<h1>Unauthorized</h1>",
-            status_code=401,
-            process_response=True
-        )
-    return None
+    if not request.headers.get("authorization"):
+        return Response.json({"detail": "Unauthorized"}, status=401)
+    # return None to continue
 
-def logging_middleware(request):
-    print(f"Request: {request.method} {request.path}")
-    return None
+@app.after_request
+def logging_middleware(response):
+    response.set_header("X-Handled-By", "pyweber")
+    return response
 
-# Add global middleware
-app.add_before_request_middleware(auth_middleware)
-app.add_before_request_middleware(logging_middleware)
+# Or register by call:
+app.add_before_request(auth_middleware)
+app.add_after_request(logging_middleware)
+
+# Onion middleware (request, call_next) — wraps the full pipeline
+@app.middleware()
+async def timing(request, call_next):
+    return await call_next()
 
 # Add route-specific middleware
 @app.route("/protected", middlewares=[auth_middleware])
@@ -565,7 +568,7 @@ def error_handling_middleware(request):
             process_response=True
         )
 
-app.add_before_request_middleware(error_handling_middleware)
+app.add_before_request(error_handling_middleware)
 ```
 
 ## Performance Considerations
@@ -627,7 +630,7 @@ def global_error_handler(request):
             process_response=True
         )
 
-app.add_before_request_middleware(global_error_handler)
+app.add_before_request(global_error_handler)
 ```
 
 ### Security
@@ -641,7 +644,7 @@ def security_middleware(response):
     })
     return response
 
-app.add_after_request_middleware(security_middleware)
+app.add_after_request(security_middleware)
 ```
 
 ### Development vs Production

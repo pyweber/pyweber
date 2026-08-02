@@ -6,24 +6,38 @@ The `Response` class handles HTTP response generation and formatting for both WS
 
 ### Constructor
 ```python
-def __init__(
-    self,
-    request: Request,
-    response_content: bytes,
-    code: int,
-    cookies: list[str],
-    response_type: ContentTypes,
-    route: str
-):
+Response(
+    content=None,          # bytes | str | dict | list
+    status=200,
+    *,
+    request=None,          # defaults to a stub request
+    cookies=None,
+    content_type=None,     # inferred from content when omitted
+    route=None,
+    headers=None,          # extra headers (e.g. WWW-Authenticate)
+    allowed_methods=None,
+    # Legacy aliases still work:
+    response_content=...,
+    code=...,
+    response_type=...,
+)
+```
+
+**Helpers:**
+```python
+Response.json({"ok": True}, status=201)
+Response.text("hello")
+Response.html("<p>hi</p>")
 ```
 
 **Parameters:**
-- `request`: The original Request object
-- `response_content`: Response body content in bytes
-- `code`: HTTP status code (e.g., 200, 404, 500)
-- `cookies`: List of cookies to set in the response
-- `response_type`: Content type from ContentTypes enum
-- `route`: The route that generated this response
+- `content` / `response_content`: Response body (`dict`/`list` → JSON)
+- `status` / `code`: HTTP status code (e.g. 200, 404, 500)
+- `request`: The original Request (optional for manual responses)
+- `cookies`: Cookies to set
+- `content_type` / `response_type`: ContentTypes enum or MIME string
+- `route`: Route path associated with the response
+- `headers`: Extra headers applied after defaults
 
 ### Properties
 
@@ -76,10 +90,10 @@ Builds the complete HTTP response as bytes, including:
 ### Special Behavior
 
 #### Status Code Handling
-The `status_code` property provides enhanced status codes with additional headers:
+The response enhances certain status codes with additional headers:
 
 - **3xx (Redirects)**: Adds `Location` header
-- **401 (Unauthorized)**: Adds `WWW-Authenticate` header with app name
+- **401 (Unauthorized)**: Does **not** add `WWW-Authenticate` by default. Set it manually (`headers=` / `set_header`) or via OpenAPI security schemes (`HTTPBasic` / `HTTPBearer`) which attach the challenge header only when that scheme rejects the request
 - **405 (Method Not Allowed)**: Adds `Allow` header listing the route's allowed methods (from `Response(..., allowed_methods=[...])` or defaults)
 - **503 (Service Unavailable)**: Adds `Retry-After` header
 

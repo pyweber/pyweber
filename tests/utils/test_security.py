@@ -128,6 +128,28 @@ class TestCORSAndHeaders:
         assert response.headers['Access-Control-Allow-Origin'] == 'https://app.example'
         assert response.headers['Access-Control-Allow-Credentials'] == 'true'
 
+    @pytest.mark.asyncio
+    async def test_cors_preflight_options(self, monkeypatch):
+        from pyweber.pyweber.pyweber import Pyweber
+
+        monkeypatch.setenv('PYWEBER_ALLOWED_ORIGINS', 'https://app.example')
+        app = Pyweber()
+        request = Request(
+            headers=(
+                'OPTIONS /api HTTP/1.1\r\n'
+                'Host: localhost\r\n'
+                'Origin: https://app.example\r\n'
+                'Access-Control-Request-Method: POST\r\n'
+                'Access-Control-Request-Headers: content-type, authorization\r\n'
+                '\r\n'
+            ),
+            body=b'',
+        )
+        response = await app.get_response(request)
+        assert response.status_code == 204
+        assert response.headers['Access-Control-Allow-Origin'] == 'https://app.example'
+        assert 'content-type' in response.headers['Access-Control-Allow-Headers'].lower()
+
 
 class TestSessionBinding:
     def test_ws_ignores_client_session_without_cookie(self):

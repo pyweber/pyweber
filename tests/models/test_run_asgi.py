@@ -39,6 +39,24 @@ class TestEncodeHeader:
         assert b'set-cookie' not in names
         assert b'code' not in names
 
+    def test_strips_internal_bookkeeping_headers(self):
+        headers = {
+            'Content-Type': 'text/html',
+            'Method': 'GET',
+            'Status': 200,
+            'Request-Path': '/',
+            'Response-Path': '/',
+            'Http-Version': 'HTTP/1.1',
+            'Access-Control-Allow-Origin': 'https://app.example',
+        }
+        encoded = encode_header(headers)
+        names = {h[0] for h in encoded}
+        assert b'content-type' in names
+        assert b'access-control-allow-origin' in names
+        assert b'method' not in names
+        assert b'status' not in names
+        assert b'request-path' not in names
+
 
 class TestRunAsAsgiHttp:
     @pytest.mark.asyncio
@@ -105,6 +123,38 @@ class TestRunAsAsgiHttp:
     async def test_lifespan_is_noop(self, asgi_app):
         scope = {'type': 'lifespan'}
         await run_as_asgi(scope, lambda: None, lambda m: None, app=asgi_app)
+
+    @pytest.mark.asyncio
+    async def test_cors_headers_on_asgi_wire(self, asgi_app, monkeypatch):
+        monkeypatch.setenv('PYWEBER_ALLOWED_ORIGINS', 'https://app.example')
+        scope = {
+            'type': 'http',
+            'method': 'GET',
+            'scheme': 'http',
+            'http_version': '1.1',
+            'raw_path': b'/',
+            'query_string': b'',
+            'headers': [
+                (b'host', b'localhost:8800'),
+                (b'origin', b'https://app.example'),
+            ],
+        }
+        body_chunks = [{'type': 'http.request', 'body': b'', 'more_body': False}]
+        sent = []
+
+        async def receive():
+            return body_chunks.pop(0)
+
+        async def send(message):
+            sent.append(message)
+
+        await run_as_asgi(scope, receive, send, app=asgi_app)
+        start = next(m for m in sent if m['type'] == 'http.response.start')
+        header_map = {k: v for k, v in start['headers']}
+        assert header_map.get(b'access-control-allow-origin') == b'https://app.example'
+        assert b'method' not in header_map
+        assert b'status' not in header_map
+        assert b'request-path' not in header_map
 
 
 class TestRunFunction:
