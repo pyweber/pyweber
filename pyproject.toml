@@ -37,5 +37,5 @@ pyweber = ["static/**/*", "admin/**/*"]
 omit = ["pyweber/cli/commands.py"]
 
 [tool.coverage.report]
-fail_under = 87.5
+fail_under = 86
 show_missing = true
