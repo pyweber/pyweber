@@ -1,5 +1,25 @@
 # PyWeber Changelog
 
+## [1.5.3] - Unreleased
+
+### Added
+
+- **`pyweber.db`** (extra `pyweber[db]`) — async SQLAlchemy 2 wrapper (`db`, `Model`, `db.session()`), config/`PYWEBER_DATABASE_URL`, driver extras (`db-sqlite`, `db-pg`, `db-mysql`, `db-mssql`). CLI: `pyweber db init|revision|upgrade|downgrade` (Alembic async scaffold). See [docs/guides/database.md](docs/guides/database.md).
+- **`pyweber.session_store`** — `SessionStore` protocol, `MemorySessionStore` (default), `RedisSessionStore` (`pyweber[redis]`), `session.backend` / `PYWEBER_REDIS_URL`. See [docs/guides/session-backends.md](docs/guides/session-backends.md).
+- **`pyweber.services`** collaborators — `StaticFilesService`, `ResponsePipeline`, `TemplateService`, `OpenAPISetup`. `Pyweber` keeps the flat public API (`app.route`, `app.set_cookie`, …) via mixins, but CSRF/gzip/ETag/static/OpenAPI logic lives in composed services.
+- **`Window.set_timeout` / `set_interval` / `clear_*` / `request_animation_frame` / `cancel_animation_frame`** — aligned with the existing WebSocket protocol in `static/js.js`. Timer responses no longer steal the confirm/prompt Future.
+- Declarative HTML inputs — shared `_EXTRA_ATTRS` / `_sync_attrs` on `Input`; text-like and date/time families share internal bases (public class names unchanged).
+
+### Changed
+
+- **Routing** — static paths resolve in **O(1)** via exact dict lookup; only `{param}` patterns are scanned. Static paths win over dynamic patterns for the same URL (e.g. `/users/me` before `/users/{id}`).
+- **`Window.scroll_by`** sends a true `scroll_by` payload (delta), matching the client handler.
+- Default `[database]` / `session.backend` keys in shipped `config.toml` for optional persistence.
+
+### Fixed
+
+- Duplicate `InputCheckbox` export in `components.__all__` / package `__all__`.
+
 ## [1.5.2] - Unreleased
 
 ### Fixed

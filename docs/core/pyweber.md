@@ -1,6 +1,6 @@
 # Pyweber Class Documentation
 
-The `Pyweber` class is the main application class for the PyWeber web framework. It inherits from multiple manager classes to provide comprehensive web application functionality including routing, middleware, cookies, and error handling.
+The `Pyweber` class is the main application class for the PyWeber web framework. It inherits from multiple manager classes to provide a flat public API (`app.route`, `app.set_cookie`, middleware hooks, error pages) and composes internal services for static files, response pipeline (CSRF/gzip/ETag), templates, and OpenAPI setup.
 
 !!! tip "Prefer the guides for day-to-day use"
     This page is a detailed API reference. For practical topics, start with:
@@ -9,6 +9,22 @@ The `Pyweber` class is the main application class for the PyWeber web framework.
     - [Routing advanced](../guides/routing-advanced.md) — query parameters
     - [File streaming](../guides/file-streaming.md) — large uploads
     - [Components](../guides/components.md) — form inputs
+
+## Architecture (1.5.3+)
+
+```text
+Pyweber (facade)
+├── mixins (public API): RouteManager, CookieManager, MiddlewareManager, ErrorPages
+└── composed services:
+    ├── _static     → StaticFilesService
+    ├── _pipeline   → ResponsePipeline (CSRF, CORS, rate limit, gzip, ETag)
+    ├── _templates  → TemplateService
+    └── _openapi    → OpenAPISetup
+```
+
+App code should keep using the flat API. Direct use of `pyweber.services.*` is optional and intended for advanced customization / testing.
+
+**Routing:** static paths resolve in O(1); only dynamic `{param}` patterns are scanned linearly.
 
 ## Static asset directories (1.2.0+)
 
@@ -31,26 +47,21 @@ See [File streaming guide](../guides/file-streaming.md).
 ## Dependencies
 
 ```python
-import inspect
-import json
-import os
-import re
-import webbrowser
-from typing import Union, Callable, Any
-from dataclasses import dataclass
 from pyweber.core.element import Element
 from pyweber.core.template import Template
 from pyweber.models.request import Request
 from pyweber.models.response import Response
-from pyweber.utils.types import ContentTypes, StaticFilePath, HTTPStatusCode
-from pyweber.utils.loads import LoadStaticFiles
-from pyweber.core.window import window
 from pyweber.models.middleware import MiddlewareManager
 from pyweber.models.error_pages import ErrorPages
 from pyweber.models.cookies import CookieManager
-from pyweber.models.routes import Route, RedirectRoute, RouteManager
-from pyweber.models.openapi import OpenApiProcessor
-from pyweber.utils.utils import PrintLine
+from pyweber.models.routes import Route, RouteManager
+from pyweber.models.openapi import OpenAPIConfig
+from pyweber.services import (
+    StaticFilesService,
+    ResponsePipeline,
+    TemplateService,
+    OpenAPISetup,
+)
 ```
 
 ## Pyweber Class
@@ -71,6 +82,8 @@ The Pyweber class inherits from multiple manager classes, providing:
 - **MiddlewareManager**: Request/response middleware processing
 - **RouteManager**: Route registration and resolution
 
+Internal collaborators (`_static`, `_pipeline`, `_templates`, `_openapi`) hold the bulk of CSRF, static jail, serialization, and docs registration logic. Mixin removal in favour of full composition is planned for **2.0**.
+
 ### Constructor
 ```python
 def __init__(self, **kwargs):
@@ -82,6 +95,7 @@ def __init__(self, **kwargs):
 
 **Initialization:**
 - Initializes all parent manager classes
+- Builds composed services
 - Adds framework-specific routes (admin, docs, static files)
 - Sets up internal state tracking
 - Configures request handling

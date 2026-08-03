@@ -157,27 +157,37 @@ Encodes a string to Base64.
 
 **Returns:** Base64 encoded string
 
-### Timer Methods (Not Implemented)
+### Timer Methods (1.5.3+)
 
-#### `set_timeout(callback: Callable, delay: int)`
-**Status:** Not implemented - raises NotImplementedError
+Timers run in the **browser** via WebSocket. Callbacks are invoked on the server when the client reports completion. Returns an opaque `str` id (not `threading.Timer`).
 
-#### `set_interval(callback: Callable, interval: int)`
-**Status:** Not implemented - raises NotImplementedError
+#### `set_timeout(callback: Callable, delay: int) -> str`
+Schedule `callback` after `delay` milliseconds.
 
-#### `clear_timeout(timer: Timer)`
-**Status:** Not implemented - raises NotImplementedError
+#### `set_interval(callback: Callable, interval: int) -> str`
+Schedule `callback` repeatedly every `interval` milliseconds.
 
-#### `clear_interval(timer: Timer)`
-**Status:** Not implemented - raises NotImplementedError
+#### `clear_timeout(timer_id: str)`
+Cancel a timeout previously returned by `set_timeout`.
 
-### Animation Methods (Not Implemented)
+#### `clear_interval(timer_id: str)`
+Cancel an interval previously returned by `set_interval`.
 
-#### `request_animation_frame(callback: callable)`
-**Status:** Not implemented - raises NotImplementedError
+### Animation Methods (1.5.3+)
 
-#### `cancel_animation_frame(frame_id)`
-**Status:** Not implemented - raises NotImplementedError
+#### `request_animation_frame(callback: Callable) -> str`
+Schedule `callback` before the next browser repaint.
+
+#### `cancel_animation_frame(frame_id: str)`
+Cancel a frame previously returned by `request_animation_frame`.
+
+```python
+def tick():
+    window.alert('done')
+
+timer_id = window.set_timeout(tick, 1000)
+# window.clear_timeout(timer_id)
+```
 
 ### Magic Methods
 

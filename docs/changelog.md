@@ -4,6 +4,19 @@ This page summarizes recent releases in plain language. For the full history, se
 
 ---
 
+## 1.5.3 — Unreleased
+
+### New
+
+- **Optional ORM** — `pyweber[db]`: SQLAlchemy 2 async (`db` / `Model`), Alembic via `pyweber db …` ([guide](guides/database.md))
+- **Session backends** — memory (default) or Redis (`pyweber[redis]`) for multi-replica WS ([guide](guides/session-backends.md))
+- **Services refactor** — static/response/template/OpenAPI collaborators under `pyweber.services`
+- **Window timers / rAF** — `set_timeout`, `set_interval`, `request_animation_frame` (and clear/cancel)
+
+### Changed
+
+- Static routes resolve in **O(1)**; static paths win over dynamic for the same URL
+
 ## 1.5.2 — Unreleased
 
 ### Fixed

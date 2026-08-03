@@ -25,6 +25,9 @@ Practical topics not covered in the API reference:
 | [Components](guides/components.md) | Inputs, forms, icons |
 | [File streaming](guides/file-streaming.md) | Large uploads via WebSocket |
 | [Routing advanced](guides/routing-advanced.md) | Query params, **multi-method routes**, 405, OpenAPI |
+| [Authentication](guides/authentication.md) | Login cookie, RBAC, SQLAlchemy User example |
+| [Database](guides/database.md) | Optional SQLAlchemy 2 + Alembic (`pyweber[db]`) |
+| [Session backends](guides/session-backends.md) | Memory / Redis for multi-replica WS |
 | [Deployment](guides/deployment.md) | ASGI, HTTPS, production |
 
 ## Quick example

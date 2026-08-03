@@ -84,6 +84,14 @@ class Colors:
     BOLD_WHITE = "\033[1;97m"
 
 class JWTAlgorithms(Enum):
+    """Names of standard JWT signing algorithms.
+
+    This enum only lists algorithm identifiers for use in your own OpenAPI/
+    security-scheme metadata; PyWeber does **not** ship a JWT encode/decode/
+    verify implementation. Use ``pyjwt`` (or similar) for actual token
+    issuance and validation, or ``pyweber.auth`` for session-based auth.
+    """
+
     HS256 = 'HS256'
     HS384 = 'HS384'
     HS512 = 'HS512'

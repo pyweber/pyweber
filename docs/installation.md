@@ -19,6 +19,22 @@ pip install pyweber
 
 This installs the latest stable version of PyWeber and all its dependencies.
 
+### Optional extras
+
+| Extra | Purpose |
+|-------|---------|
+| `pyweber[db]` | SQLAlchemy 2 (async) + Alembic |
+| `pyweber[db-sqlite]` / `[db-pg]` / `[db-mysql]` / `[db-mssql]` | Async DB drivers |
+| `pyweber[redis]` | Redis-backed WebSocket session store |
+| `pyweber[fast-html]` | Faster HTML parsing via lxml |
+
+```bash
+pip install 'pyweber[db,db-sqlite]'
+pip install 'pyweber[redis]'
+```
+
+See [Database](guides/database.md) and [Session backends](guides/session-backends.md).
+
 ## Development Installation
 
 For the latest development version with the newest features (which may be less stable), install directly from GitHub:

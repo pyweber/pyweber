@@ -19,6 +19,11 @@ PyWeber supports configuration through environment variables, allowing you to ov
 | `PYWEBER_CSRF_ENABLED` | Enable CSRF checks on mutating HTTP methods | `true` | `PYWEBER_CSRF_ENABLED=false` |
 | `PYWEBER_CSP` | Override `Content-Security-Policy` (`off` to disable) | CDN-friendly default | `PYWEBER_CSP=off` |
 | `PYWEBER_VALIDATE_UPLOADS` | Sniff MIME magic bytes on multipart uploads | `false` | `PYWEBER_VALIDATE_UPLOADS=1` |
+| `PYWEBER_DATABASE_URL` | SQLAlchemy async URL (`pyweber[db]`) | from `[database]` | `postgresql+asyncpg://…` |
+| `DATABASE_URL` | Fallback alias for DB URL | — | same as above |
+| `PYWEBER_SESSION_BACKEND` | WS session store: `memory` / `redis` | `memory` | `PYWEBER_SESSION_BACKEND=redis` |
+| `PYWEBER_REDIS_URL` | Redis URL for session store | from `session.redis_url` | `redis://localhost:6379/0` |
+| `REDIS_URL` | Fallback alias for Redis URL | — | same as above |
 
 ## Security config (`config.toml`)
 
@@ -26,6 +31,13 @@ PyWeber supports configuration through environment variables, allowing you to ov
 [session]
 secret_key = 'replace-me'
 env = 'development'   # use 'production' to hide 500 details
+timeout = 3600
+backend = 'memory'    # or 'redis' with pyweber[redis]
+# redis_url = 'redis://localhost:6379/0'
+
+[database]
+# url = 'sqlite+aiosqlite:///./app.db'
+# echo = false
 
 [security]
 allowed_origins = []  # e.g. ['https://app.example']
@@ -114,5 +126,9 @@ export PYWEBER_HTTPS_ENABLED=True
 export PYWEBER_CERT_FILE=/etc/letsencrypt/live/yourdomain.com/fullchain.pem
 export PYWEBER_KEY_FILE=/etc/letsencrypt/live/yourdomain.com/privkey.pem
 export PYWEBER_SERVER_HOST=0.0.0.0
-python main.py
+export PYWEBER_ENV=production
+export PYWEBER_DATABASE_URL='postgresql+asyncpg://app:secret@db:5432/app'
+export PYWEBER_SESSION_BACKEND=redis
+export PYWEBER_REDIS_URL='redis://redis:6379/0'
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```

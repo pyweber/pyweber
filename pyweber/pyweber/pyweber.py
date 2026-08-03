@@ -14,7 +14,6 @@ from pyweber.core.template import Template
 from pyweber.models.request import Request
 from pyweber.models.response import Response
 from pyweber.utils.types import ContentTypes, StaticFilePath, HTTPStatusCode
-from pyweber.utils.loads import LoadStaticFiles
 from pyweber.core.window import window
 from pyweber.connection.websocket import WebsocketManager
 from pyweber.models.context import (
@@ -38,32 +37,24 @@ from pyweber.models.routes import (
     RouteManager,
 )
 
-from pyweber.models.openapi import OpenApiProcessor, OpenAPIConfig, OpenAPIBuilder
+from pyweber.models.openapi import OpenApiProcessor, OpenAPIConfig
 from pyweber.models.security import SecurityEnforcer, normalize_security_requirements
 from pyweber.core.events import WindowBookEvents
 
 from pyweber.utils.utils import PrintLine
 from pyweber.utils.exceptions import ParameterConversionError
-from pyweber.utils.security import (
-    SESSION_COOKIE_NAME,
-    CSRF_COOKIE_NAME,
-    CSRF_FORM_FIELD,
-    CSRF_HEADER,
-    csrf_enabled,
-    generate_csrf_token,
-    generate_session_id,
-    is_production,
-    safe_join,
-    sign_value,
-    unsign_value,
-    verify_csrf_token,
-    https_enabled,
-)
+from pyweber.utils.security import is_production
 from pyweber.models.file import File
 from pyweber.models.strem_stats import AdaptiveController
 from pyweber.models.file_stream import (
     FileResult,
     file_chunk_manager
+)
+from pyweber.services import (
+    StaticFilesService,
+    ResponsePipeline,
+    TemplateService,
+    OpenAPISetup,
 )
 
 @dataclass
@@ -140,11 +131,16 @@ class Pyweber(
         ErrorPages.__init__(self)
         self.__update_handler: Callable = data.pop('update_handler', None)
         self.openapi: OpenAPIConfig = data.pop('openapi', None) or OpenAPIConfig()
+        self._static = StaticFilesService(set(assets_directories))
+        self._templates = TemplateService()
+        self._pipeline = ResponsePipeline(self)
+        self._openapi = OpenAPISetup(self)
+        # Alias kept for any code that introspected the mangled name
+        self.__static_directories = self._static.directories
         self.__add_framework_routes()
         self._setup_openapi_routes()
         self.data = data
         self.__cache_templates: dict[str, tuple[ContentResult, TemplateResult]] = {}
-        self.__static_directories: set[str] = set(assets_directories)
 
     # Request
     @property
@@ -183,7 +179,7 @@ class Pyweber(
         return decorator
 
     def static(self, *directories: str):
-        self.__static_directories.update(directories)
+        self._static.add(*directories)
 
     async def _receive_chunk(self, file_id: str, timeout: float) -> tuple[bytes, float]:
         loop = asyncio.get_event_loop()
@@ -278,7 +274,7 @@ class Pyweber(
             reset_cookie_manager(cookie_token)
 
     def _finalize_response(self, request: Request, response: Response) -> Response:
-        return self._apply_gzip(request, response)
+        return self._pipeline.finalize(request, response)
 
     async def _produce_response(self, request: Request) -> Response:
         _route, _ = self.resolve_path(route=request.path)
@@ -361,261 +357,42 @@ class Pyweber(
         return self._finalize_response(request, final)
 
     def _enforce_rate_limit(self, request: Request) -> Response | None:
-        from pyweber.models.rate_limit import rate_limit_enabled, get_rate_limiter
-
-        if not rate_limit_enabled():
-            return None
-        host = getattr(request.client_info, 'host', None) or 'unknown'
-        path = request.path or '/'
-        allowed, retry_after = get_rate_limiter().allow(f'{host}:{path}')
-        if allowed:
-            return None
-        response = Response(
-            request=request,
-            response_content=b'{"detail":"Too Many Requests"}',
-            code=429,
-            cookies={},
-            response_type=ContentTypes.json,
-            route=path,
-        )
-        response.set_header('Retry-After', str(int(retry_after) + 1))
-        return response
+        return self._pipeline.enforce_rate_limit(request)
 
     def _apply_static_etag(self, request: Request, response: Response, template_result) -> Response:
-        import hashlib
-
-        # Only for successful static-ish binary/text assets
-        if response.status_code != 200:
-            return response
-        ctype = str(response.response_type or '')
-        if 'html' in ctype and 'text/html' in ctype:
-            # dynamic HTML — skip
-            if getattr(template_result, 'process_response', False):
-                return response
-
-        body = response.response_content or b''
-        if not isinstance(body, (bytes, bytearray)) or len(body) == 0:
-            return response
-
-        # Apply ETag for non-HTML or static file responses
-        is_html = 'text/html' in ctype
-        route = request.path or ''
-        if is_html and not self.is_static_file(route) and not route.startswith('/_pyweber/static/'):
-            return response
-
-        etag = '"' + hashlib.sha256(bytes(body)).hexdigest()[:32] + '"'
-        response.set_header('ETag', etag)
-        response.set_header('Cache-Control', 'public, max-age=3600')
-        inm = None
-        for key, value in request.headers.items():
-            if key.lower() == 'if-none-match':
-                inm = value.strip()
-                break
-        if inm and inm == etag:
-            response = Response(
-                request=request,
-                response_content=b'',
-                code=304,
-                cookies=dict(self.cookies),
-                response_type=ContentTypes.txt,
-                route=template_result.redirect_path if template_result else route,
-            )
-            response.set_header('ETag', etag)
-            response.set_header('Cache-Control', 'public, max-age=3600')
-        return response
+        return self._pipeline.apply_static_etag(request, response, template_result)
 
     def _apply_gzip(self, request: Request, response: Response) -> Response:
-        import gzip as gzip_mod
-        import os
-        from pyweber.config.config import config as app_config
-
-        enabled = os.environ.get('PYWEBER_GZIP_ENABLED')
-        if enabled is not None:
-            gzip_on = enabled.strip().lower() in {'1', 'true', 'yes', 'on'}
-        else:
-            val = app_config.get('security', 'gzip_enabled', default=True)
-            gzip_on = str(val).lower() in {'1', 'true', 'yes', 'on'} if isinstance(val, str) else bool(val)
-
-        if not gzip_on or response.status_code in {204, 304}:
-            return response
-
-        accept = ''
-        for key, value in request.headers.items():
-            if key.lower() == 'accept-encoding':
-                accept = value.lower()
-                break
-        if 'gzip' not in accept:
-            return response
-
-        body = response.response_content or b''
-        if not isinstance(body, (bytes, bytearray)):
-            return response
-        threshold = int(app_config.get('security', 'gzip_min_bytes', default=500) or 500)
-        if len(body) < threshold:
-            return response
-        if response.headers.get('Content-Encoding'):
-            return response
-
-        compressed = gzip_mod.compress(bytes(body), compresslevel=6)
-        response.new_content(compressed)
-        response.set_header('Content-Encoding', 'gzip')
-        vary = str(response.headers.get('Vary') or '')
-        if 'Accept-Encoding' not in vary:
-            response.set_header('Vary', f'{vary}, Accept-Encoding'.strip(', '))
-        return response
+        return self._pipeline.apply_gzip(request, response)
 
     def _csrf_exempt(self, path: str) -> bool:
-        return path.startswith('/_pyweber/')
+        return self._pipeline.csrf_exempt(path)
 
     def _enforce_csrf(self, request: Request) -> Response | None:
-        method = (request.method or 'GET').upper()
-        if not csrf_enabled() or method in {'GET', 'HEAD', 'OPTIONS', 'TRACE'}:
-            return None
-        if self._csrf_exempt(request.path or ''):
-            return None
-
-        header_token = None
-        for key, value in request.headers.items():
-            if key.lower() == CSRF_HEADER.lower():
-                header_token = value
-                break
-
-        body_token = None
-        try:
-            body = request.body
-            if isinstance(body, dict):
-                body_token = body.get(CSRF_FORM_FIELD)
-        except Exception:
-            body_token = None
-
-        token = header_token or body_token
-        cookie_token = request.cookies.get(CSRF_COOKIE_NAME)
-        if verify_csrf_token(token or '', cookie_token):
-            return None
-
-        return Response(
-            request=request,
-            response_content=b'{"detail":"CSRF token missing or invalid"}',
-            code=403,
-            cookies={},
-            response_type=ContentTypes.json,
-            route=request.path or '/',
-        )
+        return self._pipeline.enforce_csrf(request)
 
     def _ensure_session_cookie(self, request: Request) -> str:
-        signed = request.cookies.get(SESSION_COOKIE_NAME)
-        sid = unsign_value(signed) if signed else None
-        if not sid:
-            sid = generate_session_id()
-            signed = sign_value(sid)
-            self.set_cookie(
-                cookie_name=SESSION_COOKIE_NAME,
-                cookie_value=signed,
-                httponly=True,
-                secure=https_enabled(),
-                samesite='Strict',
-            )
-        elif SESSION_COOKIE_NAME not in self.cookies:
-            # Refresh cookie on response so clients keep a valid signed value
-            self.set_cookie(
-                cookie_name=SESSION_COOKIE_NAME,
-                cookie_value=signed,
-                httponly=True,
-                secure=https_enabled(),
-                samesite='Strict',
-            )
-        return sid
+        return self._pipeline.ensure_session_cookie(request)
 
     def _ensure_csrf_cookie(self, request: Request) -> str | None:
-        if not csrf_enabled():
-            return None
-        existing = request.cookies.get(CSRF_COOKIE_NAME)
-        if existing and unsign_value(existing):
-            token = existing
-        else:
-            token = generate_csrf_token()
-        self.set_cookie(
-            cookie_name=CSRF_COOKIE_NAME,
-            cookie_value=token,
-            httponly=False,
-            secure=https_enabled(),
-            samesite='Strict',
-        )
-        return token
+        return self._pipeline.ensure_csrf_cookie(request)
 
     def static_roots(self) -> list[str]:
-        roots = [os.path.realpath(str(StaticFilePath.favicon_path.value.parent))]
-        for directory in self.__static_directories:
-            roots.append(os.path.realpath(directory))
-        return roots
+        return self._static.roots()
 
     def resolve_safe_static_path(self, path: str) -> str | None:
-        if not path:
-            return None
-        roots = self.static_roots()
-        # Absolute / already-resolved filesystem path (e.g. Route templates)
-        abs_candidate = path
-        if os.path.isfile(abs_candidate):
-            real = os.path.realpath(abs_candidate)
-            for root in roots:
-                try:
-                    if os.path.commonpath([root, real]) == root:
-                        return real
-                except ValueError:
-                    continue
-            return None
-
-        stripped = path.replace('\\', '/').lstrip('/')
-        framework_static = roots[0]
-
-        if stripped.startswith('_pyweber/static/'):
-            remainder = stripped[len('_pyweber/static/'):]
-            joined = safe_join(framework_static, remainder)
-            if joined and os.path.isfile(joined):
-                return joined
-
-        for directory in self.__static_directories:
-            name = directory.replace('\\', '/').strip('/')
-            prefix = f'{name}/'
-            if stripped == name or stripped.startswith(prefix):
-                remainder = '' if stripped == name else stripped[len(name) + 1:]
-                joined = safe_join(os.path.realpath(directory), remainder)
-                if joined and os.path.isfile(joined):
-                    return joined
-        return None
-
+        return self._static.resolve_safe_path(path)
 
     # Utils
     def _should_register_handoff(self, template_result: 'TemplateResult') -> bool:
-        if not (
-            template_result.process_response
-            and template_result.content_type == ContentTypes.html
-            and 200 <= template_result.status_code < 300
-        ):
-            return False
-
-        template = template_result.template
-        if isinstance(template, (dict, list, set, Response)):
-            return False
-        # No stable uuid contract → no reactive session handoff
-        if isinstance(template, Template) and not template.include_uuid:
-            return False
-        if isinstance(template, Element) and not getattr(template, 'include_uuid', True):
-            return False
-        return True
+        return self._templates.should_register_handoff(template_result)
 
     def _ensure_template_object(
         self,
         template: Union[Template, Element, str],
         title: str = None,
     ) -> Template:
-        if isinstance(template, Response):
-            raise TypeError('Response cannot be converted to Template for handoff')
-        if isinstance(template, Template):
-            return template
-        if isinstance(template, Element):
-            return Template(template=template.to_html(), title=title)
-        return Template(template=str(template), title=title)
+        return self._templates.ensure_template_object(template, title=title)
 
     def template_to_bytes(
         self,
@@ -624,43 +401,21 @@ class Pyweber(
         title: str = None,
         process_response: bool = False
     ):
-        if isinstance(template, Template):
-            return self._process_template_object(template=template, title=title, content_type=content_type)
-
-        elif isinstance(template, Element):
-            return self._process_element_object(
-                element=template,
-                title=title,
-                content_type=content_type,
-                process_template=process_response
-            )
-
-        elif isinstance(template, (dict, set, list)):
-            return self._process_json_object(template=template)
-
-        elif isinstance(template, bytes):
-            return self._process_byte_object(data=template, content_type=content_type)
-
-        elif isinstance(template, Response):
-            return template
-
-        else:
-            return self._process_string_object(
-                data=template,
-                title=title,
-                content_type=content_type,
-                process_response=process_response
-            )
+        return self._templates.template_to_bytes(
+            template,
+            content_type=content_type,
+            title=title,
+            process_response=process_response,
+        )
 
     def _process_byte_object(self, data: bytes, content_type: ContentTypes):
-        return ContentResult(content=data, content_type=content_type)
+        return self._templates._process_byte_object(data, content_type)
 
     def _process_json_object(self, template: Union[dict, list, set]):
-        return ContentResult(content=json.dumps(template).encode(), content_type=ContentTypes.json)
+        return self._templates._process_json_object(template)
 
     def _process_template_object(self, template: Template, title: str, content_type: ContentTypes):
-        template.title = title if title else template.title
-        return ContentResult(content=template.build_html().encode(), content_type=content_type)
+        return self._templates._process_template_object(template, title, content_type)
 
     def _process_element_object(
         self,
@@ -669,13 +424,9 @@ class Pyweber(
         content_type: ContentTypes,
         process_template: bool
     ):
-        if process_template:
-            return ContentResult(
-                content=Template(template=element.to_html(), title=title).build_html().encode(),
-                content_type=content_type
-            )
-
-        return ContentResult(content=element.to_html().encode(), content_type=content_type)
+        return self._templates._process_element_object(
+            element, title, content_type, process_template
+        )
 
     def _process_string_object(
         self,
@@ -684,16 +435,9 @@ class Pyweber(
         content_type: ContentTypes,
         process_response: bool
     ):
-        if not isinstance(data, str):
-            data = str(data)
-
-        if process_response and content_type == ContentTypes.html:
-            return ContentResult(
-                content=Template(template=data, title=title).build_html().encode(),
-                content_type=content_type
-            )
-
-        return ContentResult(content=data.encode(), content_type=content_type)
+        return self._templates._process_string_object(
+            data, title, content_type, process_response
+        )
 
     def get_content_type(self, route: str) -> ContentTypes:
         if self.is_file_requested(route=route):
@@ -1015,31 +759,10 @@ class Pyweber(
         )
 
     def _prefers_html(self, request: Request) -> bool:
-        accept = (request.headers.get('accept') or '').lower()
-        if 'text/html' not in accept:
-            return False
-        if 'application/json' not in accept:
-            return True
-        return accept.find('text/html') <= accept.find('application/json')
+        return self._pipeline.prefers_html(request)
 
     def _cors_preflight_response(self, request: Request) -> Response | None:
-        """Early OPTIONS 204 with CORS headers when Origin is whitelisted."""
-        method = (request.method or '').upper()
-        if method != 'OPTIONS':
-            return None
-        origin = request.origin
-        from pyweber.utils.security import get_allowed_origins
-        allowed = get_allowed_origins()
-        if not origin or origin.rstrip('/') not in allowed:
-            return None
-        return Response(
-            content=b'',
-            status=204,
-            request=request,
-            cookies={},
-            content_type=ContentTypes.txt,
-            route=request.path or '/',
-        )
+        return self._pipeline.cors_preflight_response(request)
 
     async def process_route_middleware(self, resp: str, middlewares: list[Callable], status_code: int):
         return await self.process_middleware(
@@ -1058,10 +781,10 @@ class Pyweber(
         return re.match(r".*(\.[a-zA-Z0-9]+)+$", route.split('?')[0].split('/')[-1]) is not None
 
     def is_static_file(self, route: str):
-        return self.resolve_safe_static_path(route) is not None
+        return self._static.is_static_file(route)
 
     def normalize_path(self, route: str):
-        return os.path.normpath(path=route.removeprefix('/'))
+        return self._static.normalize_path(route)
 
     def normaize_path(self, route: str):
         from pyweber.utils.deprecation import warn_deprecated
@@ -1069,7 +792,7 @@ class Pyweber(
         return self.normalize_path(route)
 
     def load_static_files(self, path: str):
-        return LoadStaticFiles(path=path, allowed_roots=self.static_roots()).load
+        return self._static.load(path)
 
     def __add_framework_routes(self):
         self.add_group_routes(
@@ -1120,58 +843,10 @@ class Pyweber(
 
     def _setup_openapi_routes(self):
         """Register /docs and openapi.json from OpenAPIConfig (callable schema)."""
-        config = self.openapi or OpenAPIConfig()
-        routes: list[Route] = []
-
-        expose = bool(getattr(config, 'expose_in_production', False))
-        if is_production() and not expose:
-            return
-
-        docs_security = getattr(config, 'docs_security', None)
-        if docs_security is None:
-            docs_security = []
-
-        if config.docs_url:
-            routes.append(
-                Route(
-                    route=config.docs_url,
-                    template=StaticFilePath.pyweber_docs.value,
-                    title='Pyweber Documentation',
-                    security=docs_security,
-                    include_in_schema=False,
-                )
-            )
-
-        if config.openapi_url:
-            routes.append(
-                Route(
-                    route=config.openapi_url,
-                    template=self.get_openapi_schema,
-                    content_type=ContentTypes.json,
-                    process_response=False,
-                    security=docs_security,
-                    include_in_schema=False,
-                    title='OpenAPI Schema',
-                )
-            )
-            # Backward-compatible alias used by older docs.html clients
-            routes.append(
-                Route(
-                    route='/_pyweber/{uuid}/openapi.json',
-                    template=self.get_openapi_schema,
-                    content_type=ContentTypes.json,
-                    process_response=False,
-                    security=docs_security,
-                    include_in_schema=False,
-                    title='OpenAPI Schema',
-                )
-            )
-
-        if routes:
-            self.add_group_routes(routes)
+        self._openapi.setup_routes()
 
     def get_openapi_schema(self, **kwargs):
-        return OpenAPIBuilder(self).build()
+        return self._openapi.build_schema(**kwargs)
 
     def __get_routes(self):
         return self.get_openapi_schema()

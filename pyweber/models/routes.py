@@ -364,7 +364,30 @@ class RouteManager:
         self.__redirects: dict[str, RedirectRoute] = {}
         # name -> (path, methods)
         self.__route_names: dict[str, tuple[str, tuple[str, ...]]] = {}
+        # Insertion-ordered dynamic path keys (contain ``{param}``) for O(k) matching
+        self.__dynamic_route_paths: list[str] = []
+        self.__dynamic_redirect_paths: list[str] = []
         self.groups: list[str] = []
+
+    @staticmethod
+    def _is_dynamic_path(path: str) -> bool:
+        return '{' in (path or '')
+
+    def _index_route_path(self, path: str):
+        if self._is_dynamic_path(path) and path not in self.__dynamic_route_paths:
+            self.__dynamic_route_paths.append(path)
+
+    def _unindex_route_path(self, path: str):
+        if path in self.__dynamic_route_paths:
+            self.__dynamic_route_paths.remove(path)
+
+    def _index_redirect_path(self, path: str):
+        if self._is_dynamic_path(path) and path not in self.__dynamic_redirect_paths:
+            self.__dynamic_redirect_paths.append(path)
+
+    def _unindex_redirect_path(self, path: str):
+        if path in self.__dynamic_redirect_paths:
+            self.__dynamic_redirect_paths.remove(path)
 
     def is_redirected(self, route: str) -> bool:
         return self.get_redirected_route(route=route) is not None
@@ -394,6 +417,7 @@ class RouteManager:
         ]
         for key in keys_to_remove:
             del self.__routes[key]
+            self._unindex_route_path(key)
 
     def get_allowed_methods(self, route: str) -> list[str]:
         """Return all HTTP methods registered for a resolved path."""
@@ -458,6 +482,7 @@ class RouteManager:
             raise ValueError(f'status code {status_code} is invalid Redirect HttpStatusCode')
 
         self.__redirects[from_route] = RedirectRoute(route=route, status_code=status_code, **kwargs)
+        self._index_redirect_path(from_route)
 
     def route(
         self,
@@ -575,6 +600,7 @@ class RouteManager:
             raise RouteNameAlreadyExistError(name=name)
 
         self.__routes.setdefault(full, []).append(_route)
+        self._index_route_path(full)
         if name:
             self.__route_names[name] = (full, tuple(_route.methods))
 
@@ -596,6 +622,7 @@ class RouteManager:
                     if not (set(r.methods) & set(route.methods))
                 ]
             self.__routes.setdefault(full, []).append(route)
+            self._index_route_path(full)
             if route.name:
                 self.__route_names[route.name] = (full, tuple(route.methods))
 
@@ -653,8 +680,10 @@ class RouteManager:
                 self.__routes[full] = remaining
             else:
                 del self.__routes[full]
+                self._unindex_route_path(full)
         else:
             del self.__routes[full]
+            self._unindex_route_path(full)
 
     def remove_group(self, group: str):
         keys_to_remove = [
@@ -663,10 +692,12 @@ class RouteManager:
         ]
         for key in keys_to_remove:
             del self.__routes[key]
+            self._unindex_route_path(key)
 
     def remove_redirected_route(self, route: str):
         if route in self.__redirects:
             del self.__redirects[route]
+            self._unindex_redirect_path(route)
 
     def get_route_by_path(self, route: str, follow_redirect: bool = True, method: str = None):
         path, _ = self.resolve_path(route=route)
@@ -736,15 +767,27 @@ class RouteManager:
         return path in self.__routes or path in self.__redirects
 
     def resolve_path(self, route: str) -> tuple[str, dict[str, str]]:
-        path, kwargs = self.__resolve_path__(route=route, list_routes=self.__redirects)
+        path, kwargs = self.__resolve_path__(
+            route=route,
+            list_routes=self.__redirects,
+            dynamic_paths=self.__dynamic_redirect_paths,
+        )
 
         if path not in self.__redirects:
-            path, kwargs = self.__resolve_path__(route=route, list_routes=self.__routes)
+            path, kwargs = self.__resolve_path__(
+                route=route,
+                list_routes=self.__routes,
+                dynamic_paths=self.__dynamic_route_paths,
+            )
 
         return path, kwargs
 
     @staticmethod
-    def __resolve_path__(route: str, list_routes: dict):
+    def __resolve_path__(
+        route: str,
+        list_routes: dict,
+        dynamic_paths: list[str] | None = None,
+    ):
         kwargs: dict[str, str] = {}
 
         # Separa path dos query params antes de qualquer processamento
@@ -758,7 +801,21 @@ class RouteManager:
                 if key:
                     query_params[key] = val
 
-        for path in list_routes:
+        # O(1) exact match for static paths (and dynamic keys requested verbatim)
+        if clean_route in list_routes:
+            return clean_route, query_params
+
+        # Scan only dynamic patterns (paths containing ``{param}``)
+        paths_to_scan = (
+            dynamic_paths
+            if dynamic_paths is not None
+            else [p for p in list_routes if '{' in p]
+        )
+
+        for path in paths_to_scan:
+            if path not in list_routes:
+                continue
+
             l_route = path.strip('/').split('/')
             r_route = clean_route.strip('/').split('/')  # usa o path limpo
 
@@ -769,6 +826,7 @@ class RouteManager:
                 continue
 
             match = True
+            kwargs.clear()
 
             for key, value in zip(l_route, r_route):
                 if key.startswith('{') and key.endswith('}'):

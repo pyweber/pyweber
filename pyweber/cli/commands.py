@@ -36,6 +36,11 @@ class CLI:
         self.add_cert_command()
         self._add_run_command()
         self.add_build_command()
+        try:
+            from pyweber.db.cli import build_parser as build_db_parser
+            build_db_parser(self.subparsers)
+        except Exception:
+            pass
 
         self.commands_funcs = CommandFunctions()
         self.edit_cli_parameters = ConfigManagerCLI()
@@ -301,6 +306,10 @@ class CLI:
             elif args.command == 'build':
                 project_name = getattr(args, 'project_name')
                 self.commands_funcs.build_project(project_name=project_name)
+
+            elif args.command == 'db':
+                from pyweber.db.cli import handle_db_command
+                raise SystemExit(handle_db_command(args))
             else:
                 self.parser.print_help()
                 exit(code=1)

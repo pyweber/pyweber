@@ -23,7 +23,7 @@ if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8800, reload=True)
 ```
 
-Hot reload watches Python files. Modules like `alembic` and `database` are skipped by default during reload to avoid breaking migrations.
+Hot reload watches Python files. Modules like `alembic`, `sqlalchemy`, and `database` are skipped by default during reload to avoid breaking migrations.
 
 ## ASGI (Uvicorn / Gunicorn)
 
@@ -57,6 +57,24 @@ run_as_asgi(app, host='0.0.0.0', port=8000)
 !!! note "WebSocket + ASGI"
     Real-time updates require WebSocket support. Ensure your ASGI server and reverse proxy allow WebSocket upgrades on the same host/port.
 
+## Database and Redis
+
+Apps using `pyweber.db` should run under **ASGI** in production (`AsyncSession` + async drivers). See [Database](database.md).
+
+```bash
+pip install 'pyweber[db]' 'pyweber[db-pg]'
+export PYWEBER_DATABASE_URL='postgresql+asyncpg://...'
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+```
+
+Multiple workers / replicas:
+
+| Concern | Approach |
+|---------|----------|
+| HTTP auth cookie | Signed cookie — works across workers (shared `secret_key`) |
+| Reactive WS session | Sticky sessions **or** `session.backend = 'redis'` ([session backends](session-backends.md)) |
+| Migrations | Run `pyweber db upgrade head` once before rolling out new workers |
+
 ## HTTPS
 
 Configure certificates via environment variables or config file:
@@ -89,12 +107,14 @@ Only registered directories are served. This prevents accidental exposure of the
 
 ## Production checklist
 
-- [ ] Set `debug = false` in config
+- [ ] Set `debug = false` / `PYWEBER_ENV=production` in config
 - [ ] Use HTTPS in production
 - [ ] Put a reverse proxy (nginx, Caddy) in front for static files if needed
 - [ ] Do not rely on hot reload
-- [ ] Configure session `secret_key` in config
-- [ ] Test WebSocket connectivity through your proxy
+- [ ] Configure session `secret_key` (and Redis URL if `backend = 'redis'`)
+- [ ] Set `PYWEBER_DATABASE_URL` when using the ORM; run Alembic before deploy
+- [ ] Prefer Uvicorn/Gunicorn ASGI for DB-backed apps
+- [ ] Test WebSocket connectivity through your proxy (sticky sessions or Redis store)
 
 ## Platform notes
 
@@ -111,5 +131,7 @@ The built-in server uses a non-blocking accept loop suitable for Linux productio
 ## Next steps
 
 - [Installation](../installation.md) — project setup
+- [Database](database.md) — SQLAlchemy + Alembic
+- [Session backends](session-backends.md) — memory / Redis
 - [Environment variables](../environment.md) — configuration reference
 

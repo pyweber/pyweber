@@ -427,12 +427,54 @@ class BaseWebsockets:
             self._window_response_future.pop(session_id, None)
 
     async def set_window_response(self, response: dict, session_id: str):
-        """Quando chega uma resposta do client, dispara a future."""
+        """When a client window_response arrives, resolve confirm/prompt or run timers."""
+        if self._is_timer_response(response):
+            await self._dispatch_timer_callback(response, session_id)
+            return
+
         self.window_response = response
 
         future = self._window_response_future.get(session_id)
         if future and not future.done():
             future.set_result(response)
+
+    @staticmethod
+    def _is_timer_response(response: dict | None) -> bool:
+        if not isinstance(response, dict):
+            return False
+        return bool(
+            response.get('timeout_completed')
+            or response.get('interval_executed')
+            or response.get('animation_frame_executed')
+        )
+
+    async def _dispatch_timer_callback(self, response: dict, session_id: str):
+        session = sessions.get_session(session_id=session_id)
+        window = getattr(session, 'window', None) if session else None
+        if window is None:
+            return
+
+        timer_id = (
+            response.get('timeout_id')
+            or response.get('interval_id')
+            or response.get('frame_id')
+        )
+        if not timer_id:
+            return
+
+        keep = bool(response.get('interval_executed')) and window.is_interval_id(timer_id)
+        callback = window.take_timer_callback(timer_id, keep=keep)
+        if not callable(callback):
+            return
+
+        token = set_current_window(window)
+        try:
+            if inspect.iscoroutinefunction(callback):
+                await callback()
+            else:
+                callback()
+        finally:
+            reset_current_window(token)
 
     async def get_file_content(self, timeout: int, file_id: str):
         if file_id not in self._file_content_future:

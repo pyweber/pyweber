@@ -168,6 +168,51 @@ app = pw.Pyweber(
 
 Optional: set `PYWEBER_VALIDATE_UPLOADS=1` or `[security] validate_uploads = true` to sniff magic bytes on multipart files (raises `UploadValidationError` when invalid).
 
+## SQLAlchemy User model
+
+Install `pyweber[db]` (+ a driver extra). Auth stays cookie-based; the ORM only holds credentials.
+
+```python
+import pyweber as pw
+from pyweber.db import db, Model
+from pyweber.auth import (
+    login_required, login_user, logout_user,
+    hash_password, check_password,
+)
+from sqlalchemy import String, select
+from sqlalchemy.orm import Mapped, mapped_column
+
+app = pw.Pyweber()
+db.init_app(app)
+
+class User(Model):
+    __tablename__ = 'users'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    roles_csv: Mapped[str] = mapped_column(String(255), default='viewer')
+
+@app.route('/login', methods=['POST'])
+async def login(request: pw.Request):
+    body = request.json or {}
+    email, password = body.get('email'), body.get('password')
+    async with db.session() as session:
+        user = await session.scalar(select(User).where(User.email == email))
+        if not user or not check_password(password or '', user.password_hash):
+            return pw.Response.json({'detail': 'Invalid credentials'}, status=401)
+        roles = [r for r in user.roles_csv.split(',') if r]
+        login_user(str(user.id), roles=roles, data={'email': user.email})
+    return pw.Response.json({'ok': True})
+
+@app.route('/me')
+@login_required()
+async def me():
+    from pyweber.auth import current_user
+    return current_user()
+```
+
+Create the table with Alembic (`pyweber db init` / `revision` / `upgrade`) — see [Database](database.md).
+
 ## What this is not
 
-No built-in user table / ORM, Redis-backed sessions, or argon2 by default — bring your own store. RBAC here is the in-process role→permission registry above (enough for most apps without a full Identity framework).
+No built-in user table. Optional ORM is `pyweber[db]`; optional shared WS session store is `pyweber[redis]` ([session backends](session-backends.md)). No argon2 by default — PBKDF2 via stdlib. RBAC here is the in-process role→permission registry (enough for most apps without a full Identity framework).

@@ -139,6 +139,19 @@ Add a new section to the configuration file:
 pyweber add-section --section-name database
 ```
 
+## Database migrations (optional)
+
+Requires `pip install 'pyweber[db]'` (plus a driver extra such as `db-sqlite` / `db-pg`). Thin wrappers around Alembic:
+
+```bash
+pyweber db init                  # alembic.ini + migrations/ (async)
+pyweber db revision -m "add users"
+pyweber db upgrade head
+pyweber db downgrade -1
+```
+
+See [Database guide](guides/database.md).
+
 ## Dependency Management
 
 ### Install Requirements

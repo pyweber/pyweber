@@ -2,7 +2,6 @@ import asyncio
 import base64
 import json
 from uuid import uuid4
-from threading import Timer
 from typing import Callable, Literal
 from pyweber.core.events import WindowEvents
 from pyweber.connection.websocket import WebsocketManager
@@ -156,6 +155,8 @@ class Prompt:
 class Window:
     def __init__(self):
         self.__events_dict: dict[str, Callable] = {}
+        self.__timer_callbacks: dict[str, Callable] = {}
+        self.__interval_ids: set[str] = set()
         self.width: float = 0.0
         self.height: float = 0.0
         self.inner_width: float = 0.0
@@ -278,7 +279,7 @@ class Window:
     def scroll_by(self, x: float = 0, y: float = 0, behavior: Literal['auto', 'smooth', 'instant'] = 'instant'):
         """Rola a janela por um deslocamento (x, y)."""
         self.scroll_x, self.scroll_y = self.scroll_x + x, self.scroll_y + y
-        self.__send__(data={'scroll_to': {'x': self.scroll_x, 'y': self.scroll_y, 'behavior': behavior}})
+        self.__send__(data={'scroll_by': {'x': x, 'y': y, 'behavior': behavior}})
     
     def atob(self, encoded_string: str) -> str:
         """Decodifica uma string codificada em Base64."""
@@ -287,30 +288,59 @@ class Window:
     def btoa(self, string: str) -> str:
         """Codifica uma string em Base64."""
         return base64.b64encode(string.encode("utf-8")).decode("utf-8")
-    
-    def set_timeout(self, callback: Callable, delay: int):
-        """Executa uma função após um atraso (em milissegundos)."""
-        raise NotImplementedError()
 
-    def set_interval(self, callback: Callable, interval: int):
-        """Executa uma função repetidamente com um intervalo fixo (em milissegundos)."""
-        raise NotImplementedError()
+    def _register_timer(self, callback: Callable, *, interval: bool = False) -> str:
+        if not callable(callback):
+            raise TypeError('callback must be a callable function')
+        timer_id = str(uuid4())
+        self.__timer_callbacks[timer_id] = callback
+        if interval:
+            self.__interval_ids.add(timer_id)
+        return timer_id
 
-    def clear_timeout(self, timer: Timer):
-        """Cancela um timeout."""
-        raise NotImplementedError()
+    def take_timer_callback(self, timer_id: str, *, keep: bool = False) -> Callable | None:
+        """Return a registered timer callback; drop one-shots unless ``keep``."""
+        if keep:
+            return self.__timer_callbacks.get(timer_id)
+        return self.__timer_callbacks.pop(timer_id, None)
 
-    def clear_interval(self, timer: Timer):
-        """Cancela um intervalo."""
-        raise NotImplementedError()
+    def set_timeout(self, callback: Callable, delay: int) -> str:
+        """Schedule ``callback`` after ``delay`` milliseconds in the browser."""
+        timer_id = self._register_timer(callback)
+        self.__send__(data={'set_timeout': {'id': timer_id, 'delay': int(delay)}})
+        return timer_id
 
-    def request_animation_frame(self, callback: callable):
-        """Agenda uma função para ser executada antes do próximo repaint."""
-        raise NotImplementedError()
-    
-    def cancel_animation_frame(self, frame_id):
-        """Cancela um requestAnimationFrame."""
-        raise NotImplementedError()
+    def set_interval(self, callback: Callable, interval: int) -> str:
+        """Schedule ``callback`` repeatedly every ``interval`` milliseconds."""
+        timer_id = self._register_timer(callback, interval=True)
+        self.__send__(data={'set_interval': {'id': timer_id, 'interval': int(interval)}})
+        return timer_id
+
+    def clear_timeout(self, timer_id: str):
+        """Cancel a timeout previously returned by ``set_timeout``."""
+        self.__timer_callbacks.pop(timer_id, None)
+        self.__interval_ids.discard(timer_id)
+        self.__send__(data={'clear_timeout': {'id': timer_id}})
+
+    def clear_interval(self, timer_id: str):
+        """Cancel an interval previously returned by ``set_interval``."""
+        self.__timer_callbacks.pop(timer_id, None)
+        self.__interval_ids.discard(timer_id)
+        self.__send__(data={'clear_interval': {'id': timer_id}})
+
+    def request_animation_frame(self, callback: Callable) -> str:
+        """Schedule ``callback`` before the next browser repaint."""
+        frame_id = self._register_timer(callback)
+        self.__send__(data={'request_animation_frame': {'id': frame_id}})
+        return frame_id
+
+    def cancel_animation_frame(self, frame_id: str):
+        """Cancel a frame previously returned by ``request_animation_frame``."""
+        self.__timer_callbacks.pop(frame_id, None)
+        self.__send__(data={'cancel_animation_frame': {'id': frame_id}})
+
+    def is_interval_id(self, timer_id: str) -> bool:
+        return timer_id in self.__interval_ids
     
     def __send__(self, data: dict[str, (int, float)]):
         try:

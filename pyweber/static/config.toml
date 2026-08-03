@@ -16,21 +16,26 @@ https_enabled = false
 cert_file = ''
 key_file = ''
 
-[database.database_1]
-type = ''
-name = ''
-username = ''
-password = ''
-host = ''
-port = ''
-dsn = ''
-ssl = ''
+[database]
+# Prefer a full async SQLAlchemy URL. Env PYWEBER_DATABASE_URL wins.
+url = 'sqlite+aiosqlite:///:memory:'
+echo = false
+pool_size = 5
+auto_commit = false
+
+# Legacy nested form still supported by pyweber.db.config.build_url_from_parts:
+# [database.database_1]
+# type = 'sqlite'
+# name = './app.db'
 
 [session]
 secret_key = 'TOKEN_HEX'
 timeout = 3600
 reload_mode = false
 env = 'development'
+backend = 'memory'
+# redis_url = 'redis://localhost:6379/0'
+# key_prefix = 'pyweber:session:'
 
 [security]
 allowed_origins = []
