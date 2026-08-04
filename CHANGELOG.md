@@ -1,10 +1,10 @@
 # PyWeber Changelog
 
-## [1.5.3] - Unreleased
+## [1.6.0] - Unreleased
 
 ### Added
 
-- **`pyweber.db`** (extra `pyweber[db]`) — async SQLAlchemy 2 wrapper (`db`, `Model`, `db.session()`), config/`PYWEBER_DATABASE_URL`, driver extras (`db-sqlite`, `db-pg`, `db-mysql`, `db-mssql`). CLI: `pyweber db init|revision|upgrade|downgrade` (Alembic async scaffold). See [docs/guides/database.md](docs/guides/database.md).
+- **`pyweber.db`** (extra `pyweber[db]`) — async SQLAlchemy 2 wrapper (`db`, `Model`, `db.session()`), config/`PYWEBER_DATABASE_URL`, driver extras (`db-sqlite`, `db-pg`, `db-mysql`, `db-mssql`). CLI: `pyweber db init|revision|migrate|upgrade|downgrade` (`migrate` = apply all pending / `upgrade head`). See [docs/guides/database.md](docs/guides/database.md).
 - **`pyweber.session_store`** — `SessionStore` protocol, `MemorySessionStore` (default), `RedisSessionStore` (`pyweber[redis]`), `session.backend` / `PYWEBER_REDIS_URL`. See [docs/guides/session-backends.md](docs/guides/session-backends.md).
 - **`pyweber.services`** collaborators — `StaticFilesService`, `ResponsePipeline`, `TemplateService`, `OpenAPISetup`. `Pyweber` keeps the flat public API (`app.route`, `app.set_cookie`, …) via mixins, but CSRF/gzip/ETag/static/OpenAPI logic lives in composed services.
 - **`Window.set_timeout` / `set_interval` / `clear_*` / `request_animation_frame` / `cancel_animation_frame`** — aligned with the existing WebSocket protocol in `static/js.js`. Timer responses no longer steal the confirm/prompt Future.
@@ -15,10 +15,12 @@
 - **Routing** — static paths resolve in **O(1)** via exact dict lookup; only `{param}` patterns are scanned. Static paths win over dynamic patterns for the same URL (e.g. `/users/me` before `/users/{id}`).
 - **`Window.scroll_by`** sends a true `scroll_by` payload (delta), matching the client handler.
 - Default `[database]` / `session.backend` keys in shipped `config.toml` for optional persistence.
+- **WS DOM sync** — client outerHTML is **merged by uuid** into the existing Python tree (no wholesale `parse_html` replace). Handoff **moves** the same `Template` instance into the session. `Element`/`Template.clone` preserve subclass type; route `Element`s are adopted without HTML round-trip. Bound handlers can use `self` after the first render. See [docs/guides/reactivity.md](docs/guides/reactivity.md).
 
 ### Fixed
 
 - Duplicate `InputCheckbox` export in `components.__all__` / package `__all__`.
+- **`self` orphaned after WS connect** — session tree no longer replaced by a fresh parse; subclass refs (`self.label`, etc.) stay live.
 
 ## [1.5.2] - Unreleased
 

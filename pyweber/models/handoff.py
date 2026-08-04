@@ -18,6 +18,13 @@ class HandoffEntry:
 
 
 class TemplateHandoffRegistry:
+    """One-shot HTTP → WS handoff of the **same** Template instance (move on consume).
+
+    Storing a clone would type-erase subclasses and orphan ``self`` refs used by
+    bound event handlers. The HTTP response and the future session share one object
+    until ``consume`` moves it into the WebSocket session.
+    """
+
     def __init__(self, ttl: int = HANDOFF_TTL_SECONDS):
         self._ttl = ttl
         self._entries: dict[str, HandoffEntry] = {}
@@ -28,7 +35,7 @@ class TemplateHandoffRegistry:
         with self._lock:
             self._purge_expired()
             self._entries[token] = HandoffEntry(
-                template=template.clone(),
+                template=template,
                 route=route,
                 created_at=time(),
             )
@@ -50,7 +57,7 @@ class TemplateHandoffRegistry:
         if time() - entry.created_at > self._ttl:
             return None
 
-        return entry.template.clone()
+        return entry.template
 
     def clear(self):
         with self._lock:

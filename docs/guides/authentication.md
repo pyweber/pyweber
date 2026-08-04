@@ -211,7 +211,7 @@ async def me():
     return current_user()
 ```
 
-Create the table with Alembic (`pyweber db init` / `revision` / `upgrade`) — see [Database](database.md).
+Create the table with Alembic (`pyweber db init` / `revision` / `migrate`) — see [Database](database.md).
 
 ## What this is not
 

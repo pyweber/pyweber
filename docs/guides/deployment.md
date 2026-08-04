@@ -73,7 +73,7 @@ Multiple workers / replicas:
 |---------|----------|
 | HTTP auth cookie | Signed cookie — works across workers (shared `secret_key`) |
 | Reactive WS session | Sticky sessions **or** `session.backend = 'redis'` ([session backends](session-backends.md)) |
-| Migrations | Run `pyweber db upgrade head` once before rolling out new workers |
+| Migrations | Run `pyweber db migrate` once before rolling out new workers |
 
 ## HTTPS
 

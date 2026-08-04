@@ -63,8 +63,17 @@ class wsMessage:
                 not getattr(session_template, 'include_uuid', True)
                 or (used_handoff and 'uuid=' not in client_html.lower())
             )
-            if not keep_server:
-                session_template.root = session_template.parse_html(html=client_html)
+            if keep_server:
+                self.insert_values(element=session_template.root)
+            else:
+                # Preserve Python object identity (self / bound handlers).
+                from pyweber.models.dom_merge import merge_client_dom
+
+                merge_client_dom(
+                    session_template.root,
+                    client_html,
+                    include_uuid=getattr(session_template, 'include_uuid', True),
+                )
                 self.insert_values(element=session_template.root)
 
         return session_template

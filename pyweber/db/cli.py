@@ -1,4 +1,4 @@
-"""Alembic CLI helpers: ``pyweber db init|revision|upgrade|downgrade``."""
+"""Alembic CLI helpers: ``pyweber db init|revision|migrate|upgrade|downgrade``."""
 
 from __future__ import annotations
 
@@ -149,7 +149,7 @@ Generic single-database Alembic configuration for PyWeber (async).
 
 1. Import your models in ``env.py`` so ``Model.metadata`` includes them.
 2. ``pyweber db revision -m "message"``
-3. ``pyweber db upgrade head``
+3. ``pyweber db migrate``  (applies all pending revisions; same as ``upgrade head``)
 '''
 
 
@@ -195,6 +195,11 @@ def upgrade(target: str = 'head') -> int:
     return _alembic_cmd('upgrade', target)
 
 
+def migrate(target: str = 'head') -> int:
+    """Apply pending migrations (default: all the way to ``head``)."""
+    return upgrade(target)
+
+
 def downgrade(target: str = '-1') -> int:
     return _alembic_cmd('downgrade', target)
 
@@ -213,6 +218,17 @@ def build_parser(subparsers) -> None:
         help='Do not pass --autogenerate to Alembic',
     )
 
+    mig = db_sub.add_parser(
+        'migrate',
+        help='Apply all pending migrations (alias for upgrade head)',
+    )
+    mig.add_argument(
+        'target',
+        nargs='?',
+        default='head',
+        help='Revision target (default: head — run everything pending)',
+    )
+
     up = db_sub.add_parser('upgrade', help='Upgrade to a revision (default: head)')
     up.add_argument('target', nargs='?', default='head')
 
@@ -228,9 +244,11 @@ def handle_db_command(args: argparse.Namespace) -> int:
         return 0
     if cmd == 'revision':
         return revision(args.message, autogenerate=not args.no_autogenerate)
+    if cmd == 'migrate':
+        return migrate(args.target)
     if cmd == 'upgrade':
         return upgrade(args.target)
     if cmd == 'downgrade':
         return downgrade(args.target)
-    print('Usage: pyweber db {init,revision,upgrade,downgrade}')
+    print('Usage: pyweber db {init,revision,migrate,upgrade,downgrade}')
     return 1

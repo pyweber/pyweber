@@ -146,7 +146,8 @@ Requires `pip install 'pyweber[db]'` (plus a driver extra such as `db-sqlite` / 
 ```bash
 pyweber db init                  # alembic.ini + migrations/ (async)
 pyweber db revision -m "add users"
-pyweber db upgrade head
+pyweber db migrate               # apply all pending migrations
+pyweber db upgrade head          # same as migrate (explicit target)
 pyweber db downgrade -1
 ```
 

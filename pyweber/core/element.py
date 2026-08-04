@@ -264,8 +264,9 @@ class Element(ElementConstrutor):
         from pyweber.core.events import TemplateEvents
 
         element = self
+        cls = type(self)
 
-        cln = Element(
+        init_kwargs = dict(
             tag=element.tag,
             id=element.id,
             content=element.content,
@@ -274,15 +275,55 @@ class Element(ElementConstrutor):
             style=self.__deepy_clone(element.style),
             attrs=self.__deepy_clone(element.attrs),
             events=TemplateEvents(**element.events.__dict__),
-            **element.kwargs
+            sanitize=getattr(element, 'sanitize', True),
+            files=list(getattr(element, 'files', []) or []),
+            include_uuid=getattr(element, 'include_uuid', True),
+            **element.kwargs,
         )
+
+        if cls is Element:
+            cln = Element(**init_kwargs)
+        else:
+            # Avoid subclass __init__ (would rebuild a different tree).
+            cln = object.__new__(cls)
+            Element.__init__(cln, childs=None, data=getattr(element, 'data', None), **init_kwargs)
+
         cln.uuid = element.uuid
-        cln.parent = element.parent
+        cln.parent = None
         cln.template = getattr(element, 'template', None)
+        cln.data = getattr(element, 'data', None)
         cln._Element__element_methods = self.__deepy_clone(self.__element_methods)
 
+        uuid_map: dict[str, Element] = {cln.uuid: cln} if cln.uuid else {}
         for child in element.childs:
-            cln.childs.append(child.clone)
+            child_clone = child.clone
+            cln.childs.append(child_clone)
+            if child_clone.uuid:
+                uuid_map[child_clone.uuid] = child_clone
+            # Index deep descendants for subclass ref remapping
+            stack = list(child_clone.childs)
+            while stack:
+                node = stack.pop()
+                if node.uuid:
+                    uuid_map[node.uuid] = node
+                stack.extend(node.childs)
+
+        if cls is not Element:
+            skip = {
+                'kwargs', 'tag', 'id', 'attrs', 'style', 'content', 'value',
+                'classes', 'parent', 'data', 'files', 'events', 'childs',
+                'include_uuid', 'sanitize', 'uuid', 'template',
+            }
+            for key, val in element.__dict__.items():
+                if key in skip or key.startswith('_Element') or key.startswith('_ElementConstrutor'):
+                    continue
+                if isinstance(val, Element) and val.uuid and val.uuid in uuid_map:
+                    object.__setattr__(cln, key, uuid_map[val.uuid])
+                elif not isinstance(val, Element):
+                    try:
+                        object.__setattr__(cln, key, val)
+                    except AttributeError:
+                        cln.__dict__[key] = val
 
         return cln
 

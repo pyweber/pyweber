@@ -16,6 +16,7 @@ This page summarizes recent releases in plain language. For the full history, se
 ### Changed
 
 - Static routes resolve in **O(1)**; static paths win over dynamic for the same URL
+- **WS sync preserves `self`** — merge-by-uuid + handoff move (no tree replace); use `self.label` in handlers after connect ([reactivity](guides/reactivity.md))
 
 ## 1.5.2 — Unreleased
 

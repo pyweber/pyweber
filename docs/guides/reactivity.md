@@ -76,14 +76,16 @@ sequenceDiagram
 
 O handoff **não substitui** o sync do DOM. No `socket.onopen` continua a enviar-se `includeTemplate: true` (HTML completo do browser). O servidor faz:
 
-1. Consome o handoff (template Python do HTTP — evita re-correr o handler)
-2. **`parse_html(outerHTML)`** — o DOM real do browser **substitui** a árvore; nós sem `uuid` recebem um novo id
+1. Consome o handoff — **a mesma** instância `Template` / árvore Python do HTTP (move, sem clone type-erasing)
+2. **`merge_client_dom`** — actualiza nós existentes por `uuid` (values/attrs) e **enxerta** nós só-do-cliente (JS inject); **não** substitui a árvore Python
+
+Assim `self` e referências guardadas em `__init__` (ex. `self.label`) continuam válidas após o 1º connect. `e.template` / `e.target` também.
 
 Antes do envio, o cliente corre **`stampMissingUuids()`** — qualquer nó injectado por JS/libs externas ganha `uuid` **no browser e no servidor**, ficando no ciclo reactivo.
 
 | Momento | O que acontece |
 |---------|----------------|
-| JS **antes** do WS abrir | Capturado no `onopen` + uuid atribuído |
+| JS **antes** do WS abrir | Capturado no `onopen` + uuid atribuído → graft no merge |
 | JS **depois** do WS abrir | Chamar `window.__pyweber_resyncDom()` quando o JS terminar |
 | Eventos normais | Só diff (`template: null`) — não re-enviam a página inteira |
 
@@ -97,7 +99,27 @@ thirdPartyWidget.render('#container').then(() => {
 !!! warning "Limites"
     - Elementos JS **sem** `uuid` não entram em `getFormValues()` nem em eventos Pyweber até ao sync
     - Handlers Python (`_onclick`, etc.) só funcionam em elementos Pyweber ou após resync + registo no servidor
-    - `clone_template()` (fallback sem handoff) segue o mesmo fluxo de `parse_html` no connect
+    - `include_uuid=False` ignora outerHTML do cliente (evita uuids inventados)
+
+### Using `self` in event handlers
+
+After connect, the session still holds the objects you built:
+
+```python
+class Counter(pw.Element):
+    def __init__(self):
+        self.label = pw.Element('span', id='n', content='0')
+        super().__init__('div', childs=[
+            self.label,
+            pw.Element('button', content='+', events=pw.TemplateEvents(onclick=self.inc)),
+        ])
+
+    async def inc(self, e: pw.EventHandler):
+        self.label.content = str(int(self.label.content) + 1)  # OK — same instance
+        e.update()
+```
+
+You can still use `e.template.querySelector(...)` when convenient; it is no longer required to work around a rebuilt tree.
 
 ### Disabling WebSocket
 

@@ -275,14 +275,15 @@ class Template:
         return root
 
     def clone(self):
-        tpl = Template(
-            template=self.template,
-            status_code=self.status_code,
-            title=self.title,
-            include_uuid=self.__include_uuid,
-            **self.kwargs
-        )
+        """Deep-copy the template tree, preserving subclass type when possible."""
+        cls = type(self)
+        tpl = object.__new__(cls)
+        tpl._Template__include_uuid = self._Template__include_uuid
+        tpl._Template__template = self._Template__template
+        tpl.kwargs = dict(self.kwargs)
         tpl.data = self.data
-        tpl.root = self.root.clone
-
+        tpl._Template__status_code = self._Template__status_code
+        tpl._Template__icon = self._Template__icon
+        tpl._Template__title = self._Template__title
+        tpl._Template__root = self.root.clone
         return tpl

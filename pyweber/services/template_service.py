@@ -44,8 +44,40 @@ class TemplateService:
         if isinstance(template, Template):
             return template
         if isinstance(template, Element):
-            return Template(template=template.to_html(), title=title)
+            return self._adopt_element_as_template(template, title=title)
         return Template(template=str(template), title=title)
+
+    def _adopt_element_as_template(self, element: Element, title: str = None) -> Template:
+        """Wrap an Element tree in a Template without HTML round-trip (keeps identity)."""
+        from pyweber.config.config import config
+
+        include_uuid = getattr(element, 'include_uuid', True)
+        if element.tag == 'html':
+            tpl = object.__new__(Template)
+            tpl._Template__include_uuid = include_uuid
+            tpl._Template__template = ''
+            tpl.kwargs = {}
+            tpl.data = getattr(element, 'data', None)
+            tpl._Template__status_code = 200
+            tpl._Template__icon = str(config['app'].get('icon'))
+            tpl._Template__title = title
+            tpl._Template__root = element
+            if title:
+                # Use property to sync <title> when present
+                tpl.title = title
+            return tpl
+
+        shell = Template(
+            template='<html><head></head><body></body></html>',
+            title=title,
+            include_uuid=include_uuid,
+        )
+        body = shell.body
+        while body.childs:
+            body.childs.pop()
+        body.content = None
+        body.add_child(element)
+        return shell
 
     def template_to_bytes(
         self,

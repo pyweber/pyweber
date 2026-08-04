@@ -26,14 +26,14 @@ def clear_handoff_registry():
 
 
 class TestTemplateHandoffRegistry:
-    def test_create_and_consume_returns_clone(self):
+    def test_create_and_consume_moves_same_instance(self):
         registry = TemplateHandoffRegistry()
         source = _html_page('one')
         token = registry.create(source, '/page')
 
         result = registry.consume(token, '/page')
 
-        assert result is not None
+        assert result is source
         assert result.build_html() == source.build_html()
         assert registry.consume(token, '/page') is None
 
