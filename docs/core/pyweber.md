@@ -352,6 +352,13 @@ def api_data():
 ```
 
 ### Middleware Integration
+
+!!! tip "Added in 1.5.1"
+    Onion `@app.middleware(request, call_next)` plus Flask-style `@app.before_request` / `@app.after_request`.
+
+!!! warning "Deprecated — removed in 2.0"
+    Do not pass `status_code=` / `process_response=` to `before_request` / `after_request`. Return a `Response` with the desired status instead. Prefer `add_before_request` over `add_before_request_middleware`. See [Deprecations](../guides/deprecations.md).
+
 ```python
 @app.before_request
 def auth_middleware(request):

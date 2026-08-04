@@ -119,6 +119,14 @@ class Pyweber(
     MiddlewareManager,
     RouteManager
 ):
+    """PyWeber application.
+
+    Public surface stays flat (``app.route``, cookies, middleware) via mixins.
+    Heavy logic lives in composed services (``_static``, ``_pipeline``,
+    ``_templates``, ``_openapi``). Full mixin → composition migration is planned
+    for **2.0**; do not add new responsibilities directly on this class.
+    """
+
     def __init__(self, *assets_directories, **data: Any):
         """Pyweber
         Args:
@@ -863,13 +871,19 @@ class Pyweber(
         return self.__update_handler(module=changed_file) if self.__update_handler else None
 
     def launch_url(self, url: str, new_page: bool = False):
-        return webbrowser.open(url=url, new=new_page)
+        from pyweber.utils.security import ensure_safe_redirect_url
+
+        safe = ensure_safe_redirect_url(url)
+        return webbrowser.open(url=safe, new=new_page)
 
     def to_url(self, url: str, new_page: bool = False, message: str = None):
-        window.open(url=url, new_page=new_page)
+        from pyweber.utils.security import ensure_safe_redirect_url
+
+        safe = ensure_safe_redirect_url(url)
+        window.open(url=safe, new_page=new_page)
         return Element(
             tag='p',
-            content=message or f"Redirected to {Element( tag='a', attrs={'href': url}, content=url).to_html()}"
+            content=message or f"Redirected to {Element( tag='a', attrs={'href': safe}, content=safe).to_html()}"
         )
 
     async def __call__(self, scope, receive, send):

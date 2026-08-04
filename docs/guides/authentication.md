@@ -1,5 +1,8 @@
 # Authentication
 
+!!! tip "Added in 1.5.0 / 1.5.1"
+    Cookie login, password hashing, and lightweight RBAC (`register_roles`, `@permission_required`).
+
 Lightweight session login helpers inspired by Flask-Login — **no ORM**. Pair them with your own user store (dict, SQLAlchemy, etc.).
 
 For API-token auth see OpenAPI security schemes (`HTTPBearer`, `HTTPBasic`, API keys) in the security / OpenAPI docs. `@login_required` accepts **either** a signed login cookie **or** a successful `request.auth` from those schemes.

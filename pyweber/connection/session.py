@@ -21,7 +21,12 @@ class Session:
         self.session_id = session_id
         self.create_at = time()
         self.current_route = current_route
-        self.old_template = template
+        # Must be a distinct snapshot for TemplateDiff; aliasing template makes
+        # every e.update() produce an empty diff (mutations visible on both sides).
+        try:
+            self.old_template = template.clone()
+        except Exception:
+            self.old_template = None
 
 
 class SessionManager:
@@ -57,8 +62,14 @@ class SessionManager:
         self._schedule_persist(session)
 
     def remove_session(self, session_id: str):
-        if session_id in self.sessions:
-            del self.sessions[session_id]
+        session = self.sessions.pop(session_id, None)
+        if session is not None:
+            try:
+                from pyweber.core.events import cleanup_template_events
+                cleanup_template_events(getattr(session, 'template', None))
+                cleanup_template_events(getattr(session, 'old_template', None))
+            except Exception as exc:
+                logger.debug('EventBook cleanup skipped: %s', exc)
         self._schedule_delete(session_id)
 
     def get_session(self, session_id: str):

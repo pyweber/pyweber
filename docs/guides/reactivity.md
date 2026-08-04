@@ -13,6 +13,9 @@ async def handle_click(self, e: pw.EventHandler):
 
 Without `e.update()`, changes stay on the server until the next full page load.
 
+!!! tip "Fixed in 1.6.0.dev3"
+    Click payloads often send `template: null` with a `values` map (input text by uuid). The server always applies those values before your handler runs, so `input.value` / `e.current_target.parent.childs[0].value` reflect what the user typed. WS session bind and Form/Input clone regressions that dropped events or resent `setSessionId` every frame are also fixed — see [CHANGELOG](../changelog.md).
+
 ### Other EventHandler actions
 
 | Method | Effect |
@@ -22,6 +25,12 @@ Without `e.update()`, changes stay on the server until the next full page load.
 | `e.reload()` | Full page reload |
 
 ## Template Handoff (HTTP → WebSocket)
+
+!!! tip "Added in 1.3.0"
+    WebSocket sessions reuse the HTTP-rendered template so route handlers are not run twice on connect.
+
+!!! tip "Improved in 1.6.0"
+    Handoff **moves** the same Python instance into the session; DOM sync **merges by uuid** so `self` / subclass refs stay valid after connect.
 
 When a reactive HTML page is served over HTTP, Pyweber **registers the rendered template** in memory and embeds a one-time token in the page:
 
@@ -74,34 +83,54 @@ sequenceDiagram
 
 ### DOM injectado por JavaScript (sem `uuid`)
 
-O handoff **não substitui** o sync do DOM. No `socket.onopen` continua a enviar-se `includeTemplate: true` (HTML completo do browser). O servidor faz:
+Nos cliques normais o cliente **não** reenvia a página (`template: null`) — só `values` + evento. Isso é correcto para performance, mas nós criados só no browser ficam invisíveis à sessão Python até haver um **merge**.
 
-1. Consome o handoff — **a mesma** instância `Template` / árvore Python do HTTP (move, sem clone type-erasing)
-2. **`merge_client_dom`** — actualiza nós existentes por `uuid` (values/attrs) e **enxerta** nós só-do-cliente (JS inject); **não** substitui a árvore Python
+O handoff / `onopen` já envia `includeTemplate: true`. O servidor faz:
 
-Assim `self` e referências guardadas em `__init__` (ex. `self.label`) continuam válidas após o 1º connect. `e.template` / `e.target` também.
+1. Consome o handoff — **a mesma** instância `Template` / árvore Python do HTTP
+2. **`merge_client_dom`** — actualiza nós existentes por `uuid` e **enxerta** nós só-do-cliente
 
-Antes do envio, o cliente corre **`stampMissingUuids()`** — qualquer nó injectado por JS/libs externas ganha `uuid` **no browser e no servidor**, ficando no ciclo reactivo.
+Antes do envio, o cliente corre **`stampMissingUuids()`** — nós injectados ganham `uuid` e entram no ciclo reactivo.
 
 | Momento | O que acontece |
 |---------|----------------|
-| JS **antes** do WS abrir | Capturado no `onopen` + uuid atribuído → graft no merge |
-| JS **depois** do WS abrir | Chamar `window.__pyweber_resyncDom()` quando o JS terminar |
-| Eventos normais | Só diff (`template: null`) — não re-enviam a página inteira |
+| JS **antes** do WS abrir | Capturado no `onopen` → graft no merge |
+| JS **depois** do WS abrir | **Auto:** `MutationObserver` (debounce ~80ms) detecta nós sem `uuid` e chama resync |
+| Controlo explícito | `window.__pyweber_adopt(el)` ou `window.__pyweber_resyncDom()` |
+| Eventos normais | Só diff (`template: null`) — não re-enviam a página |
 
 ```javascript
-// Exemplo: lib externa injecta HTML após load
+// Explícito (recomendado após widgets grandes)
 thirdPartyWidget.render('#container').then(() => {
     window.__pyweber_resyncDom?.();
 });
+
+// Ou um único nó
+const tip = document.createElement('div');
+tip.textContent = 'hint';
+document.body.appendChild(tip);
+await window.__pyweber_adopt?.(tip);
 ```
 
+Desligar o observer automático (páginas com muito DOM dinâmico irrelevante para Python):
+
+```html
+<meta name="pyweber-dom-watch" content="off">
+```
+
+!!! tip "Added in 1.6.0.dev3"
+    `MutationObserver` + `__pyweber_adopt` — injects JS-side leave the server tree without waiting for the next full reload.
+
 !!! warning "Limites"
-    - Elementos JS **sem** `uuid` não entram em `getFormValues()` nem em eventos Pyweber até ao sync
-    - Handlers Python (`_onclick`, etc.) só funcionam em elementos Pyweber ou após resync + registo no servidor
-    - `include_uuid=False` ignora outerHTML do cliente (evita uuids inventados)
+    - Elementos **sem** `uuid` não entram em `getFormValues()` / eventos Pyweber até ao sync
+    - Handlers Python (`_onclick`) só em elementos criados no servidor (ou após merge; o graft não regista callables Python automaticamente)
+    - `include_uuid=False` ignora outerHTML do cliente (páginas estáticas)
+    - O observer não substitui `e.update()` — só alinha DOM browser → sessão
 
 ### Using `self` in event handlers
+
+!!! tip "Added in 1.6.0"
+    Identity-preserving sync — `self.label` and other `__init__` refs remain the live tree after WS connect.
 
 After connect, the session still holds the objects you built:
 
@@ -138,8 +167,8 @@ async def handler(self, e: pw.EventHandler):
     e.session         # session object for this tab
 ```
 
-!!! note "`e.element` is deprecated"
-    Use `e.target` instead. `e.element` remains for backward compatibility but will be removed in a future release.
+!!! warning "Deprecated — removed in 2.0"
+    Use `e.target` instead of `e.element`. Prefer `e.target` in all new code. See [Deprecations](deprecations.md).
 
 ## How TemplateDiff works
 

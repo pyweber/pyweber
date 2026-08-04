@@ -41,6 +41,7 @@ function connectWebSocket() {
     socket.onopen = async function () {
         socketReady = true;
         reconnectAttempts = 0;
+        watchDomInjections();
         // Só envia outerHTML no handshake se existir contrato uuid estável
         const includeTemplate = pageHasStableUuids();
         sendToServer(await getEventData({ includeTemplate }));
@@ -71,6 +72,11 @@ function connectWebSocket() {
                 : event.data);
 
         const data = JSON.parse(raw);
+
+        // Bind session before flushing buffered window events from the same payload.
+        if (data.setSessionId) {
+            setSessionId(data.setSessionId);
+        }
 
         if (data.windowEvents && data.windowEvents.length > 0) {
             Object.keys(sessionStorage).forEach(item => {
@@ -107,7 +113,6 @@ function connectWebSocket() {
         }
 
         if (data.setSessionId) {
-            setSessionId(data.setSessionId);
             return;
         }
 
@@ -355,7 +360,8 @@ function getsessionId() {
 }
 
 function setSessionId(sessionId) {
-    if (!getsessionId()) {
+    // Server is authoritative — always accept (fixes stale sessionStorage after reconnect).
+    if (sessionId) {
         sessionStorage.setItem('_pyweber_sessionId', sessionId);
     }
 }
@@ -412,15 +418,82 @@ function stampMissingUuids(root = document.documentElement) {
     });
 }
 
+function domWatchEnabled() {
+    const meta = document.querySelector('meta[name="pyweber-dom-watch"]');
+    if (!meta) return true;
+    const v = (meta.content || '').trim().toLowerCase();
+    return !(v === 'off' || v === '0' || v === 'false' || v === 'no');
+}
+
 /** Re-sincroniza DOM → servidor depois de JS injectar HTML (sem uuid) após o WS abrir. */
-async function resyncDomWithServer() {
+async function resyncDomWithServer(root = null) {
     if (!socketReady || socket.readyState !== WebSocket.OPEN) return;
     if (!pageHasStableUuids()) return;
-    stampMissingUuids();
+    stampMissingUuids(root instanceof Element ? root : document.documentElement);
     await sendToServer(await getEventData({ includeTemplate: true }));
 }
 
+/**
+ * Adopt a JS-injected node into the reactive contract: stamp uuids on the
+ * subtree, then push outerHTML so ``merge_client_dom`` grafts it on the server.
+ *
+ * @example
+ *   const el = document.createElement('div');
+ *   el.textContent = 'hi';
+ *   document.querySelector('[uuid]')?.appendChild(el);
+ *   await window.__pyweber_adopt(el);
+ */
+async function adoptDomNode(node) {
+    if (!(node instanceof Element)) return;
+    if (!pageHasStableUuids()) return;
+    stampMissingUuids(node);
+    await resyncDomWithServer();
+}
+
+let _domWatchTimer = null;
+let _domObserver = null;
+
+function scheduleDomResync() {
+    if (!domWatchEnabled()) return;
+    if (_domWatchTimer) clearTimeout(_domWatchTimer);
+    _domWatchTimer = setTimeout(() => {
+        _domWatchTimer = null;
+        resyncDomWithServer();
+    }, 80);
+}
+
+function mutationAddsUntrackedNode(mutation) {
+    for (const node of mutation.addedNodes) {
+        if (!(node instanceof Element)) continue;
+        if (!node.getAttribute('uuid')) return true;
+        if (node.querySelector && node.querySelector(':not([uuid])')) return true;
+    }
+    return false;
+}
+
+/** Watch for programmer/lib DOM injects; debounce a full-template merge. */
+function watchDomInjections() {
+    if (_domObserver || !domWatchEnabled()) return;
+    if (typeof MutationObserver === 'undefined') return;
+
+    _domObserver = new MutationObserver(mutations => {
+        if (!socketReady || !pageHasStableUuids()) return;
+        for (const m of mutations) {
+            if (m.type === 'childList' && mutationAddsUntrackedNode(m)) {
+                scheduleDomResync();
+                return;
+            }
+        }
+    });
+
+    _domObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+    });
+}
+
 window.__pyweber_resyncDom = resyncDomWithServer;
+window.__pyweber_adopt = adoptDomNode;
 
 // ─── Construção do payload ────────────────────────────────────────────────────
 async function getEventData({ type = null, event = null, event_ref = null, window_response = null, file_content = null, includeTemplate = false }) {
@@ -674,3 +747,4 @@ function trackEvents() {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 connectWebSocket();
 trackEvents();
+watchDomInjections();

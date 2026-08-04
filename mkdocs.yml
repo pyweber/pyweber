@@ -35,6 +35,7 @@ nav:
 
   - Getting Started:
     - Installation: installation.md
+    - Supported versions: guides/supported-versions.md
     - Element model (important): guides/element-model.md
     - Reactivity & updates: guides/reactivity.md
     - Environment Variables: environment.md
@@ -43,9 +44,12 @@ nav:
     - Components: guides/components.md
     - File streaming: guides/file-streaming.md
     - Routing (path & query): guides/routing-advanced.md
-    - Deprecations: guides/deprecations.md
     - Authentication: guides/authentication.md
+    - Database: guides/database.md
+    - Session backends: guides/session-backends.md
     - Deployment: guides/deployment.md
+    - Deprecations: guides/deprecations.md
+    - Doc conventions: guides/doc-conventions.md
 
   - Core Framework:
     - PyWeber Application: core/pyweber.md

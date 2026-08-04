@@ -20,7 +20,7 @@ from pyweber.utils.security import (
 from pyweber.connection.session import sessions, Session
 from pyweber.models.template_diff import TemplateDiff
 from pyweber.models.task_manager import TaskManager
-from pyweber.core.events import EventConstrutor, EventBook
+from pyweber.core.events import EventConstrutor
 from pyweber.models.context import set_current_window, reset_current_window
 
 if TYPE_CHECKING:
@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from pyweber.core.window import Window
 
 def need_message_keys():
+    """Keys the browser always includes in ``getEventData`` payloads."""
     return [
         'type',
         'event_ref',
@@ -46,11 +47,38 @@ def need_message_keys():
         'handoffToken',
     ]
 
+
+def _ws_message_is_actionable(message: dict) -> bool:
+    """True when the payload can create a session or drive an event/update.
+
+    The old gate rejected *any* message without ``template`` when the session
+    was unknown — that dropped clicks, window responses, and handshakes that
+    omit outerHTML (``includeTemplate: false``).
+    """
+    if message.get('template'):
+        return True
+    if message.get('handoffToken'):
+        return True
+    if message.get('type') and message.get('event_ref'):
+        return True
+    if message.get('window_response'):
+        return True
+    if message.get('file_content'):
+        return True
+    session_id = message.get('sessionId')
+    return bool(session_id and session_id in sessions.all_sessions)
+
 def event_is_running(message: wsMessage, task_manager: TaskManager) -> bool:
     """Check if event is running"""
     if message.session_id in task_manager.active_handlers_async:
         template = sessions.get_session(session_id=message.session_id).template
-        event_id = template.getElement(by='uuid', value=message.target_uuid).events.__dict__.get(f'on{message.type}')
+        element = template.getElement(by='uuid', value=message.target_uuid)
+        handler = element.events.__dict__.get(f'on{message.type}') if element else None
+
+        if not callable(handler):
+            return False
+
+        event_id = f'event_{id(handler)}'
 
         if event_id in task_manager.active_handlers_async[message.session_id]:
             return True
@@ -150,6 +178,7 @@ class WebsocketServer:
         current_opcode = None
         is_coro = inspect.iscoroutinefunction(message_handler)
         timeout = 60 * 60
+        consumer_task: asyncio.Task | None = None
 
         try:
             while True:
@@ -174,13 +203,18 @@ class WebsocketServer:
                                 else self.__all_message
                             )
                             self.__messages.append(decoded)
-
-                            if is_coro:
-                                asyncio.create_task(message_handler(self))
-                            else:
-                                message_handler(self)
-
                             self.__all_message = b''
+
+                            # One long-lived consumer (async for). Spawning a
+                            # task per frame made sync ``for`` exit after the
+                            # first drain and raced multiple consumers.
+                            if consumer_task is None or consumer_task.done():
+                                if is_coro:
+                                    consumer_task = asyncio.create_task(
+                                        message_handler(self)
+                                    )
+                                else:
+                                    message_handler(self)
 
                         elif current_opcode == 8:
                             break
@@ -209,6 +243,12 @@ class WebsocketServer:
             raise e
 
         finally:
+            if consumer_task is not None and not consumer_task.done():
+                consumer_task.cancel()
+                try:
+                    await consumer_task
+                except (asyncio.CancelledError, Exception):
+                    pass
             await self.close()
             PrintLine(text=f'Connection {self.id} closed.')
 
@@ -290,12 +330,13 @@ class BaseWebsockets:
         self.__window_response = value
 
     def event_handler(self, message: wsMessage):
+        session = sessions.get_session(session_id=message.session_id)
         return EventConstrutor(
             target_id=message.target_uuid,
             current_target_id=message.current_target_uuid,
             app=self.app,
             ws=self,
-            session=sessions.get_session(session_id=message.session_id),
+            session=session,
             route=message.route,
             event_data=message.event_data,
             event_type=message.type
@@ -304,14 +345,28 @@ class BaseWebsockets:
     async def message_handler(self, message: wsMessage):
         token = set_current_window(message.window)
         try:
+            if sessions.get_session(session_id=message.session_id) is None:
+                return
+
             event_handler = self.event_handler(message)
 
             if message.event_ref == 'document':
                 if event_handler.current_target:
-                    event_id = event_handler.current_target.events.__dict__.get(f'on{message.type}')
-                    if event_id and event_id in EventBook:
-                        handler: Callable[..., Any] = EventBook.get(event_id).get('event')
+                    raw = event_handler.current_target.events.__dict__.get(f'on{message.type}')
+                    handler: Callable[..., Any] | None = None
+                    event_id: str | None = None
 
+                    if callable(raw):
+                        handler = raw
+                        event_id = f'event_{id(handler)}'
+                    elif isinstance(raw, str):
+                        from pyweber.core.events import EventBook
+                        entry = EventBook.get(raw)
+                        if entry and callable(entry.get('event')):
+                            handler = entry['event']
+                            event_id = raw
+
+                    if handler and event_id:
                         if inspect.iscoroutinefunction(handler):
                             if event_id not in self.task_manager.active_handlers_async.get(message.session_id, {}):
                                 await self.task_manager.create_task_async(
@@ -355,10 +410,7 @@ class BaseWebsockets:
             session = sessions.get_session(session_id=session_id)
             current_template: 'Template' = data.get('template', None)
 
-            if current_template:
-                updated_template = current_template.clone()
-                # session.template = updated_template
-
+            if current_template and session is not None:
                 data['template'] = await self.get_template_diff(
                     session=session
                 )
@@ -499,13 +551,27 @@ class BaseWebsockets:
 
         diff = TemplateDiff()
 
+        if session.old_template is None:
+            try:
+                session.old_template = session.template.clone()
+            except Exception:
+                # No baseline → empty diff rather than crashing the WS send path
+                return {}
+
         for tag in ['head', 'body']:
+            old_el = session.old_template.querySelector(tag)
+            new_el = session.template.querySelector(tag)
+            if old_el is None or new_el is None:
+                continue
             diff.track_differences(
-                new_element=session.template.querySelector(tag),
-                old_element=session.old_template.querySelector(tag)
+                new_element=new_el,
+                old_element=old_el,
             )
 
-        session.old_template = session.template.clone()
+        try:
+            session.old_template = session.template.clone()
+        except Exception as exc:
+            PrintLine(text=f'template clone after diff failed: {exc}', level='ERROR')
 
         return diff.differences
 
@@ -518,18 +584,33 @@ class WebsocketManager(BaseWebsockets):
         self.ws_connections[connection.id] = connection
 
     def remove_connection(self, id: str):
-        if id in self.ws_connections:
-            self.ws_connections[id].close()
-            del self.ws_connections[id]
+        conn = self.ws_connections.pop(id, None)
+        if conn is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(conn.close())
+        except RuntimeError:
+            try:
+                conn.client.close()
+            except Exception:
+                pass
 
     def remove_all(self):
-        for id, conn in self.ws_connections.items():
-            conn.close()
-            del self.ws_connections[id]
+        ids = list(self.ws_connections.keys())
+        for conn_id in ids:
+            self.remove_connection(conn_id)
 
     def send_all(self, message: bytes):
-        for _, conn in self.ws_connections.items():
-            conn.send(message=message)
+        for conn in list(self.ws_connections.values()):
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(conn.send(message=message))
+            except RuntimeError:
+                try:
+                    asyncio.run(conn.send(message=message))
+                except Exception:
+                    pass
 
     def get_connection(self, id: str):
         return self.ws_connections.get(id, None)
@@ -549,12 +630,109 @@ class WebsocketManager(BaseWebsockets):
         # Ignore client-supplied session_id when cookie is missing/invalid
         return generate_session_id()
 
+    def bind_session_id(
+        self,
+        *,
+        client_session_id: str | None,
+        connection_id: str | None,
+        cookies: dict[str, str] | None,
+    ) -> tuple[str, bool]:
+        """Resolve the session for this WS connection.
+
+        Prefer an id already bound on the socket (``connection_id``). That stops
+        the handshake race where a second frame still has ``sessionId: null`` and
+        would otherwise mint a new session + ``clone_template`` (new UUIDs → no
+        event handlers match the DOM).
+
+        Returns ``(session_id, is_new)``.
+        """
+        if connection_id and connection_id in sessions.all_sessions:
+            return connection_id, False
+
+        if client_session_id and client_session_id in sessions.all_sessions:
+            return client_session_id, False
+
+        resolved = self.get_session_id(
+            session_id=client_session_id,
+            cookies=cookies or {},
+        )
+        if resolved in sessions.all_sessions:
+            return resolved, False
+
+        # Keep a stable id for this socket even before add_session runs
+        if connection_id:
+            return connection_id, True
+
+        return resolved, True
+
+    async def _ensure_session_and_template(
+        self,
+        message: wsMessage,
+        *,
+        connection_id: str | None,
+        cookies: dict[str, str] | None,
+        send_target,
+    ) -> tuple[str, 'Template', bool]:
+        """Bind session id *before* template sync, then create/reuse session."""
+        session_id, is_new = self.bind_session_id(
+            client_session_id=message.session_id,
+            connection_id=connection_id,
+            cookies=cookies,
+        )
+        message.session_id = session_id
+
+        sync_template = await self.get_sync_template(message=message)
+
+        if is_new:
+            self.add_session(
+                session_id=session_id,
+                template=sync_template,
+                window=message.window,
+                route=message.route,
+            )
+            self.ws_connections[session_id] = send_target
+            await self.send_message(
+                data={
+                    'setSessionId': session_id,
+                    'windowEvents': message.window.get_all_event_ids,
+                },
+                session_id=session_id,
+            )
+        else:
+            self.ws_connections[session_id] = send_target
+            if message.get_value(key='template'):
+                self.update_session(
+                    session_id=session_id,
+                    template=sync_template,
+                    window=message.window,
+                    route=message.route,
+                )
+                session = sessions.get_session(session_id=session_id)
+                if session:
+                    try:
+                        session.old_template = sync_template.clone()
+                    except Exception as exc:
+                        PrintLine(
+                            text=f'template clone for diff failed: {exc}',
+                            level='ERROR',
+                        )
+
+        return session_id, sync_template, is_new
+
     async def get_sync_template(self, message: wsMessage):
         assert isinstance(message, wsMessage)
         sync_template = await message.template
         session = sessions.get_session(session_id=message.session_id)
         if session:
-            session.old_template = sync_template.clone()
+            try:
+                session.old_template = sync_template.clone()
+            except Exception as exc:
+                # Never drop the WS event path because old_template clone failed
+                # (historically Form/Input attrs setters broke Element.clone).
+                PrintLine(text=f'template clone for diff failed: {exc}', level='ERROR')
+                # Do not alias template (that yields empty diffs after mutations).
+                if session.old_template is sync_template:
+                    session.old_template = None
         return sync_template
 
     def add_session(self, session_id: str, template: 'Template', window: 'Window', route: str):
@@ -578,7 +756,14 @@ class WebsocketManager(BaseWebsockets):
         sessions.remove_session(session_id=session_id)
 
         if session_id in self.ws_connections:
-            del self.ws_connections[session_id]
+            conn = self.ws_connections.pop(session_id)
+            try:
+                await conn.close()
+            except Exception:
+                try:
+                    conn.client.close()
+                except Exception:
+                    pass
 
         try:
             await self.task_manager.cancel_session_handlers(session_id=session_id)
@@ -596,19 +781,19 @@ class WebsocketManager(BaseWebsockets):
             if not isinstance(message, dict):
                 return {}
 
-            if not all(key in need_message_keys() for key in message):
+            # Require the JS contract keys (values may be null). Extra keys are
+            # ignored — do not invert this into an allowlist over message.keys()
+            # (that rejects nothing useful and confuses debugging).
+            required = need_message_keys()
+            if not all(key in message for key in required):
                 return {}
 
-            session_id = message.get('sessionId')
-            if (
-                not message.get('template')
-                and message.get('window_data')
-                and (not session_id or session_id not in sessions.all_sessions)
-            ):
+            if not _ws_message_is_actionable(message):
                 return {}
 
-            route = message.get('route', '')
+            route = message.get('route', '') or ''
             route = route[:-1] if route.endswith('/') and len(route) > 1 else route
+            message['route'] = route
             if route not in self.app.list_routes:
                 return {}
 
@@ -618,7 +803,7 @@ class WebsocketManager(BaseWebsockets):
             return {}
 
     async def ws_handler_wsgi(self, ws_server: WebsocketServer):
-        for message in ws_server:
+        async for message in ws_server:
             raw_message = self.process_ws_message_handler(message=message)
 
             if not raw_message:
@@ -632,54 +817,19 @@ class WebsocketManager(BaseWebsockets):
             if message.window_response:
                 await self.set_window_response(message.window_response, message.session_id)
 
-            sync_template = await self.get_sync_template(message=message)
-
-            is_new_session = (
-                not message.session_id
-                or any(
-                    session_id not in sessions.all_sessions
-                    for session_id in [message.session_id, ws_server.id]
-                )
+            session_id, sync_template, _is_new = await self._ensure_session_and_template(
+                message,
+                connection_id=ws_server.id,
+                cookies=getattr(ws_server, 'cookies', {}) or {},
+                send_target=ws_server,
             )
-
-            if is_new_session:
-                ws_server.id = self.get_session_id(
-                    session_id=message.session_id,
-                    cookies=getattr(ws_server, 'cookies', {}) or {},
-                )
-                self.ws_connections[ws_server.id] = ws_server
-
-                self.add_session(
-                    session_id=ws_server.id,
-                    template=sync_template,
-                    window=message.window,
-                    route=message.route
-                )
-
-                await self.send_message(
-                    data={
-                        'setSessionId': ws_server.id,
-                        'windowEvents': message.window.get_all_event_ids
-                    },
-                    session_id=ws_server.id
-                )
-
-            elif message.get_value(key='template'):
-                self.update_session(
-                    session_id=ws_server.id,
-                    template=sync_template,
-                    window=message.window,
-                    route=message.route
-                )
-                session = sessions.get_session(session_id=ws_server.id)
-                if session:
-                    session.old_template = sync_template.clone()
+            ws_server.id = session_id
 
             if message.type and message.event_ref and not event_is_running(
                 message=message, task_manager=self.task_manager
             ):
                 self.update_session(
-                    session_id=ws_server.id,
+                    session_id=session_id,
                     template=sync_template,
                     window=message.window,
                     route=message.route
@@ -711,55 +861,23 @@ class WebsocketManager(BaseWebsockets):
                             if message.file_content:
                                 await self.set_file_content(message.file_content, message.session_id)
 
-                            sync_template = await self.get_sync_template(message=message)
-
-                            is_new_session = (
-                                not message.session_id
-                                or message.session_id not in sessions.all_sessions
+                            session_id, sync_template, _is_new = await self._ensure_session_and_template(
+                                message,
+                                connection_id=ws_connection,
+                                cookies=handshake_cookies,
+                                send_target=send,
                             )
+                            ws_connection = session_id
 
-                            if is_new_session:
-                                ws_connection = self.get_session_id(
-                                    session_id=message.session_id,
-                                    cookies=handshake_cookies,
-                                )
-
-                                self.add_session(
-                                    session_id=ws_connection,
-                                    template=sync_template,
-                                    window=message.window,
-                                    route=message.route
-                                )
-
-                                self.ws_connections[ws_connection] = send
-
-                                await self.send_message(
-                                    data={
-                                        'setSessionId': ws_connection,
-                                        'windowEvents': message.window.get_all_event_ids,
-                                    },
-                                    session_id=ws_connection
-                                )
-
-                            elif message.get_value(key='template'):
+                            if message.type and message.event_ref and not event_is_running(
+                                message=message, task_manager=self.task_manager
+                            ):
                                 self.update_session(
                                     session_id=ws_connection,
                                     template=sync_template,
                                     window=message.window,
                                     route=message.route
                                 )
-                                session = sessions.get_session(session_id=ws_connection)
-                                if session:
-                                    session.old_template = sync_template.clone()
-
-                            if message.type and message.event_ref and not event_is_running(message=message, task_manager=self.task_manager):
-                                self.update_session(
-                                    session_id=ws_connection,
-                                    template=sync_template,
-                                    window=message.window,
-                                    route=message.route
-                                )
-
                                 await self.message_handler(message=message)
                 else:
                     break

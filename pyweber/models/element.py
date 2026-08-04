@@ -575,16 +575,19 @@ class ElementConstrutor:
 
         else:
             event_id = f'event_{id(event)}'
-            EventBook[event_id] = {
-                'event': event,
-                'elements': {
-                    element_id: []
+            if event_id not in EventBook:
+                EventBook[event_id] = {
+                    'event': event,
+                    'elements': {},
                 }
-            }
+            else:
+                EventBook[event_id]['event'] = event
 
-        EventBook.get(event_id).get('elements', {}).get(element_id, []).append(
-            type.removeprefix('on')
-        )
+        elements = EventBook[event_id].setdefault('elements', {})
+        bucket = elements.setdefault(element_id, [])
+        event_name = type.removeprefix('on')
+        if event_name not in bucket:
+            bucket.append(event_name)
 
         return event_id
 

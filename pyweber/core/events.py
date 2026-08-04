@@ -90,6 +90,10 @@ class EventHandler:
         self.event_data = event_data
         self.session = session
         self.__ws = ws
+        try:
+            self.__loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.__loop = None
 
     def update_all(self):
         self.__send__(data=self.__data_to_send__(), session_id=None)
@@ -113,15 +117,21 @@ class EventHandler:
         }
 
     def __send__(self, data: dict[str, Any], session_id: str):
+        coro = self.__ws.send_message(data=data, session_id=session_id, route=self.route)
         try:
-            asyncio.get_running_loop()
-            asyncio.create_task(
-                self.__ws.send_message(data=data, session_id=session_id, route=self.route)
-            )
+            running = asyncio.get_running_loop()
+            running.create_task(coro)
+            return
         except RuntimeError:
-            asyncio.run(
-                self.__ws.send_message(data=data, session_id=session_id, route=self.route)
-            )
+            pass
+
+        # Sync handlers run in ThreadPoolExecutor — bounce send onto the WS loop.
+        loop = self.__loop
+        if loop is not None and loop.is_running():
+            asyncio.run_coroutine_threadsafe(coro, loop)
+            return
+
+        asyncio.run(coro)
 
     def __repr__(self):
         return f'EventHandler(event_type: {self.event_type}, route: {self.route})'
@@ -184,6 +194,59 @@ class EventConstrutor:
 
 EventBook: dict[str, dict[str, Union[Callable, dict[str, list[str]]]]] = {}
 WindowBookEvents: dict[str, dict[str, Callable]] = {}
+
+
+def collect_element_uuids(root) -> set[str]:
+    """Collect all element uuids under ``root`` (Template.root or Element)."""
+    out: set[str] = set()
+    if root is None:
+        return out
+
+    def walk(el) -> None:
+        uid = getattr(el, 'uuid', None)
+        if uid:
+            out.add(str(uid))
+        for child in getattr(el, 'childs', None) or []:
+            walk(child)
+
+    walk(root)
+    return out
+
+
+def unregister_events_for_uuids(uuids: set[str] | None) -> int:
+    """Drop EventBook element refs; remove handlers with no remaining elements.
+
+    Returns the number of event_id entries fully removed.
+    """
+    if not uuids:
+        return 0
+    removed = 0
+    dead: list[str] = []
+    for event_id, entry in list(EventBook.items()):
+        elements = entry.get('elements') or {}
+        for uid in list(elements.keys()):
+            if uid in uuids:
+                del elements[uid]
+        if not elements:
+            dead.append(event_id)
+    for event_id in dead:
+        EventBook.pop(event_id, None)
+        removed += 1
+    return removed
+
+
+def cleanup_template_events(template) -> int:
+    """Unregister EventBook entries tied to elements in ``template``."""
+    if template is None:
+        return 0
+    root = getattr(template, 'root', template)
+    return unregister_events_for_uuids(collect_element_uuids(root))
+
+
+def clear_event_book() -> None:
+    """Clear the process-wide EventBook (tests / shutdown)."""
+    EventBook.clear()
+
 
 class TemplateEvents:
     def __init__(

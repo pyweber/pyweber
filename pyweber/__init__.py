@@ -105,7 +105,6 @@ from .utils.types import (
     EventType,
     HTMLTag,
     HTTPStatusCode,
-    JWTAlgorithms,
     NonSelfClosingHTMLTags,
     WebSocketStatusCode,
     WindowEventType,
@@ -305,3 +304,21 @@ __all__ = [
     'Label',
     'TextArea',
 ]
+
+
+def __getattr__(name: str):
+    if name == 'JWTAlgorithms':
+        from pyweber.utils.deprecation import warn_deprecated
+        from pyweber.utils.types import JWTAlgorithms as _JWTAlgorithms
+
+        warn_deprecated(
+            'pyweber.JWTAlgorithms',
+            alternative=(
+                'pyjwt (or similar) for encode/decode/verify; '
+                'pyweber.auth for session login. '
+                'JWTAlgorithms remains an algorithm-name enum only until 2.0'
+            ),
+            removal='2.0',
+        )
+        return _JWTAlgorithms
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

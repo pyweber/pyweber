@@ -89,3 +89,36 @@ class TestWsMessage:
         assert msg_a.window is not msg_b.window
         assert msg_a.window.session_storage.data['user'] == 'a'
         assert msg_b.window.session_storage.data['user'] == 'b'
+
+
+class TestWsMessageInsertValues:
+    @pytest.mark.asyncio
+    async def test_click_without_template_applies_form_values(self, raw_message, app, ws_manager):
+        """Clicks send values with template=null — must still hydrate input.value."""
+        from pyweber.core.element import Element
+        from pyweber.core.template import Template
+
+        tpl = Template(template='<html><head></head><body></body></html>')
+        body = tpl.body
+        while body.childs:
+            body.childs.pop()
+        body.content = None
+        inp = Element('input', attrs={'type': 'text', 'name': 'new_title'}, value='')
+        body.add_child(inp)
+
+        sessions.add_session(
+            'session-a',
+            Session(template=tpl, window=Window(), session_id='session-a', current_route='/'),
+        )
+        try:
+            raw_message['template'] = None
+            raw_message['values'] = {
+                inp.uuid: {'value': 'Hello from JS', 'selection_start': 0, 'selection_end': 0},
+            }
+            msg = wsMessage(raw_message=raw_message, app=app, ws=ws_manager)
+            synced = await msg.ensure_template()
+            live = synced.getElement(by='uuid', value=inp.uuid)
+            assert live is not None
+            assert live.value == 'Hello from JS'
+        finally:
+            sessions.remove_session('session-a')

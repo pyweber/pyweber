@@ -2,6 +2,9 @@
 
 This guide covers the installation process for PyWeber and setting up your development environment.
 
+!!! danger "Avoid versions ≤ 1.3.1"
+    Releases through **1.3.1** are **not recommended** for production (security gaps fixed in later lines). Install a current release (`>=1.5`). Details: [Supported versions](guides/supported-versions.md).
+
 ## Requirements
 
 PyWeber requires:
@@ -14,10 +17,10 @@ PyWeber requires:
 The simplest way to install PyWeber is using pip:
 
 ```bash
-pip install pyweber
+pip install -U 'pyweber>=1.5'
 ```
 
-This installs the latest stable version of PyWeber and all its dependencies.
+This installs a current stable version and its dependencies. Do **not** pin `==1.3.1` (or older) for new projects.
 
 ### Optional extras
 

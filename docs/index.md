@@ -4,6 +4,9 @@ Pyweber is a Python web framework for **reactive** applications: you manipulate 
 
 [![PyPI](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
+!!! danger "Use a supported release"
+    **≤ 1.3.1 is not recommended** (security). Prefer `pip install -U 'pyweber>=1.5'`. See [Supported versions](guides/supported-versions.md).
+
 ## Start here
 
 New to Pyweber? Follow this path:
@@ -25,10 +28,12 @@ Practical topics not covered in the API reference:
 | [Components](guides/components.md) | Inputs, forms, icons |
 | [File streaming](guides/file-streaming.md) | Large uploads via WebSocket |
 | [Routing advanced](guides/routing-advanced.md) | Query params, **multi-method routes**, 405, OpenAPI |
-| [Authentication](guides/authentication.md) | Login cookie, RBAC, SQLAlchemy User example |
-| [Database](guides/database.md) | Optional SQLAlchemy 2 + Alembic (`pyweber[db]`) |
-| [Session backends](guides/session-backends.md) | Memory / Redis for multi-replica WS |
+| [Authentication](guides/authentication.md) | Login cookie, RBAC, SQLAlchemy User example *(Added in 1.5)* |
+| [Database](guides/database.md) | Optional SQLAlchemy 2 + Alembic (`pyweber[db]`) *(Added in 1.6)* |
+| [Session backends](guides/session-backends.md) | Memory / Redis for multi-replica WS *(Added in 1.6)* |
 | [Deployment](guides/deployment.md) | ASGI, HTTPS, production |
+| [Supported versions](guides/supported-versions.md) | Security policy; yank ≤1.3.1 |
+| [Deprecations](guides/deprecations.md) | What leaves in **2.0** |
 
 ## Quick example
 

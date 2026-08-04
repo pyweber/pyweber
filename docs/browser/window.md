@@ -111,8 +111,17 @@ Displays a prompt dialog for user input.
 
 ### Navigation Methods
 
+!!! tip "Added in 1.6.0.dev2 (hardening)"
+    Absolute URLs require an allowlisted host; relative paths (`/dashboard`) always work.
+
 #### `open(url: str, new_page: bool = False)`
-Opens a URL in the current window or a new page.
+
+Open or navigate. Safe URLs only:
+
+- Relative: `/path`, `/a/b?x=1`
+- Absolute `http(s)://…` if the hostname is in `[security].allowed_redirect_hosts` / `PYWEBER_ALLOWED_REDIRECT_HOSTS` (or derived from CORS `allowed_origins`)
+
+Raises `ValueError` for `javascript:`, `data:`, protocol-relative `//…`, or non-allowlisted hosts.Opens a URL in the current window or a new page.
 
 **Parameters:**
 - `url`: URL to open
@@ -157,7 +166,10 @@ Encodes a string to Base64.
 
 **Returns:** Base64 encoded string
 
-### Timer Methods (1.5.3+)
+### Timer Methods
+
+!!! tip "Added in 1.5.3 / 1.6"
+    Browser-backed `set_timeout` / `set_interval` / `request_animation_frame` (and clear/cancel).
 
 Timers run in the **browser** via WebSocket. Callbacks are invoked on the server when the client reports completion. Returns an opaque `str` id (not `threading.Timer`).
 
@@ -229,7 +241,8 @@ async def user_interaction():
         print(f"User entered: {name_result.result}")
 
     # Navigation
-    window.open("https://example.com", new_page=True)
+    window.open("/dashboard", new_page=False)
+    # window.open("https://app.example/x")  # only if app.example is allowlisted
 ```
 
 ### Event Handling

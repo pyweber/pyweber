@@ -1,5 +1,8 @@
 # Response
 
+!!! tip "Added in 1.5.1"
+    Ergonomic helpers `Response.json` / `.text` / `.html` and constructor kwargs `content=` / `status=`.
+
 The `Response` class handles HTTP response generation and formatting for both WSGI and ASGI modes, providing a unified interface for creating HTTP responses with proper headers, status codes, and content.
 
 ## Response Class
@@ -16,12 +19,15 @@ Response(
     route=None,
     headers=None,          # extra headers (e.g. WWW-Authenticate)
     allowed_methods=None,
-    # Legacy aliases still work:
+    # Legacy aliases still work until 2.0:
     response_content=...,
     code=...,
     response_type=...,
 )
 ```
+
+!!! warning "Deprecated — removed in 2.0"
+    Prefer `content` / `status` (and `Response.json` / `.html` / `.text`) over `response_content` / `code` / `response_type`. See [Deprecations](../guides/deprecations.md).
 
 **Helpers:**
 ```python

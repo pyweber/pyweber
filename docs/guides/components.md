@@ -59,6 +59,12 @@ form = pw.Form(
 
 ## Icons (Bootstrap Icons)
 
+!!! tip "Added in 1.5.1 (module move)"
+    Prefer `from pyweber.utils.icons import Icons` when using the enum.
+
+!!! warning "Deprecated — removed in 2.0"
+    `from pyweber.utils.types import Icons` still works but emits `DeprecationWarning`. Use `pyweber.utils.icons.Icons`. See [Deprecations](deprecations.md).
+
 ```python
 play = pw.Icon(classes=['bi', 'bi-play-fill'])
 ```

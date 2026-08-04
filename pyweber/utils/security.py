@@ -189,6 +189,84 @@ def get_allowed_origins() -> set[str]:
     return {str(o).rstrip('/') for o in origins if o}
 
 
+def get_allowed_redirect_hosts() -> set[str]:
+    """Hostnames allowed for absolute redirects (``Window.open`` / ``to_url`` / ``launch_url``).
+
+    Config: ``[security].allowed_redirect_hosts`` or ``PYWEBER_ALLOWED_REDIRECT_HOSTS``.
+    Also accepts hostnames extracted from ``allowed_origins`` / ``PYWEBER_ALLOWED_ORIGINS``.
+    Empty set ⇒ only relative paths (``/…``) are permitted.
+    """
+    from urllib.parse import urlparse
+
+    hosts: set[str] = set()
+    raw = _config().get('security', 'allowed_redirect_hosts', default=None)
+    if raw is None:
+        raw = []
+    if isinstance(raw, str):
+        raw = [h.strip() for h in raw.split(',') if h.strip()]
+    env = os.environ.get('PYWEBER_ALLOWED_REDIRECT_HOSTS')
+    if env:
+        raw = list(raw) + [h.strip() for h in env.split(',') if h.strip()]
+    for item in raw:
+        item = str(item).strip().lower()
+        if not item:
+            continue
+        if '://' in item:
+            host = urlparse(item).hostname
+            if host:
+                hosts.add(host.lower())
+        else:
+            hosts.add(item.rstrip('/'))
+
+    for origin in get_allowed_origins():
+        host = urlparse(origin).hostname if '://' in origin else origin
+        if host:
+            hosts.add(host.lower())
+    return hosts
+
+
+def is_safe_redirect_url(url: str, *, allowed_hosts: set[str] | None = None) -> bool:
+    """Return True if ``url`` is a safe in-app or allowlisted absolute redirect."""
+    from urllib.parse import urlparse
+
+    if url is None:
+        return False
+    text = str(url).strip()
+    if not text:
+        return False
+
+    lower = text.lower()
+    if lower.startswith(('javascript:', 'data:', 'vbscript:', 'blob:', 'file:')):
+        return False
+    # Protocol-relative //evil.example
+    if text.startswith('//'):
+        return False
+    # App-relative path
+    if text.startswith('/') and not text.startswith('//'):
+        return True
+
+    parsed = urlparse(text)
+    if parsed.scheme not in ('http', 'https'):
+        return False
+    host = (parsed.hostname or '').lower()
+    if not host:
+        return False
+    allowed = allowed_hosts if allowed_hosts is not None else get_allowed_redirect_hosts()
+    return host in allowed
+
+
+def ensure_safe_redirect_url(url: str, *, allowed_hosts: set[str] | None = None) -> str:
+    """Return ``url`` if safe, otherwise raise ``ValueError``."""
+    if is_safe_redirect_url(url, allowed_hosts=allowed_hosts):
+        return str(url).strip()
+    raise ValueError(
+        f'Unsafe redirect URL rejected: {url!r}. '
+        'Use a relative path (/…) or add the host to '
+        '[security].allowed_redirect_hosts / PYWEBER_ALLOWED_REDIRECT_HOSTS '
+        '(or allowed_origins).'
+    )
+
+
 def get_max_body_size() -> int:
     value = os.environ.get('PYWEBER_MAX_BODY_SIZE') or _config().get(
         'security', 'max_body_size', default=DEFAULT_MAX_BODY_SIZE

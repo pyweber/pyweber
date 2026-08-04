@@ -39,6 +39,9 @@ backend = 'memory'
 
 [security]
 allowed_origins = []
+# Hosts for Window.open / to_url / launch_url absolute URLs (relative /paths always OK).
+# Also inherits hostnames from allowed_origins. Env: PYWEBER_ALLOWED_REDIRECT_HOSTS
+allowed_redirect_hosts = []
 max_body_size = 10485760
 csrf_enabled = true
 rate_limit_enabled = false

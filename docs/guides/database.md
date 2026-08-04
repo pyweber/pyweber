@@ -1,5 +1,8 @@
 # Database (SQLAlchemy + Alembic)
 
+!!! tip "Added in 1.6.0"
+    Optional extra — core `pip install pyweber` stays free of SQLAlchemy. Install `pyweber[db]` (+ a driver extra).
+
 PyWeber does **not** ship an ORM in the core install. Persistence is an **optional extra** built on **SQLAlchemy 2.0 (async-first)** with a thin Flask-SQLAlchemy-style wrapper and **Alembic** for migrations.
 
 ```bash

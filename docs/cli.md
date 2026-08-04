@@ -141,7 +141,8 @@ pyweber add-section --section-name database
 
 ## Database migrations (optional)
 
-Requires `pip install 'pyweber[db]'` (plus a driver extra such as `db-sqlite` / `db-pg`). Thin wrappers around Alembic:
+!!! tip "Added in 1.6.0"
+    Requires `pip install 'pyweber[db]'` (plus a driver extra). Thin wrappers around Alembic.
 
 ```bash
 pyweber db init                  # alembic.ini + migrations/ (async)

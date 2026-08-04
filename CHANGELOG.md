@@ -9,6 +9,7 @@
 - **`pyweber.services`** collaborators — `StaticFilesService`, `ResponsePipeline`, `TemplateService`, `OpenAPISetup`. `Pyweber` keeps the flat public API (`app.route`, `app.set_cookie`, …) via mixins, but CSRF/gzip/ETag/static/OpenAPI logic lives in composed services.
 - **`Window.set_timeout` / `set_interval` / `clear_*` / `request_animation_frame` / `cancel_animation_frame`** — aligned with the existing WebSocket protocol in `static/js.js`. Timer responses no longer steal the confirm/prompt Future.
 - Declarative HTML inputs — shared `_EXTRA_ATTRS` / `_sync_attrs` on `Input`; text-like and date/time families share internal bases (public class names unchanged).
+- **Safe redirects** (`1.6.0.dev2`) — `Window.open` / `to_url` / `launch_url` allow relative `/…` or hosts in `allowed_redirect_hosts` / `PYWEBER_ALLOWED_REDIRECT_HOSTS`.
 
 ### Changed
 
@@ -16,11 +17,31 @@
 - **`Window.scroll_by`** sends a true `scroll_by` payload (delta), matching the client handler.
 - Default `[database]` / `session.backend` keys in shipped `config.toml` for optional persistence.
 - **WS DOM sync** — client outerHTML is **merged by uuid** into the existing Python tree (no wholesale `parse_html` replace). Handoff **moves** the same `Template` instance into the session. `Element`/`Template.clone` preserve subclass type; route `Element`s are adopted without HTML round-trip. Bound handlers can use `self` after the first render. See [docs/guides/reactivity.md](docs/guides/reactivity.md).
+- Docs: **Added in X.Y** tips on feature pages; expanded [deprecations](docs/guides/deprecations.md); [supported versions](docs/guides/supported-versions.md) marks **≤1.3.1** as not recommended (PyPI **yank** for install warnings — not expressible in `pyproject.toml`).
+- **EventBook lifecycle** (`1.6.0.dev2`) — cleanup by element uuid when a session is removed.
+- **WS `close`/`send`** (`1.6.0.dev2`) — no discarded coroutines from `remove_connection` / `send_all`.
+- **`wsMessage.template`** (`1.6.0.dev2`) — lazy `ensure_template()` (no un-awaited coroutine in `__init__`).
+- **`JWTAlgorithms`** (`1.6.0.dev2`) — public import warns; enum-only until **2.0**.
 
 ### Fixed
 
 - Duplicate `InputCheckbox` export in `components.__all__` / package `__all__`.
 - **`self` orphaned after WS connect** — session tree no longer replaced by a fresh parse; subclass refs (`self.label`, etc.) stay live.
+- **Reactive WS events** (`1.6.0.dev3`) — end-to-end fixes so clicks/`e.update()` work again:
+  - **`Form`/`Input` `Element.clone`** — subclass `attrs` setters no longer abort clone (empty diffs / lost handlers).
+  - **`Template.clone`** — bound methods (`self.handler`) and Element refs (`self.page_title`) rebind onto the clone so `clone_template` / reconnect still mutate the live tree.
+  - **Document event dispatch** — call the callable on `element.events` (EventBook id lookup never matched callables).
+  - **`process_ws_message_handler`** — no longer drop clicks/`handoff` when `template` is null and the session is not yet registered; require the JS key contract instead of an inverted allowlist.
+  - **WSGI consumer** — `async for` on `WebsocketServer` plus a single long-lived handler task (sync `for` exited after the first drain).
+  - **Session bind before template sync** — reuse `ws_server.id` / cookie so a second frame with `sessionId: null` does not mint another session + `setSessionId` (UUID mismatch → handlers never found).
+  - **Form `values` on clicks** — `insert_values` always runs when the payload has `values`, even with `template: null` (input text was ignored before `e.update()`).
+  - **`e.update()` from sync handlers** — schedule `send_message` on the WS event loop via `run_coroutine_threadsafe` (ThreadPoolExecutor had no running loop).
+  - **Client `setSessionId`** — always accept the server id; apply it before flushing buffered window events.
+  - **JS-injected DOM** — debounced `MutationObserver` + `window.__pyweber_adopt(el)` / `__pyweber_resyncDom()` stamp uuids and `merge_client_dom` grafts into the session; disable with `<meta name="pyweber-dom-watch" content="off">`.
+
+### Removed
+
+- **`Element.update()`** stub (`1.6.0.dev2`) — use `e.update()`; surgical per-element WS push remains out of scope.
 
 ## [1.5.2] - Unreleased
 

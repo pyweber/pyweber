@@ -264,9 +264,12 @@ class Window:
         )
 
     def open(self, url: str, new_page: bool = False) -> "Window":
-        """Open a new window or redirect to new url."""
-        self.__send__(data={'open': {'path': url, 'new_page': new_page}})
+        """Open a new window or redirect to a new url (relative or allowlisted host)."""
+        from pyweber.utils.security import ensure_safe_redirect_url
 
+        safe = ensure_safe_redirect_url(url)
+        self.__send__(data={'open': {'path': safe, 'new_page': new_page}})
+        return self
     def close(self):
         """Close the current window if it was openned with script."""
         self.__send__(data={'close': True})

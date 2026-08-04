@@ -46,8 +46,8 @@ e.update_all()     # Sync state to other connected clients
 e.reload()         # Reload the current page
 ```
 
-!!! note "`e.element` is deprecated"
-    Use `e.target` instead. `e.element` still works but will be removed in a future release.
+!!! warning "Deprecated — removed in 2.0"
+    Use `e.target` instead of `e.element`. See [Deprecations](../guides/deprecations.md).
 
 ## Registering Event Handlers
 

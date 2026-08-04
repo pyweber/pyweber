@@ -265,6 +265,7 @@ class Element(ElementConstrutor):
 
         element = self
         cls = type(self)
+        attrs_data = self.__deepy_clone(element.attrs)
 
         init_kwargs = dict(
             tag=element.tag,
@@ -273,7 +274,9 @@ class Element(ElementConstrutor):
             value=element.value,
             classes=self.__deepy_clone(element.classes),
             style=self.__deepy_clone(element.style),
-            attrs=self.__deepy_clone(element.attrs),
+            # Form/Input/Label/… attrs setters reject non-empty dicts. Pass {}
+            # during Element.__init__ and restore snapshot afterwards.
+            attrs={} if cls is not Element else attrs_data,
             events=TemplateEvents(**element.events.__dict__),
             sanitize=getattr(element, 'sanitize', True),
             files=list(getattr(element, 'files', []) or []),
@@ -287,6 +290,7 @@ class Element(ElementConstrutor):
             # Avoid subclass __init__ (would rebuild a different tree).
             cln = object.__new__(cls)
             Element.__init__(cln, childs=None, data=getattr(element, 'data', None), **init_kwargs)
+            self._restore_cloned_attrs(cln, attrs_data)
 
         cln.uuid = element.uuid
         cln.parent = None
@@ -316,6 +320,9 @@ class Element(ElementConstrutor):
             }
             for key, val in element.__dict__.items():
                 if key in skip or key.startswith('_Element') or key.startswith('_ElementConstrutor'):
+                    continue
+                # Already restored via _restore_cloned_attrs (avoid sharing the live dict)
+                if key.endswith('__attrs'):
                     continue
                 if isinstance(val, Element) and val.uuid and val.uuid in uuid_map:
                     object.__setattr__(cln, key, uuid_map[val.uuid])
@@ -465,9 +472,6 @@ class Element(ElementConstrutor):
 
         return file_path
 
-    def update(self):
-        raise NotImplementedError
-
     def __deepy_clone(self, obj):
         if isinstance(obj, list):
             return [self.__deepy_clone(item) for item in obj]
@@ -475,6 +479,19 @@ class Element(ElementConstrutor):
             return {chave: self.__deepy_clone(valor) for chave, valor in obj.items()}
         else:
             return obj
+
+    @staticmethod
+    def _restore_cloned_attrs(cln: 'Element', attrs_data: dict) -> None:
+        """Write attrs onto subclass private storage (``_Form__attrs``, etc.)."""
+        attrs_data = dict(attrs_data or {})
+        for klass in type(cln).__mro__:
+            if klass is ElementConstrutor:
+                object.__setattr__(cln, '_ElementConstrutor__attrs', attrs_data)
+                return
+            if 'attrs' in klass.__dict__:
+                object.__setattr__(cln, f'_{klass.__name__}__attrs', attrs_data)
+                return
+        object.__setattr__(cln, '_ElementConstrutor__attrs', attrs_data)
 
 
     def __str__(self):

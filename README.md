@@ -14,16 +14,24 @@ Pyweber is a lightweight Python web framework designed to create dynamic, reacti
 - **Intuitive DOM Manipulation**: Query and modify elements with familiar selectors
 - **Event-Driven Programming**: Handle user interactions with Python event handlers
 - **WebSocket Integration**: Real-time communication between client and server
-- **Template Handoff (1.3.0)**: WebSocket sessions reuse the HTTP-rendered template — handlers are not executed twice on connect
+- **Template Handoff (1.3.0+)**: WebSocket sessions reuse the HTTP-rendered template — handlers are not executed twice on connect
+- **Identity-preserving sync (1.6.0+)**: `self` / subclass element refs stay valid after WS connect
+- **Optional ORM & Redis sessions (1.6.0+)**: `pyweber[db]`, `pyweber[redis]`
+- **Auth & RBAC (1.5+)**: signed login cookie, roles/permissions
 - **Minimal Configuration**: Get started quickly with sensible defaults
 
 ## Quick Start
 
 ### Installation
 
+!!! danger "Avoid ≤ 1.3.1"
+    Older lines are **not recommended** for production. Use a current release:
+
 ```bash
-pip install pyweber
+pip install -U 'pyweber>=1.5'
 ```
+
+See [Supported versions](https://pyweber.dev/guides/supported-versions/) (docs) for yank / security notes. `pyproject.toml` cannot warn when someone pins an old wheel — that requires [PyPI yanking](https://docs.pypi.org/project-management/yanking/).
 
 ### Create a Project
 

@@ -25,8 +25,19 @@ class wsMessage:
         self.event_data: dict[str, int] = self.get_value(key='event_data') or {}
         self.session_id: str = self.get_value(key='sessionId')
         self.window_event: str = self.get_value(key='window_event')
-        self.template = self.get_template()
+        self._resolved_template = None
         self.window = self.get_window()
+
+    async def ensure_template(self):
+        """Resolve and cache the session template (call once per message)."""
+        if self._resolved_template is None:
+            self._resolved_template = await self.get_template()
+        return self._resolved_template
+
+    @property
+    def template(self):
+        """Awaitable alias: ``await message.template`` → ``ensure_template()``."""
+        return self.ensure_template()
 
     @property
     def window_response(self) -> dict[str, (str, int)]:
@@ -64,7 +75,7 @@ class wsMessage:
                 or (used_handoff and 'uuid=' not in client_html.lower())
             )
             if keep_server:
-                self.insert_values(element=session_template.root)
+                pass
             else:
                 # Preserve Python object identity (self / bound handlers).
                 from pyweber.models.dom_merge import merge_client_dom
@@ -74,7 +85,11 @@ class wsMessage:
                     client_html,
                     include_uuid=getattr(session_template, 'include_uuid', True),
                 )
-                self.insert_values(element=session_template.root)
+
+        # Always apply browser field values — click events send values with
+        # template=null, so this must not be gated on client_html.
+        if self.__values:
+            self.insert_values(element=session_template.root)
 
         return session_template
 

@@ -109,10 +109,6 @@ class TestWebsocketManager:
     def manager(self, pyweber_app):
         return pyweber_app.ws_server
 
-    def test_process_ws_message_rejects_incomplete(self, manager):
-        assert manager.process_ws_message_handler('not-json') == {}
-        assert manager.process_ws_message_handler(json.dumps({'foo': 'bar'})) == {}
-
     def test_process_ws_message_valid_minimal(self, manager):
         message = {
             'type': '',
@@ -128,10 +124,42 @@ class TestWebsocketManager:
             'window_event': '',
             'sessionId': 'sess-test',
             'file_content': {},
+            'handoffToken': None,
         }
         result = manager.process_ws_message_handler(json.dumps(message))
         assert result.get('route') == '/'
 
+    def test_process_ws_message_accepts_click_without_session(self, manager):
+        """Clicks must not be dropped before the WS handler can create/bind a session."""
+        message = {
+            'type': 'click',
+            'event_ref': 'document',
+            'route': '/',
+            'target_uuid': 'u1',
+            'current_target_uuid': 'u1',
+            'template': None,
+            'values': {},
+            'event_data': {},
+            'window_data': {'width': 100},
+            'window_response': {},
+            'window_event': None,
+            'sessionId': None,
+            'file_content': {},
+            'handoffToken': None,
+        }
+        result = manager.process_ws_message_handler(json.dumps(message))
+        assert result.get('type') == 'click'
+        assert result.get('route') == '/'
+
+    def test_process_ws_message_rejects_incomplete(self, manager):
+        assert manager.process_ws_message_handler('not-json') == {}
+        assert manager.process_ws_message_handler(json.dumps({'foo': 'bar'})) == {}
+        # Missing required contract keys
+        assert manager.process_ws_message_handler(json.dumps({
+            'type': 'click',
+            'event_ref': 'document',
+            'route': '/',
+        })) == {}
     def test_add_session(self, manager):
         from pyweber.core.window import Window
         from pyweber.connection.session import sessions

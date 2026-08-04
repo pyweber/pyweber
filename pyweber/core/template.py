@@ -275,7 +275,12 @@ class Template:
         return root
 
     def clone(self):
-        """Deep-copy the template tree, preserving subclass type when possible."""
+        """Deep-copy the template tree, preserving subclass type when possible.
+
+        Bound event handlers (``self.handler``) are rebound to the clone so
+        ``clone_template`` / reconnect sessions still mutate the live tree and
+        produce a non-empty DOM diff on ``e.update()``.
+        """
         cls = type(self)
         tpl = object.__new__(cls)
         tpl._Template__include_uuid = self._Template__include_uuid
@@ -286,4 +291,66 @@ class Template:
         tpl._Template__icon = self._Template__icon
         tpl._Template__title = self._Template__title
         tpl._Template__root = self.root.clone
+
+        uuid_map = self._index_elements_by_uuid(tpl.root)
+
+        # Remap ``self.title_el``-style Element refs onto the cloned tree
+        if isinstance(tpl._Template__title, Element):
+            title_uid = getattr(tpl._Template__title, 'uuid', None)
+            if title_uid and title_uid in uuid_map:
+                tpl._Template__title = uuid_map[title_uid]
+
+        skip = {
+            'kwargs', 'data',
+            '_Template__include_uuid', '_Template__template',
+            '_Template__status_code', '_Template__icon',
+            '_Template__title', '_Template__root',
+        }
+        for key, val in self.__dict__.items():
+            if key in skip:
+                continue
+            if isinstance(val, Element):
+                uid = getattr(val, 'uuid', None)
+                if uid and uid in uuid_map:
+                    object.__setattr__(tpl, key, uuid_map[uid])
+            else:
+                try:
+                    object.__setattr__(tpl, key, val)
+                except AttributeError:
+                    tpl.__dict__[key] = val
+
+        self._rebind_events_to_clone(tpl)
         return tpl
+
+    @staticmethod
+    def _index_elements_by_uuid(root: Element) -> dict[str, Element]:
+        out: dict[str, Element] = {}
+
+        def walk(el: Element) -> None:
+            uid = getattr(el, 'uuid', None)
+            if uid:
+                out[str(uid)] = el
+            for child in getattr(el, 'childs', None) or []:
+                walk(child)
+
+        if root is not None:
+            walk(root)
+        return out
+
+    def _rebind_events_to_clone(self, cloned: 'Template') -> None:
+        """Point bound methods that closed over ``self`` at ``cloned`` instead."""
+
+        def rebind(el: Element) -> None:
+            events = getattr(el, 'events', None)
+            if events is not None:
+                for name, handler in list(vars(events).items()):
+                    if handler is None:
+                        continue
+                    owner = getattr(handler, '__self__', None)
+                    func = getattr(handler, '__func__', None)
+                    if owner is self and func is not None:
+                        setattr(events, name, func.__get__(cloned, type(cloned)))
+            for child in getattr(el, 'childs', None) or []:
+                rebind(child)
+
+        rebind(cloned.root)

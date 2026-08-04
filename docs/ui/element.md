@@ -193,6 +193,9 @@ element.toggle_class("selected")
 element.toggle_class("expanded collapsed")  # Toggle multiple classes
 ```
 
+!!! warning "Deprecated — removed in 2.0"
+    `toogle_class` (typo alias) still works but emits `DeprecationWarning`. Use `toggle_class`. See [Deprecations](../guides/deprecations.md).
+
 ## Working with Styles
 ```python
 # Set styles

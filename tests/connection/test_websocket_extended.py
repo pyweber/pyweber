@@ -60,6 +60,25 @@ class TestWebsocketManagerExtended:
         cookies = {SESSION_COOKIE_NAME: sign_value('fixed')}
         assert manager.get_session_id(session_id='ignored', cookies=cookies) == 'fixed'
 
+    def test_bind_session_reuses_connection_id(self, manager):
+        """Second frame with null client sessionId must not mint a new session."""
+        from pyweber.connection.session import sessions
+        from pyweber.core.template import Template
+        from pyweber.core.window import Window
+
+        first, is_new = manager.bind_session_id(
+            client_session_id=None, connection_id=None, cookies={}
+        )
+        assert is_new
+        manager.add_session(first, Template('<html></html>'), Window(), '/')
+
+        second, is_new2 = manager.bind_session_id(
+            client_session_id=None, connection_id=first, cookies={}
+        )
+        assert is_new2 is False
+        assert second == first
+        sessions.remove_session(first)
+
     @pytest.mark.asyncio
     async def test_send_message_broadcast(self, manager):
         sent = []
@@ -106,9 +125,21 @@ class TestWebsocketManagerExtended:
     def test_process_ws_message_non_dict_json(self, manager):
         assert manager.process_ws_message_handler(json.dumps([1, 2, 3])) == {}
 
-    def test_process_ws_message_missing_session_without_template(self, manager):
-        msg = self._full_message(template='', sessionId='missing-session')
+    def test_process_ws_message_idle_window_data_without_session(self, manager):
+        """Non-actionable keepalives (no event/template/handoff) stay rejected."""
+        msg = self._full_message(template='', sessionId='missing-session', type='', event_ref='')
         assert manager.process_ws_message_handler(json.dumps(msg)) == {}
+
+    def test_process_ws_message_click_without_session_ok(self, manager):
+        msg = self._full_message(
+            template=None,
+            sessionId=None,
+            type='click',
+            event_ref='document',
+            handoffToken=None,
+        )
+        result = manager.process_ws_message_handler(json.dumps(msg))
+        assert result.get('type') == 'click'
 
     def test_process_ws_message_unknown_route(self, manager):
         msg = self._full_message(route='/no-such-route')

@@ -1,5 +1,8 @@
 # Session backends (memory / Redis)
 
+!!! tip "Added in 1.6.0"
+    Pluggable `SessionStore` — default remains in-process memory. Redis requires `pyweber[redis]`.
+
 Reactive WebSocket sessions (`connection.session.Session`) default to an **in-process memory** store. That is fine for a single worker; horizontal scale needs a shared backend.
 
 ```bash
