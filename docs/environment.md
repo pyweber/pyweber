@@ -29,7 +29,7 @@ PyWeber supports configuration through environment variables, allowing you to ov
 !!! tip "Added in 1.6.0"
     `PYWEBER_DATABASE_URL`, `PYWEBER_SESSION_BACKEND`, `PYWEBER_REDIS_URL` (and `DATABASE_URL` / `REDIS_URL` aliases).
 
-!!! tip "Added in 1.6.0.dev2"
+!!! tip "Added in 1.6.0"
     `PYWEBER_ALLOWED_REDIRECT_HOSTS` / `[security].allowed_redirect_hosts` — open-redirect hardening.
 ## Security config (`config.toml`)
 

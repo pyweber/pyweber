@@ -13,7 +13,7 @@ async def handle_click(self, e: pw.EventHandler):
 
 Without `e.update()`, changes stay on the server until the next full page load.
 
-!!! tip "Fixed in 1.6.0.dev3"
+!!! tip "Fixed in 1.6.0"
     Click payloads often send `template: null` with a `values` map (input text by uuid). The server always applies those values before your handler runs, so `input.value` / `e.current_target.parent.childs[0].value` reflect what the user typed. WS session bind and Form/Input clone regressions that dropped events or resent `setSessionId` every frame are also fixed — see [CHANGELOG](../changelog.md).
 
 ### Other EventHandler actions
@@ -118,8 +118,8 @@ Desligar o observer automático (páginas com muito DOM dinâmico irrelevante pa
 <meta name="pyweber-dom-watch" content="off">
 ```
 
-!!! tip "Added in 1.6.0.dev3"
-    `MutationObserver` + `__pyweber_adopt` — injects JS-side leave the server tree without waiting for the next full reload.
+!!! tip "Added in 1.6.0"
+    `MutationObserver` + `__pyweber_adopt` — JS-side injects leave the server tree without waiting for the next full reload.
 
 !!! warning "Limites"
     - Elementos **sem** `uuid` não entram em `getFormValues()` / eventos Pyweber até ao sync

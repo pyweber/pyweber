@@ -111,7 +111,7 @@ Displays a prompt dialog for user input.
 
 ### Navigation Methods
 
-!!! tip "Added in 1.6.0.dev2 (hardening)"
+!!! tip "Added in 1.6.0 (hardening)"
     Absolute URLs require an allowlisted host; relative paths (`/dashboard`) always work.
 
 #### `open(url: str, new_page: bool = False)`

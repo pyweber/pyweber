@@ -4,17 +4,18 @@
 
 | Versions | Status |
 |----------|--------|
-| **Latest 1.5+ / 1.6+** | Recommended |
+| **1.6.x (latest)** | Recommended |
+| **1.5.x** | Supported; prefer upgrading to 1.6 |
 | **1.4.x** | Use only if you cannot upgrade yet; prefer latest patch |
 | **≤ 1.3.1** | **Not recommended** — treat as insecure for internet-facing apps |
 
 !!! danger "Do not deploy ≤ 1.3.1"
-    Technical audit findings (CORS, CSRF, XSS/sanitize edges, path traversal, unsigned WS session cookies, missing security headers, body limits, etc.) apply to the **≤ 1.3.1** line. Later releases addressed those classes of issues. Prefer `pip install -U pyweber` (or pin `pyweber>=1.5`).
+    Technical audit findings (CORS, CSRF, XSS/sanitize edges, path traversal, unsigned WS session cookies, missing security headers, body limits, etc.) apply to the **≤ 1.3.1** line. Later releases addressed those classes of issues. Prefer `pip install -U pyweber` (or pin `pyweber>=1.6`).
 
 Always install a current release:
 
 ```bash
-pip install -U 'pyweber>=1.5'
+pip install -U 'pyweber>=1.6'
 ```
 
 Pinning an old insecure line for “stability” is a false economy on a web framework.
@@ -29,7 +30,7 @@ What **does** work on PyPI:
 
 [Yank](https://docs.pypi.org/project-management/yanking/) each insecure release on PyPI with a clear reason, e.g.:
 
-> Security: versions ≤1.3.1 are not recommended; upgrade to ≥1.5. See https://pyweber.dev/guides/supported-versions/
+> Security: versions ≤1.3.1 are not recommended; upgrade to ≥1.6. See https://pyweber.dev/guides/supported-versions/
 
 Effects:
 

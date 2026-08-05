@@ -5,7 +5,7 @@ Pyweber is a Python web framework for **reactive** applications: you manipulate 
 [![PyPI](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 !!! danger "Use a supported release"
-    **≤ 1.3.1 is not recommended** (security). Prefer `pip install -U 'pyweber>=1.5'`. See [Supported versions](guides/supported-versions.md).
+    **≤ 1.3.1 is not recommended** (security). Prefer `pip install -U 'pyweber>=1.6'`. See [Supported versions](guides/supported-versions.md).
 
 ## Start here
 

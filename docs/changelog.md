@@ -6,32 +6,42 @@ Feature pages also use **Added in X.Y** tips — see [Doc conventions](guides/do
 
 ---
 
-## 1.6.0 — Unreleased (`dev3`)
+## 1.6.0 — 2026-08-05
 
 ### New
 
 - **Optional ORM** — `pyweber[db]`: SQLAlchemy 2 async (`db` / `Model`), Alembic via `pyweber db …` ([guide](guides/database.md))
 - **Session backends** — memory (default) or Redis (`pyweber[redis]`) ([guide](guides/session-backends.md))
 - **Safe redirects** — relative `/…` or allowlisted hosts for `Window.open` / `to_url` / `launch_url`
+- **JS DOM adopt** — `MutationObserver` + `__pyweber_adopt` / `__pyweber_resyncDom` merge browser-injected nodes into the session ([reactivity](guides/reactivity.md))
 - Docs: **Added in** badges, deprecation inventory, supported-versions / yank guidance for ≤1.3.1
 
 ### Changed
 
 - Static routes resolve in **O(1)**; static paths win over dynamic for the same URL
-- **WS sync preserves `self`** — merge-by-uuid + handoff move ([reactivity](guides/reactivity.md))
+- **WS sync preserves `self`** — merge-by-uuid + handoff move; `Template.clone` rebinds handlers ([reactivity](guides/reactivity.md))
 - EventBook cleaned on session remove; WS `close`/`send` no longer drop coroutines
 - `JWTAlgorithms` public import warns (enum-only; prefer `pyjwt` + `pyweber.auth`)
 
 ### Fixed
 
-- **Reactive WS (`dev3`)** — clicks and `e.update()` work again: Form/Input clone, `Template.clone` rebinds `self.*`, event dispatch, WS message validation, WSGI `async for` consumer, session bind before template sync (no repeated `setSessionId`), form `values` applied when `template` is null, `e.update()` from thread pool, client `setSessionId` authoritative
-- **JS-injected DOM (`dev3`)** — debounced `MutationObserver` + `window.__pyweber_adopt(el)` stamp uuids and merge into the server session (`meta pyweber-dom-watch=off` to disable)
+- **Reactive WebSocket** — clicks and `e.update()` work reliably (Form/Input clone, event dispatch, WS validation, WSGI `async for`, session bind before template sync, form `values` with `template: null`, thread-safe `e.update()`, authoritative `setSessionId`)
+- **Inline `<script>` / `<style>`** — bodies are not HTML-escaped when `sanitize=True`
 
 ### Removed
 
 - `Element.update()` stub — use `e.update()`
 
-## 1.5.2 — Unreleased
+### Upgrade tips (1.6)
+
+| Topic | Action |
+|-------|--------|
+| Install | `pip install -U 'pyweber>=1.6'` |
+| ORM / Redis | Optional extras only — core install stays light |
+| Custom JS DOM | Prefer `__pyweber_adopt(el)` or leave auto-watch on; set `pyweber-dom-watch=off` if noisy |
+| After upgrade | Hard-refresh the browser so `static/js.js` updates |
+
+## 1.5.2 — 2026-08-05
 
 ### Fixed
 

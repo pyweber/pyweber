@@ -28,7 +28,7 @@ Pyweber is a lightweight Python web framework designed to create dynamic, reacti
     Older lines are **not recommended** for production. Use a current release:
 
 ```bash
-pip install -U 'pyweber>=1.5'
+pip install -U 'pyweber>=1.6'
 ```
 
 See [Supported versions](https://pyweber.dev/guides/supported-versions/) (docs) for yank / security notes. `pyproject.toml` cannot warn when someone pins an old wheel — that requires [PyPI yanking](https://docs.pypi.org/project-management/yanking/).
@@ -229,7 +229,7 @@ pyweber add-section --section-name database
 pyweber --update
 ```
 
-Visit [Pyweber Docs](https://pyweber.dev/) for complete documentation. See [CHANGELOG.md](CHANGELOG.md) for release notes (latest: **1.3.0** — Template Handoff, 405 fixes, recursion tracking).
+Visit [Pyweber Docs](https://pyweber.dev/) for complete documentation. See [CHANGELOG.md](CHANGELOG.md) for release notes (latest: **1.6.0** — optional ORM/Redis, identity-preserving WS sync, reactive event fixes).
 
 ## License
 
