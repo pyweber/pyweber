@@ -18,3 +18,4 @@ clear_cache.py
 testes.py
 .coverage
 AUDITORIA_TECNICA_PYWEBER.md
+coverage.json
