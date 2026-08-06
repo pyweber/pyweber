@@ -2,7 +2,11 @@
 
 <img src="https://pyweber.readthedocs.io/images/pyweber.png" alt="Pyweber Logo">
 
-[![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![CI](https://github.com/pyweber/pyweber/actions/workflows/tests.yml/badge.svg)](https://github.com/pyweber/pyweber/actions/workflows/tests.yml)
+[![Documentation Status](https://readthedocs.org/projects/pyweber/badge/?version=latest)](https://pyweber.readthedocs.io/en/latest/)
+[![PyPI version](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/)
+[![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 Pyweber is a lightweight Python web framework designed to create dynamic, reactive web applications with a simple and intuitive API. It combines the simplicity of Python with the reactivity of modern frontend frameworks.
 

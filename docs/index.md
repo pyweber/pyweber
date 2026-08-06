@@ -2,7 +2,11 @@
 
 Pyweber is a Python web framework for **reactive** applications: you manipulate HTML elements in Python, and the browser updates in real time over WebSocket — without writing JavaScript for every interaction.
 
-[![PyPI](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![CI](https://github.com/pyweber/pyweber/actions/workflows/tests.yml/badge.svg)](https://github.com/pyweber/pyweber/actions/workflows/tests.yml)
+[![Documentation Status](https://readthedocs.org/projects/pyweber/badge/?version=latest)](https://pyweber.readthedocs.io/en/latest/)
+[![PyPI](https://img.shields.io/pypi/v/pyweber.svg)](https://pypi.org/project/pyweber/)
+[![Coverage Status](https://coveralls.io/repos/github/pyweber/pyweber/badge.svg?branch=master)](https://coveralls.io/github/pyweber/pyweber?branch=master)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 !!! danger "Use a supported release"
     **≤ 1.3.1 is not recommended** (security). Prefer `pip install -U 'pyweber>=1.6'`. See [Supported versions](guides/supported-versions.md).
