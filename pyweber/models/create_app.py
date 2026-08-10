@@ -86,13 +86,41 @@ class CreateApp:
     @property
     def main_module(cls):
         return os.path.basename(os.path.abspath(sys.argv[0])).split('.')[0]
-    
+
+    def _entry_as_main(self):
+        """Return ``__main__`` when it is the process entry script (``sys.argv[0]``).
+
+        ``python main.py`` / the CLI load the file as ``__main__``. Reusing that
+        module avoids a second execution via ``import_module("main")``.
+        """
+        mod = sys.modules.get('__main__')
+        main_file = getattr(mod, '__file__', None)
+        if not main_file:
+            return None
+        try:
+            if Path(main_file).resolve() != Path(sys.argv[0]).resolve():
+                return None
+        except OSError:
+            return None
+        return mod
+
     def get_main_module(self):
-        if self.main_module not in sys.modules:
-            return import_module(self.main_module)
-        if self.is_reloadable_module(self.main_module):
-            return reload(sys.modules.get(self.main_module))
-        return sys.modules.get(self.main_module)
+        name = self.main_module
+        entry = self._entry_as_main()
+        if entry is not None:
+            # Alias so hot-reload / lookups by basename ("main") see the same object
+            sys.modules.setdefault(name, entry)
+            return sys.modules[name]
+
+        if name not in sys.modules:
+            return import_module(name)
+
+        # Hot-reload already ran in reload_modules(); only reload here when
+        # there was no __main__ alias (e.g. tests / non-script entry).
+        if self.started and self.is_reloadable_module(name):
+            return reload(sys.modules[name])
+
+        return sys.modules[name]
     
     def project_modules(self):
         modules: dict[str, ModuleType] = {}

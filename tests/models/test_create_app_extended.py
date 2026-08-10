@@ -75,3 +75,61 @@ class TestCreatAppExtended:
         sessions.add_session('s1', Session(template=Mock(), window=Mock(), session_id='s1', current_route='/'))
         CreatApp(target=None).reset_reload_globals()
         assert 's1' not in sessions.all_sessions
+
+
+class TestGetMainModuleSingleLoad:
+    def test_reuses_main_without_import_module(self, project, monkeypatch):
+        entry = ModuleType('__main__')
+        entry.__file__ = str(Path(sys.argv[0]).resolve())
+        entry.marker = 'once'
+        monkeypatch.setitem(sys.modules, '__main__', entry)
+        sys.modules.pop('main', None)
+
+        creat = CreatApp(target=None)
+        with patch('pyweber.models.create_app.import_module') as import_mock, \
+             patch('pyweber.models.create_app.reload') as reload_mock:
+            mod = creat.get_main_module()
+
+        assert mod is entry
+        assert mod.marker == 'once'
+        assert sys.modules['main'] is entry
+        import_mock.assert_not_called()
+        reload_mock.assert_not_called()
+
+    def test_cold_start_does_not_reload_aliased_main(self, project, monkeypatch):
+        entry = ModuleType('__main__')
+        entry.__file__ = str(Path(sys.argv[0]).resolve())
+        monkeypatch.setitem(sys.modules, '__main__', entry)
+        sys.modules['main'] = entry
+
+        creat = CreatApp(target=None)
+        assert creat.started is False
+        with patch('pyweber.models.create_app.reload') as reload_mock:
+            assert creat.get_main_module() is entry
+        reload_mock.assert_not_called()
+
+    def test_hot_reload_path_does_not_reload_again_when_aliased(self, project, monkeypatch):
+        """reload_modules already reloaded; get_main_module must not re-exec."""
+        entry = ModuleType('__main__')
+        entry.__file__ = str(Path(sys.argv[0]).resolve())
+        monkeypatch.setitem(sys.modules, '__main__', entry)
+        sys.modules['main'] = entry
+
+        creat = CreatApp(target=None)
+        creat.started = True
+        with patch('pyweber.models.create_app.reload') as reload_mock:
+            assert creat.get_main_module() is entry
+        reload_mock.assert_not_called()
+
+    def test_import_module_when_no_matching_main(self, project, monkeypatch):
+        other = ModuleType('__main__')
+        other.__file__ = str(project / 'other.py')
+        monkeypatch.setitem(sys.modules, '__main__', other)
+        sys.modules.pop('main', None)
+
+        creat = CreatApp(target=None)
+        fake = ModuleType('main')
+        with patch('pyweber.models.create_app.import_module', return_value=fake) as import_mock:
+            mod = creat.get_main_module()
+        assert mod is fake
+        import_mock.assert_called_once_with('main')
