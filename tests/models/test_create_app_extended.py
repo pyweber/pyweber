@@ -133,3 +133,53 @@ class TestGetMainModuleSingleLoad:
             mod = creat.get_main_module()
         assert mod is fake
         import_mock.assert_called_once_with('main')
+
+    def test_reload_entry_script_execs_as_basename(self, project, monkeypatch):
+        entry_path = Path(sys.argv[0]).resolve()
+        entry_path.write_text(
+            'marker = "reloaded"\n'
+            'if __name__ == "__main__":\n'
+            '    marker = "should_not_run"\n',
+            encoding='utf-8',
+        )
+        old_main = ModuleType('__main__')
+        old_main.__file__ = str(entry_path)
+        monkeypatch.setitem(sys.modules, '__main__', old_main)
+        sys.modules.pop('main', None)
+
+        creat = CreatApp(target=None)
+        reloaded = creat._reload_entry_script()
+        try:
+            assert reloaded is not None
+            assert reloaded.marker == 'reloaded'
+            assert sys.modules['main'] is reloaded
+            assert sys.modules['__main__'] is reloaded
+        finally:
+            monkeypatch.undo()
+            sys.modules.pop('main', None)
+
+    def test_reload_modules_dedupes_main_alias(self, project, monkeypatch):
+        entry = ModuleType('__main__')
+        entry.__file__ = str(Path(sys.argv[0]).resolve())
+        entry.__spec__ = None
+        monkeypatch.setitem(sys.modules, '__main__', entry)
+        sys.modules['main'] = entry
+
+        views = ModuleType('html')
+        views.__file__ = str(project / 'html.py')
+        views.__spec__ = type('S', (), {'name': 'html'})()
+        (project / 'html.py').write_text('x = 1\n', encoding='utf-8')
+        sys.modules['html'] = views
+
+        creat = CreatApp(target=None)
+        with patch.object(CreatApp, 'project_path', project), \
+             patch.object(creat, 'load_target'), \
+             patch.object(creat, 'reset_reload_globals'), \
+             patch.object(creat, '_reload_entry_script') as entry_reload, \
+             patch('pyweber.models.create_app.reload') as reload_mock:
+            creat.reload_modules(str(project / 'html.py'))
+
+        reload_mock.assert_called_once_with(views)
+        entry_reload.assert_called_once()
+        sys.modules.pop('html', None)
+        sys.modules.pop('main', None)

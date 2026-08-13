@@ -1,4 +1,4 @@
-from importlib import import_module, reload
+from importlib import import_module, reload, util as importlib_util
 from threading import Thread
 from typing import Callable
 from types import ModuleType
@@ -20,6 +20,7 @@ DEFAULT_RELOAD_SKIP = (
     'database',
     'db.engine',
     'db.session',
+    'models.entities',
 )
 
 
@@ -35,10 +36,15 @@ class CreateApp:
         self.__server_port = kwargs.get('port', None) or os.environ.get('PYWEBER_SERVER_PORT') or config.get('server', 'port')
         self.__server_route = kwargs.get('route', None) or os.environ.get('PYWEBER_SERVER_ROUTE') or config.get('server', 'route')
         self.mobile_mode = kwargs.get('mobile', None) or os.environ.get('PYWEBER_MOBILE_MODE') or config.get('server', 'mobile')
+        env_skip = os.environ.get('PYWEBER_RELOAD_SKIP')
+        if kwargs.get('reload_skip_modules') is not None:
+            skip_modules = kwargs['reload_skip_modules']
+        elif env_skip:
+            skip_modules = env_skip.split(',')
+        else:
+            skip_modules = DEFAULT_RELOAD_SKIP
         self.__reload_skip_modules = tuple(
-            kwargs.get('reload_skip_modules')
-            or os.environ.get('PYWEBER_RELOAD_SKIP', '').split(',')
-            or DEFAULT_RELOAD_SKIP
+            item.strip() for item in skip_modules if str(item).strip()
         )
         self.http_server = HttpServer()
         self.ws_server = WebsocketManager(app=self.app, protocol='pyweber')
@@ -137,17 +143,64 @@ class CreateApp:
             reverse=True,
         )
 
+    def _is_entry_alias(self, module_name: str, module: ModuleType) -> bool:
+        """``__main__`` and basename alias (``main``) are the same entry script."""
+        if module_name == '__main__':
+            return True
+        entry = self._entry_as_main()
+        return entry is not None and module is entry
+
     def _should_reload_module(self, module_name: str, module: ModuleType) -> bool:
         if not self.is_reloadable_module(module_name):
             return False
 
-        if module_name == '__main__':
-            main_file = getattr(module, '__file__', None)
-            if not main_file:
-                return False
-            return Path(main_file).resolve() == Path(sys.argv[0]).resolve()
+        # importlib.reload() cannot reload __main__ (no spec) or its alias.
+        # Entry script is reloaded via _reload_entry_script().
+        if self._is_entry_alias(module_name, module):
+            return False
+
+        if getattr(module, '__spec__', None) is None:
+            return False
 
         return True
+
+    def _reload_entry_script(self) -> ModuleType | None:
+        """Re-exec the process entry file with a real spec (``__main__`` has none).
+
+        Loading as the basename (``main``) skips ``if __name__ == '__main__'``
+        so ``app.run()`` is not called again. Both ``sys.modules['main']`` and
+        ``__main__`` then point at the new module.
+        """
+        entry = self._entry_as_main()
+        path = getattr(entry, '__file__', None) if entry is not None else None
+        if not path or not str(path).endswith('.py') or not os.path.isfile(path):
+            return None
+
+        name = self.main_module
+        spec = importlib_util.spec_from_file_location(name, path)
+        if spec is None or spec.loader is None:
+            PrintLine(
+                text=f'Cannot reload entry script {name!r}: no loader for {path}',
+                level='WARNING',
+            )
+            return None
+
+        module = importlib_util.module_from_spec(spec)
+        sys.modules[name] = module
+        try:
+            spec.loader.exec_module(module)
+        except Exception as exc:
+            PrintLine(
+                text=f'Error reloading entry script {name}: {exc}',
+                level='WARNING',
+            )
+            if entry is not None:
+                sys.modules[name] = entry
+                sys.modules['__main__'] = entry
+            return None
+
+        sys.modules['__main__'] = module
+        return module
     
     def path_to_module(self, filepath: str):
         rel_path = Path(filepath).resolve().relative_to(self.project_path)
@@ -176,9 +229,13 @@ class CreateApp:
                 if module_name and module_name not in sys.modules:
                     import_module(module_name)
 
+                seen_ids: set[int] = set()
                 for key, module in self._ordered_project_modules():
+                    if id(module) in seen_ids:
+                        continue
                     if not self._should_reload_module(key, module):
                         continue
+                    seen_ids.add(id(module))
                     try:
                         reload(module)
                     except Exception as exc:
@@ -187,6 +244,7 @@ class CreateApp:
                             level='WARNING',
                         )
 
+                self._reload_entry_script()
                 self.reset_reload_globals()
 
             self.load_target()

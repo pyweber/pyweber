@@ -31,6 +31,7 @@ class TestCreatAppReload:
     def test_default_skip_patterns(self):
         assert 'alembic' in DEFAULT_RELOAD_SKIP
         assert 'sqlalchemy' in DEFAULT_RELOAD_SKIP
+        assert 'models.entities' in DEFAULT_RELOAD_SKIP
 
     def test_reset_reload_globals_clears_sessions(self, creat_app):
         from pyweber.connection.session import Session
@@ -59,10 +60,12 @@ class TestCreatAppReload:
         module = types.ModuleType('changed')
         module.VALUE = 1
         module.__file__ = str(mod_path)
+        module.__spec__ = types.SimpleNamespace(name='changed')
         sys.modules['changed'] = module
 
         other = types.ModuleType('other')
         other.__file__ = str(other_path)
+        other.__spec__ = types.SimpleNamespace(name='other')
         sys.modules['other'] = other
 
         with patch.object(CreatApp, 'project_path', tmp_path), \
@@ -83,6 +86,28 @@ class TestCreatAppReload:
         module = types.ModuleType('myapp.database.models')
         module.__file__ = str(creat_app.project_path / 'database' / 'models.py')
         assert creat_app._should_reload_module('myapp.database.models', module) is False
+
+    def test_should_reload_module_skips_main_and_alias(self, creat_app, monkeypatch):
+        entry = types.ModuleType('__main__')
+        entry.__file__ = str(Path(sys.argv[0]).resolve())
+        monkeypatch.setitem(sys.modules, '__main__', entry)
+        sys.modules['main'] = entry
+        assert creat_app._should_reload_module('__main__', entry) is False
+        assert creat_app._should_reload_module('main', entry) is False
+
+    def test_should_reload_module_skips_without_spec(self, creat_app, tmp_path):
+        module = types.ModuleType('views')
+        module.__file__ = str(tmp_path / 'views.py')
+        module.__spec__ = None
+        assert creat_app._should_reload_module('views', module) is False
+
+    def test_should_reload_module_skips_entities(self):
+        ca = CreatApp(target=None)
+        module = types.ModuleType('models.entities')
+        module.__file__ = 'models/entities.py'
+        module.__spec__ = types.SimpleNamespace(name='models.entities')
+        assert ca.is_reloadable_module('models.entities') is False
+        assert ca._should_reload_module('models.entities', module) is False
 
     def test_ordered_project_modules_deepest_first(self, creat_app, tmp_path):
         shallow = types.ModuleType('pkg')
