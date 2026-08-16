@@ -82,6 +82,27 @@ class TestCreatAppReload:
         sys.modules.pop('changed', None)
         sys.modules.pop('other', None)
 
+    def test_reload_modules_does_not_import_skipped_migrations(self, tmp_path):
+        entry = tmp_path / 'main.py'
+        entry.write_text('app = None\n', encoding='utf-8')
+        env_path = tmp_path / 'migrations' / 'env.py'
+        env_path.parent.mkdir()
+        env_path.write_text('raise RuntimeError("env.py must not be imported")\n', encoding='utf-8')
+
+        def target(app):
+            pass
+
+        with patch.object(sys, 'argv', [str(entry)]):
+            ca = CreatApp(target=target)
+            with patch.object(CreatApp, 'project_path', tmp_path), \
+                 patch.object(ca, 'load_target'), \
+                 patch.object(ca, 'reset_reload_globals'), \
+                 patch.object(ca, '_reload_entry_script'), \
+                 patch('pyweber.models.create_app.import_module') as import_mock:
+                ca.reload_modules(str(env_path))
+                import_mock.assert_not_called()
+        assert 'migrations.env' not in sys.modules
+
     def test_should_reload_module_skips_non_reloadable(self, creat_app):
         module = types.ModuleType('myapp.database.models')
         module.__file__ = str(creat_app.project_path / 'database' / 'models.py')

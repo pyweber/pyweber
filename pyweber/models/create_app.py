@@ -226,7 +226,11 @@ class CreateApp:
                 except ValueError:
                     module_name = None
 
-                if module_name and module_name not in sys.modules:
+                if (
+                    module_name
+                    and module_name not in sys.modules
+                    and self.is_reloadable_module(module_name)
+                ):
                     import_module(module_name)
 
                 seen_ids: set[int] = set()

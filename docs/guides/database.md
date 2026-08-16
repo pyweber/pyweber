@@ -106,6 +106,8 @@ pyweber db downgrade -1
 
 Point `migrations/env.py` at your models' metadata (`Model.metadata`). Hot-reload already skips `alembic` / `sqlalchemy` / `database` modules by default.
 
+The generated `env.py` does **not** call `fileConfig()` when the server already has loggers attached — Alembic's default config would otherwise disable them (`disable_existing_loggers=True`) and hide every INFO line in the terminal. Re-run `pyweber db init` to refresh an older scaffold (it overwrites `env.py`).
+
 ## Multi-database examples
 
 Same API; only the URL (and optional driver extra) changes:

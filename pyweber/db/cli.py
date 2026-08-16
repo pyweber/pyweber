@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import subprocess
 import sys
+from logging.config import fileConfig
 from pathlib import Path
 
 ALEMBIC_INI = '''\
@@ -25,19 +27,20 @@ keys = console
 keys = generic
 
 [logger_root]
-level = WARN
-handlers = console
+level = WARNING
+handlers =
 qualname =
 
 [logger_sqlalchemy]
-level = WARN
+level = WARNING
 handlers =
 qualname = sqlalchemy.engine
 
 [logger_alembic]
 level = INFO
-handlers =
+handlers = console
 qualname = alembic
+propagate = 0
 
 [handler_console]
 class = StreamHandler
@@ -55,7 +58,6 @@ ENV_PY = '''\
 from __future__ import annotations
 
 import asyncio
-from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import pool
@@ -65,11 +67,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 # Import your models so metadata is populated, e.g.:
 # from models import User  # noqa: F401
 from pyweber.db import Model
+from pyweber.db.cli import configure_alembic_logging
 from pyweber.db.config import load_database_settings
 
 config = context.config
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+configure_alembic_logging(config)
 
 target_metadata = Model.metadata
 
@@ -151,6 +153,27 @@ Generic single-database Alembic configuration for PyWeber (async).
 2. ``pyweber db revision -m "message"``
 3. ``pyweber db migrate``  (applies all pending revisions; same as ``upgrade head``)
 '''
+
+
+def configure_alembic_logging(config) -> None:
+    """Apply alembic.ini logging without swallowing the app/server loggers.
+
+    ``logging.config.fileConfig`` defaults to ``disable_existing_loggers=True``
+    and replaces root handlers. If ``env.py`` runs in the same process as the
+    PyWeber server (in-process migrate, hot-reload import), every INFO line
+    disappears from the terminal.
+    """
+    if config is None:
+        return
+    attributes = getattr(config, 'attributes', None) or {}
+    if not attributes.get('configure_logger', True):
+        return
+    filename = getattr(config, 'config_file_name', None)
+    if not filename:
+        return
+    if logging.getLogger().handlers:
+        return
+    fileConfig(filename, disable_existing_loggers=False)
 
 
 def _require_alembic():
