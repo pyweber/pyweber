@@ -411,13 +411,6 @@ class CommandFunctions:
         os.environ['PYWEBER_SERVER_ROUTE'] = str(route)
         os.environ['PYWEBER_DISABLE_WS'] = str(disable_ws)
         os.environ['PYWEBER_MOBILE_MODE'] = str(mobile)
-
-        config['session']['reload_mode'] = reload
-        config['server']['host'] = host
-        config['server']['port'] = port
-        config['server']['route'] = route
-        config['websocket']['disable_ws'] = disable_ws
-        config['session']['mobile'] = mobile
     
     def check_https_context(self, auto_cert: bool, cert_file: str, key_file: str):
         if auto_cert:
@@ -439,9 +432,6 @@ class CommandFunctions:
         
         os.environ['PYWEBER_CERT_FILE'] = cert_file
         os.environ['PYWEBER_KEY_FILE'] = key_file
-
-        config['server']['cert_file'] = cert_file
-        config['server']['key_file'] = key_file
 
     def run_app(self, **kwargs):
 
@@ -465,11 +455,6 @@ class CommandFunctions:
             self.set_eviron_variables(reload, port, host, route, disable_ws, mobile)
             self.check_https_context(auto_cert, cert_file, key_file)
 
-            try:
-                config.save() if config.path else None
-            except FileNotFoundError:
-                pass
-            
             if sys.platform == 'win32':
                 subprocess.run(['python', file], check=True, shell=True)
             else:

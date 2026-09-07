@@ -2,6 +2,52 @@
 
 PyWeber supports configuration through environment variables, allowing you to override settings without modifying configuration files. This is particularly useful for deployment environments, CI/CD pipelines, and development workflows.
 
+!!! tip "Added in 1.7.0"
+    `config.toml` interpolates `${VAR}` and `${VAR:-default}` from the process environment and a project-root `.env` file. Commit the toml; keep secrets out of git.
+
+## References in `config.toml`
+
+Put the **name** of an env var in the config — not the secret itself:
+
+```toml
+[session]
+secret_key = '${PYWEBER_SECRET_KEY}'
+env = '${PYWEBER_ENV:-development}'
+
+[database]
+url = '${DATABASE_URL:-sqlite+aiosqlite:///:memory:}'
+
+[server]
+port = '${PYWEBER_SERVER_PORT:-8800}'
+```
+
+| Syntax | Meaning |
+|--------|---------|
+| `${VAR}` | Value of `VAR`, or empty if unset |
+| `${VAR:-fallback}` | `VAR` if set and non-empty, otherwise `fallback` |
+| `$$` | A literal `$` |
+
+A value that is **only** `${VAR}` (or `${VAR:-n}`) is coerced when it looks like a bool/int (`true`/`8800`), so `port = '${PYWEBER_SERVER_PORT}'` stays an integer.
+
+Reads (`config.get(...)`, `config['session']['secret_key']`) resolve live from the environment. **`config.save()` writes the `${…}` placeholders**, never the expanded secrets.
+
+### `.env` file
+
+On load, PyWeber fills **missing** process variables from:
+
+1. `.env` next to `config.toml` (usually `.pyweber/.env`)
+2. `.env` in the project root (parent of `.pyweber`)
+3. `.env` in the current working directory
+4. `PYWEBER_ENV_FILE` if set (wins among files)
+
+Variables already present in the process environment are never overwritten. Add `.env` to `.gitignore`.
+
+```bash
+# .env  (not committed)
+PYWEBER_SECRET_KEY=change-me
+DATABASE_URL=postgresql+asyncpg://app:secret@db:5432/app
+```
+
 ## Available Environment Variables
 
 | Variable | Description | Default | Example |
@@ -98,17 +144,17 @@ pyweber run --https --cert /path/to/cert.pem --key /path/to/key.pem
 
 When determining configuration values, PyWeber uses the following priority order:
 
-1. Environment variables (highest priority)
+1. Environment variables (highest priority) — including `${VAR}` inside `config.toml`
 2. Command-line arguments
-3. Configuration file values
+3. Configuration file values (after interpolation)
 4. Default values (lowest priority)
 
 This means environment variables will always override settings in your configuration files.
 
 ## Security Considerations
 
-- Store sensitive information (like API keys or database credentials) in environment variables rather than configuration files
-- Never commit certificate private keys to version control
+- Store sensitive information (like API keys or database credentials) in environment variables or a gitignored `.env`, and reference them from `config.toml` with `${VAR}`
+- Never commit `.env` or certificate private keys to version control
 - For production environments, use properly signed certificates from trusted certificate authorities
 - When using self-signed certificates in development, be aware of browser security warnings
 

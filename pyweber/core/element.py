@@ -8,7 +8,9 @@ from pyweber.models.file import File
 from pyweber.models.element import (
     ElementConstrutor,
     TemplateEvents,
-    ChildElements
+    ChildElements,
+    WHITESPACE_SENSITIVE_TAGS,
+    normalize_preserved_inner_text,
 )
 from pyweber.core.html_parser import ParsedNode, parse_html
 
@@ -405,6 +407,8 @@ class Element(ElementConstrutor):
         value = cls.render_dynamic_values(attrib.pop('value', None), **kwargs)
 
         content = cls.render_dynamic_values(HTMLElement.text or None, **kwargs)
+        if str(name).lower() in WHITESPACE_SENSITIVE_TAGS:
+            content = normalize_preserved_inner_text(content)
 
         events_dict = {k[1:]: attrib.pop(k) for k in list(attrib) if k.startswith('_on')}
         event_obj = TemplateEvents()

@@ -4,8 +4,9 @@
 
 | Versions | Status |
 |----------|--------|
-| **1.6.x (latest)** | Recommended |
-| **1.5.x** | Supported; prefer upgrading to 1.6 |
+| **1.7.x (latest)** | Recommended |
+| **1.6.x** | Supported; prefer upgrading to 1.7 |
+| **1.5.x** | Supported; prefer upgrading to 1.7 |
 | **1.4.x** | Use only if you cannot upgrade yet; prefer latest patch |
 | **≤ 1.3.1** | **Not recommended** — treat as insecure for internet-facing apps |
 

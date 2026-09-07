@@ -19,3 +19,6 @@ testes.py
 .coverage
 AUDITORIA_TECNICA_PYWEBER.md
 coverage.json
+.env
+.env.*
+!.env.example

@@ -1,5 +1,6 @@
 import html as html_lib
 import re
+import textwrap
 from uuid import uuid4
 
 from typing import (
@@ -22,6 +23,26 @@ from questionary import checkbox
 if TYPE_CHECKING:
     from pyweber.core.template import Template
     from pyweber.core.element import Element
+
+# Inner text is significant: pretty-print indent would show up in the field / <pre>.
+WHITESPACE_SENSITIVE_TAGS = frozenset({'textarea', 'pre'})
+
+
+def normalize_preserved_inner_text(text: str | None) -> str | None:
+    """Drop pretty-print wrapping around ``<textarea>`` / ``<pre>`` bodies.
+
+    Serializers emit ``<textarea>\\n    body\\n</textarea>``. The browser (and
+    our parser) treat that indent as real value. If the markup starts with a
+    newline, treat it as pretty-print and ``dedent``.
+    """
+    if text is None:
+        return None
+    if not text.startswith('\n'):
+        return text
+    body = textwrap.dedent(text[1:])
+    if body.endswith('\n'):
+        body = body[:-1]
+    return body
 
 class ChildElements(list['Element']):
     def __init__(self, parent: 'Element'):
@@ -378,6 +399,9 @@ class ElementConstrutor:
 
             return self.childs[index].value if index >= 0 else None
 
+        if self.tag == 'textarea':
+            return self.content if self.__value is None else self.__value
+
         return self.__value
 
     @value.setter
@@ -390,8 +414,12 @@ class ElementConstrutor:
 
         self.__value = value
 
+        # Only copy a real value into content. ``value=None`` in the constructor
+        # used to wipe ``content=`` (empty textarea, placeholder only).
         if self.tag == 'textarea':
-            self.content = value
+            if value is not None:
+                self.content = value
+            return
 
         elif self.tag == 'select':
             self.__value = None
@@ -460,7 +488,9 @@ class ElementConstrutor:
             html += f' id="{esc_attr(element.id)}"'
         if element.classes and len(element.classes) > 0:
             html += f' class="{esc_attr(" ".join(element.classes))}"'
-        if element.value is not None and element.value != '':
+        tag = str(element.tag or '').lower()
+        # <textarea> value is the inner text, not a value="" attribute.
+        if tag != 'textarea' and element.value is not None and element.value != '':
             html += f' value="{esc_attr(element.value)}"'
 
         if element.style and len(element.style) > 0:
@@ -491,7 +521,7 @@ class ElementConstrutor:
         # Escape text early so {{placeholders}} remain (braces are not escaped).
         # Never HTML-escape <script>/<style> bodies — `>`/`&`/`<` would break JS/CSS
         # (e.g. `if (n > 0)` → `if (n &gt; 0)`), including scripts in <head>/<body>.
-        tag = str(element.tag or '').lower()
+        preserve_ws = tag in WHITESPACE_SENSITIVE_TAGS
         escape_text = element.sanitize and tag not in {'script', 'style'}
         safe_raw = esc_text(raw_content) if escape_text else raw_content
         final_content = str((self.render_dynamic_values(content=safe_raw, sanitize=escape_text, **self.kwargs) or ''))
@@ -499,7 +529,8 @@ class ElementConstrutor:
         has_children = bool(element.childs)
         rendered_child_uuids: set[str] = set()
 
-        if has_children or '\n' in final_content:
+        pretty = (has_children or '\n' in final_content) and not preserve_ws
+        if pretty:
             html += '\n'
 
         if raw_content:
@@ -531,7 +562,9 @@ class ElementConstrutor:
                 final_content += '\n' + self.to_html(child, indent + 4)
 
         if final_content:
-            if has_children or '\n' in final_content:
+            if preserve_ws:
+                html += final_content
+            elif pretty:
                 html += ' ' * (indent + 4) + final_content + '\n' + indentation
             else:
                 html += final_content

@@ -17,7 +17,7 @@ cert_file = ''
 key_file = ''
 
 [database]
-# Prefer a full async SQLAlchemy URL. Env PYWEBER_DATABASE_URL wins.
+# Prefer a full async SQLAlchemy URL. '${DATABASE_URL}' or PYWEBER_DATABASE_URL wins.
 url = 'sqlite+aiosqlite:///:memory:'
 echo = false
 pool_size = 5
@@ -29,6 +29,7 @@ auto_commit = false
 # name = './app.db'
 
 [session]
+# Prefer '${PYWEBER_SECRET_KEY}' (and a project-root .env) so config.toml can be committed.
 secret_key = 'TOKEN_HEX'
 timeout = 3600
 reload_mode = false

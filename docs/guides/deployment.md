@@ -111,7 +111,7 @@ Only registered directories are served. This prevents accidental exposure of the
 - [ ] Use HTTPS in production
 - [ ] Put a reverse proxy (nginx, Caddy) in front for static files if needed
 - [ ] Do not rely on hot reload
-- [ ] Configure session `secret_key` (and Redis URL if `backend = 'redis'`)
+- [ ] Configure session `secret_key` via `${PYWEBER_SECRET_KEY}` / `.env` (and Redis URL if `backend = 'redis'`)
 - [ ] Set `PYWEBER_DATABASE_URL` when using the ORM; run Alembic before deploy
 - [ ] Prefer Uvicorn/Gunicorn ASGI for DB-backed apps
 - [ ] Test WebSocket connectivity through your proxy (sticky sessions or Redis store)

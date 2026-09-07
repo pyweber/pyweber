@@ -97,8 +97,14 @@ class TextArea(Element):
         onselect: Callable = None,
         sanitize: bool = True
     ):
-        super().__init__(tag='textarea')
-        self.sanitize = sanitize
+        super().__init__(
+            tag='textarea',
+            id=id,
+            content=content,
+            classes=classes,
+            style=style,
+            sanitize=sanitize,
+        )
         self.content = content
         self.name = name
         self.id = id

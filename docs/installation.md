@@ -135,7 +135,7 @@ You can access configuration values in your code:
 ```python
 from pyweber.config.config import config
 
-# Get configuration values
+# Get configuration values (${VAR} in config.toml is already resolved)
 app_name = config.get("app", "name")
 port = config.get("server", "port")
 

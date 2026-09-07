@@ -47,7 +47,8 @@ class TestCommandFunctions:
         cmd = CommandFunctions()
         cmd.set_eviron_variables(True, 9000, '127.0.0.1', '/app', True, False)
         assert os.environ['PYWEBER_SERVER_PORT'] == '9000'
-        assert config['server']['port'] == 9000
+        assert os.environ['PYWEBER_SERVER_HOST'] == '127.0.0.1'
+        assert os.environ['PYWEBER_RELOAD_MODE'] == 'True'
 
     def test_check_https_context_auto_cert(self, monkeypatch):
         cmd = CommandFunctions()
@@ -58,12 +59,13 @@ class TestCommandFunctions:
     def test_check_https_context_manual(self):
         cmd = CommandFunctions()
         cmd.check_https_context(auto_cert=False, cert_file='a.pem', key_file='b.pem')
-        assert config['server']['cert_file'] == 'a.pem'
+        assert os.environ['PYWEBER_CERT_FILE'] == 'a.pem'
+        assert os.environ['PYWEBER_KEY_FILE'] == 'b.pem'
 
     def test_check_https_context_empty(self):
         cmd = CommandFunctions()
         cmd.check_https_context(auto_cert=False, cert_file='', key_file='')
-        assert config['server']['cert_file'] == ''
+        assert os.environ['PYWEBER_CERT_FILE'] == ''
 
     def test_create_path_and_static_file(self, tmp_path):
         cmd = CommandFunctions()
@@ -111,19 +113,25 @@ class TestCommandFunctions:
         main = tmp_path / 'main.py'
         main.write_text('print("ok")')
         monkeypatch.chdir(tmp_path)
+        cfg_dir = tmp_path / '.pyweber'
+        cfg_dir.mkdir()
+        cfg = cfg_dir / 'config.toml'
+        original = '[app]\nname = "keep-me"\n'
+        cfg.write_text(original, encoding='utf-8')
         cmd.run_app(
             file=str(main),
             reload=False,
             cert_file='',
             key_file='',
             auto_cert=False,
-            port=8800,
-            host='0.0.0.0',
-            route='/',
+            port=9999,
+            host='127.0.0.1',
+            route='/x',
             disable_ws=False,
             mobile=False,
         )
         assert mock_run.called
+        assert cfg.read_text(encoding='utf-8') == original
 
     @patch('subprocess.run', side_effect=__import__('subprocess').CalledProcessError(1, 'python'))
     def test_run_app_subprocess_error(self, mock_run, tmp_path, monkeypatch):

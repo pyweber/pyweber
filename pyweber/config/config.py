@@ -1,7 +1,27 @@
 from pathlib import Path
 import toml
 
+from pyweber.config.env import load_dotenv, resolve_config_value
 from pyweber.utils.loads import StaticTemplates
+
+_DECODE_FALLBACKS = ('utf-8', 'utf-8-sig', 'cp1252', 'latin-1')
+
+
+def decode_config_bytes(data: bytes) -> str:
+    """Decode config bytes without raising. Prefer UTF-8, then Windows/Latin-1.
+
+    Invalid sequences in the last resort become replacement characters (U+FFFD)
+    so a non-UTF-8 file never aborts load (which used to fall back to defaults
+    and, on ``save()``, wipe the user's toml).
+    """
+    if data.startswith(b'\xef\xbb\xbf'):
+        data = data[3:]
+    for encoding in _DECODE_FALLBACKS:
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode('utf-8', errors='replace')
 
 class PyweberConfig:
     def __init__(self):
@@ -20,7 +40,8 @@ class PyweberConfig:
     
     @property
     def config(self):
-        return self.__config
+        """Merged config with ``${VAR}`` references resolved from the environment."""
+        return resolve_config_value(self.__config)
 
     @property
     def __defaults(self):
@@ -47,6 +68,7 @@ class PyweberConfig:
             raise ValueError(f"Config file must be a toml file, but you got {str(name).split('.')[-1]} file")
 
         self.__path, self.__name, self.__keep_defaults = path, name, keep_defaults
+        load_dotenv(Path(path, name))
 
         if not Path(path).is_dir():
             Path(path).mkdir(exist_ok=True)
@@ -58,13 +80,13 @@ class PyweberConfig:
         self.__load_from_file()
 
     def get(self, *keys, default=None):
-        current = self.config
+        current = self.__config
         for key in keys:
             if isinstance(current, dict) and key in current:
                 current = current[key]
             else:
                 return default
-        return current
+        return resolve_config_value(current)
     
     def set(self, *keys, value = None):
         current = self.config
@@ -86,18 +108,19 @@ class PyweberConfig:
         self.save()
     
     def save(self):
-        with open(self.path, 'w') as file:
-            toml.dump(self.config, file)
+        with open(self.path, 'w', encoding='utf-8', newline='\n') as file:
+            toml.dump(self.__config, file)
     
     def show(self):
         import pprint
         pprint.pprint(self.config)
     
     def __load_from_file(self):
+        load_dotenv(Path(self.__path, self.__name))
+        path = Path(self.__path, self.__name)
         try:
-            with open(Path(self.__path, self.__name), 'r', encoding='utf-8') as file:
-                file_config = toml.loads(file.read())
-                self.__merge_configs(target=self.__config, source=file_config)
+            file_config = toml.loads(decode_config_bytes(path.read_bytes()))
+            self.__merge_configs(target=self.__config, source=file_config)
         
         except FileNotFoundError:
             pass
@@ -130,6 +153,6 @@ class PyweberConfig:
         return False
     
     def __getitem__(self, section: str):
-        return self.__config.get(section, {})
+        return resolve_config_value(self.__config.get(section, {}))
 
 config = PyweberConfig()

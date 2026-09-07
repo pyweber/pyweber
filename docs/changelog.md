@@ -6,6 +6,19 @@ Feature pages also use **Added in X.Y** tips — see [Doc conventions](guides/do
 
 ---
 
+## 1.7.0 — 2026-09-07
+
+### New
+
+- **`${VAR}` in `config.toml`** — interpolate process env and `.env` (`${VAR:-default}`). `save()` keeps the placeholders so the toml can be committed. See [Environment](environment.md).
+
+### Fixed
+
+- Alembic logging no longer swallows server INFO lines (refresh `env.py` with `pyweber db init`)
+- `<textarea>` keeps `content=` and is not pretty-print indented
+- `pyweber run` no longer overwrites `config.toml` on every start
+- Non-UTF-8 `config.toml` loads via cp1252/Latin-1 instead of erroring
+
 ## 1.6.0 — 2026-08-05
 
 ### New

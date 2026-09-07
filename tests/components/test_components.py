@@ -145,3 +145,6 @@ def test_label_and_textarea():
     )
     html = area.to_html()
     assert 'textarea' in html
+    assert 'hello' in html
+    assert area.content == 'hello'
+    assert area.value == 'hello'

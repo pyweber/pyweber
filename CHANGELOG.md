@@ -1,5 +1,18 @@
 # PyWeber Changelog
 
+## [1.7.0] - 2026-09-07
+
+### Added
+
+- **`config.toml` env interpolation** — `${VAR}` / `${VAR:-default}` resolved from the process environment and `.env` (cwd, project root, next to the toml, or `PYWEBER_ENV_FILE`). Reads interpolate live; `config.save()` writes placeholders so secrets stay out of git. See [docs/environment.md](docs/environment.md).
+
+### Fixed
+
+- **Alembic `fileConfig`** no longer disables app/server loggers (`disable_existing_loggers=False`; skip when the root logger already has handlers). Re-run `pyweber db init` to refresh an older `migrations/env.py`.
+- **`<textarea>` body** — `content=` is no longer wiped by `value=None` in the constructor; pretty-print indent is not injected into the field (or `<pre>`).
+- **`config.toml` is not rewritten on `pyweber run`** — CLI flags stay in the process environment; the file is only written by `config.set` / `save` / `create-new`.
+- **`config.toml` encoding** — load tries UTF-8, then cp1252/Latin-1 (replacement characters if needed) instead of failing and falling back to defaults.
+
 ## [1.6.0] - 2026-08-05
 
 ### Added
