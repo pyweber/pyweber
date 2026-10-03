@@ -1,5 +1,11 @@
 # PyWeber Changelog
 
+## [1.8.1] - 2026-10-03
+
+### Fixed
+
+- **`HTTP Error: 'NoneType' object has no attribute 'partition'`** — browser preconnect sockets that never send a request were dispatched as HTTP after the 5 s header peek timed out, reaching the router with no path. `_dispatch_client` now closes connections that delivered no complete headers.
+
 ## [1.8.0] - 2026-10-03
 
 ### Changed

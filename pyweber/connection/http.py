@@ -200,6 +200,11 @@ class HttpServer:
         try:
             is_ws, raw = self._peek_is_websocket(client)
 
+            # Browsers open speculative (preconnect) sockets that never send a request.
+            if b'\r\n\r\n' not in raw:
+                client.close()
+                return
+
             if is_ws:
                 # Thread dedicada para WS — longa duração
                 threading.Thread(

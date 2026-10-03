@@ -54,6 +54,20 @@ class TestPeekAndDispatch:
         http_server._dispatch_client(client)
         assert len(submitted) == 1
 
+    def test_dispatch_closes_idle_preconnect_socket(self, http_server):
+        submitted = []
+
+        class Pool:
+            def submit(self, fn, coro):
+                submitted.append(coro)
+                coro.close()
+
+        http_server._pool = Pool()
+        client = RecvSocket(b'')
+        http_server._dispatch_client(client)
+        assert submitted == []
+        assert client.closed is True
+
 
 class TestHandleHttpRaw:
     @pytest.mark.asyncio

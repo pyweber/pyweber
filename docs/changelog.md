@@ -6,6 +6,12 @@ Feature pages also use **Added in X.Y** tips — see [Doc conventions](guides/do
 
 ---
 
+## 1.8.1 — 2026-10-03
+
+### Fixed
+
+- No more `HTTP Error: 'NoneType' object has no attribute 'partition'` in the log ~5 s after page loads — idle browser preconnect sockets are now closed silently
+
 ## 1.8.0 — 2026-10-03
 
 ### Changed
