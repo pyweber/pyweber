@@ -1,5 +1,14 @@
 # PyWeber Changelog
 
+## [1.8.2] - 2026-10-03
+
+### Fixed
+
+- **Hot reload left stale code in nested modules** — modules were reloaded one by one, deepest name first, so `from components.card import X` inside e.g. `pages/admin/home.py` kept the old value when the dependent was reloaded before its dependency. Reloadable project modules are now purged from `sys.modules` and the entry script is re-executed, re-importing everything in dependency order. Skipped modules (`DEFAULT_RELOAD_SKIP` / `PYWEBER_RELOAD_SKIP`) are untouched. If the new code fails to import, the previous modules are restored and the app keeps serving the old code.
+- **Hot reload stopped for good after one failed reload** — an exception escaping the watchdog handler killed the observer thread, so neither the server nor the browser reloaded again. Errors are now logged (`♻ Reload failed: …`) and watching continues.
+- **Atomic saves ignored** — editors that write a temp file and rename it over the original did not trigger a reload; `on_created` / `on_moved` are now handled.
+- **Virtualenv inside the project folder** — `.venv` / `venv` / `site-packages` under the project path are no longer treated as project modules.
+
 ## [1.8.1] - 2026-10-03
 
 ### Fixed

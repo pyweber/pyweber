@@ -23,6 +23,12 @@ DEFAULT_RELOAD_SKIP = (
     'models.entities',
 )
 
+# Third-party code installed inside the project folder must never be reloaded.
+_NON_PROJECT_DIRS = frozenset({
+    '.venv', 'venv', 'site-packages', 'dist-packages',
+    '__pycache__', '.git', 'node_modules', 'build', 'dist', '.eggs', '.tox',
+})
+
 
 class CreateApp:
     def __init__(self, target: Callable, **kwargs):
@@ -128,20 +134,21 @@ class CreateApp:
 
         return sys.modules[name]
     
+    def _is_project_file(self, file_path: str) -> bool:
+        try:
+            rel = Path(file_path).resolve().relative_to(self.project_path.resolve())
+        except (ValueError, OSError):
+            return False
+        return not any(part in _NON_PROJECT_DIRS for part in rel.parts[:-1])
+
     def project_modules(self):
         modules: dict[str, ModuleType] = {}
 
-        for key, value in sys.modules.items():
-            if hasattr(value, '__file__') and value.__file__ and str(self.project_path) in str(value.__file__):
+        for key, value in list(sys.modules.items()):
+            file_path = getattr(value, '__file__', None)
+            if file_path and self._is_project_file(file_path):
                 modules[key] = value
         return modules
-
-    def _ordered_project_modules(self):
-        return sorted(
-            self.project_modules().items(),
-            key=lambda item: item[0].count('.'),
-            reverse=True,
-        )
 
     def _is_entry_alias(self, module_name: str, module: ModuleType) -> bool:
         """``__main__`` and basename alias (``main``) are the same entry script."""
@@ -218,37 +225,32 @@ class CreateApp:
         for session_id in list(sessions.all_sessions):
             sessions.remove_session(session_id)
 
+    def _purge_project_modules(self) -> dict[str, ModuleType]:
+        """Drop reloadable project modules from ``sys.modules``.
+
+        Reloading modules one by one leaves ``from x import y`` bindings stale
+        whenever a dependent is reloaded before its dependency. Purging and
+        re-executing the entry script re-imports everything in dependency order.
+        """
+        purged: dict[str, ModuleType] = {}
+        for key, module in self.project_modules().items():
+            if not self._should_reload_module(key, module):
+                continue
+            purged[key] = sys.modules.pop(key)
+        return purged
+
     def reload_modules(self, changed_file: str):
         try:
             if changed_file and str(changed_file).endswith('.py'):
-                try:
-                    module_name = self.path_to_module(filepath=changed_file)
-                except ValueError:
-                    module_name = None
+                purged = self._purge_project_modules()
+                had_entry = self._entry_as_main() is not None
 
-                if (
-                    module_name
-                    and module_name not in sys.modules
-                    and self.is_reloadable_module(module_name)
-                ):
-                    import_module(module_name)
+                if had_entry and self._reload_entry_script() is None:
+                    # Keep serving the previous code until the error is fixed.
+                    for key, module in purged.items():
+                        sys.modules[key] = module
+                    return
 
-                seen_ids: set[int] = set()
-                for key, module in self._ordered_project_modules():
-                    if id(module) in seen_ids:
-                        continue
-                    if not self._should_reload_module(key, module):
-                        continue
-                    seen_ids.add(id(module))
-                    try:
-                        reload(module)
-                    except Exception as exc:
-                        PrintLine(
-                            text=f'Error reloading module {key}: {exc}',
-                            level='WARNING',
-                        )
-
-                self._reload_entry_script()
                 self.reset_reload_globals()
 
             self.load_target()

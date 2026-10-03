@@ -175,11 +175,11 @@ class TestGetMainModuleSingleLoad:
         with patch.object(CreatApp, 'project_path', project), \
              patch.object(creat, 'load_target'), \
              patch.object(creat, 'reset_reload_globals'), \
-             patch.object(creat, '_reload_entry_script') as entry_reload, \
-             patch('pyweber.models.create_app.reload') as reload_mock:
+             patch.object(creat, '_reload_entry_script') as entry_reload:
             creat.reload_modules(str(project / 'html.py'))
 
-        reload_mock.assert_called_once_with(views)
+        assert 'html' not in sys.modules
+        assert sys.modules['main'] is entry
         entry_reload.assert_called_once()
         sys.modules.pop('html', None)
         sys.modules.pop('main', None)

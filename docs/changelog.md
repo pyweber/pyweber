@@ -6,6 +6,15 @@ Feature pages also use **Added in X.Y** tips — see [Doc conventions](guides/do
 
 ---
 
+## 1.8.2 — 2026-10-03
+
+### Fixed
+
+- Hot reload now picks up changes in every module (nested pages using `from x import y` no longer keep old code)
+- One failed reload (e.g. saving mid-edit) no longer stops reloading for the rest of the session; the error is logged
+- Editors with atomic save (temp file + rename) trigger the reload
+- A `.venv` inside the project folder is no longer reloaded
+
 ## 1.8.1 — 2026-10-03
 
 ### Fixed

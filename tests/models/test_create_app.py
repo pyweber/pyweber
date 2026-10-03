@@ -51,14 +51,13 @@ class TestCreatAppReload:
         with patch.object(CreatApp, 'project_path', tmp_path):
             assert creat_app.path_to_module(str(file_path)) == 'pkg.routes'
 
-    def test_reload_modules_reloads_all_project_modules(self, creat_app, tmp_path):
+    def test_reload_modules_purges_all_project_modules(self, creat_app, tmp_path):
         mod_path = tmp_path / 'changed.py'
         mod_path.write_text('VALUE = 1\n', encoding='utf-8')
         other_path = tmp_path / 'other.py'
         other_path.write_text('VALUE = 2\n', encoding='utf-8')
 
         module = types.ModuleType('changed')
-        module.VALUE = 1
         module.__file__ = str(mod_path)
         module.__spec__ = types.SimpleNamespace(name='changed')
         sys.modules['changed'] = module
@@ -69,18 +68,81 @@ class TestCreatAppReload:
         sys.modules['other'] = other
 
         with patch.object(CreatApp, 'project_path', tmp_path), \
-             patch.object(creat_app, 'path_to_module', return_value='changed'), \
-             patch.object(creat_app, 'load_target'), \
-             patch.object(creat_app, 'reset_reload_globals') as reset_mock, \
-             patch('pyweber.models.create_app.reload') as reload_mock:
+             patch.object(creat_app, 'load_target') as load_mock, \
+             patch.object(creat_app, 'reset_reload_globals') as reset_mock:
             creat_app.reload_modules(str(mod_path))
-            assert reload_mock.call_count == 2
-            reload_mock.assert_any_call(module)
-            reload_mock.assert_any_call(other)
-            reset_mock.assert_called_once()
 
-        sys.modules.pop('changed', None)
-        sys.modules.pop('other', None)
+        assert 'changed' not in sys.modules
+        assert 'other' not in sys.modules
+        reset_mock.assert_called_once()
+        load_mock.assert_called_once()
+
+    def test_reload_modules_rebinds_from_imports_in_nested_dependents(self, tmp_path, monkeypatch):
+        (tmp_path / 'components').mkdir()
+        (tmp_path / 'components' / '__init__.py').write_text('', encoding='utf-8')
+        card = tmp_path / 'components' / 'card.py'
+        card.write_text("TITLE = 'v1'\n", encoding='utf-8')
+        (tmp_path / 'pages' / 'admin').mkdir(parents=True)
+        (tmp_path / 'pages' / '__init__.py').write_text('', encoding='utf-8')
+        (tmp_path / 'pages' / 'admin' / '__init__.py').write_text('', encoding='utf-8')
+        (tmp_path / 'pages' / 'admin' / 'home.py').write_text(
+            'from components.card import TITLE\n', encoding='utf-8'
+        )
+        entry = tmp_path / 'main.py'
+        entry.write_text('import pages.admin.home\n', encoding='utf-8')
+
+        monkeypatch.setattr(sys, 'argv', [str(entry)])
+        monkeypatch.setattr(sys, 'dont_write_bytecode', True)
+        monkeypatch.syspath_prepend(str(tmp_path))
+        main = types.ModuleType('__main__')
+        main.__file__ = str(entry)
+        monkeypatch.setitem(sys.modules, '__main__', main)
+        exec(entry.read_text(encoding='utf-8'), main.__dict__)
+
+        ca = CreatApp(target=None)
+        try:
+            assert sys.modules['pages.admin.home'].TITLE == 'v1'
+            card.write_text("TITLE = 'v2'\n", encoding='utf-8')
+            with patch.object(ca, 'load_target'), patch.object(ca, 'reset_reload_globals'):
+                ca.reload_modules(str(card))
+            assert sys.modules['pages.admin.home'].TITLE == 'v2'
+        finally:
+            for name in ('main', 'pages', 'pages.admin', 'pages.admin.home', 'components', 'components.card'):
+                sys.modules.pop(name, None)
+
+    def test_reload_modules_keeps_old_modules_when_entry_fails(self, tmp_path, monkeypatch):
+        helper = tmp_path / 'helper.py'
+        helper.write_text('VALUE = 1\n', encoding='utf-8')
+        entry = tmp_path / 'main.py'
+        entry.write_text('raise SyntaxError("broken")\n', encoding='utf-8')
+
+        module = types.ModuleType('helper')
+        module.__file__ = str(helper)
+        module.__spec__ = types.SimpleNamespace(name='helper')
+        monkeypatch.setitem(sys.modules, 'helper', module)
+        monkeypatch.setattr(sys, 'argv', [str(entry)])
+        main = types.ModuleType('__main__')
+        main.__file__ = str(entry)
+        monkeypatch.setitem(sys.modules, '__main__', main)
+
+        ca = CreatApp(target=None)
+        with patch.object(ca, 'load_target') as load_mock, \
+             patch('pyweber.models.create_app.PrintLine'):
+            ca.reload_modules(str(helper))
+
+        assert sys.modules['helper'] is module
+        load_mock.assert_not_called()
+        sys.modules.pop('main', None)
+
+    def test_project_modules_ignore_virtualenv_inside_project(self, creat_app, tmp_path):
+        lib = types.ModuleType('somelib')
+        lib.__file__ = str(tmp_path / '.venv' / 'Lib' / 'site-packages' / 'somelib.py')
+        sys.modules['somelib'] = lib
+        try:
+            with patch.object(CreatApp, 'project_path', tmp_path):
+                assert 'somelib' not in creat_app.project_modules()
+        finally:
+            sys.modules.pop('somelib', None)
 
     def test_reload_modules_does_not_import_skipped_migrations(self, tmp_path):
         entry = tmp_path / 'main.py'
@@ -129,19 +191,3 @@ class TestCreatAppReload:
         module.__spec__ = types.SimpleNamespace(name='models.entities')
         assert ca.is_reloadable_module('models.entities') is False
         assert ca._should_reload_module('models.entities', module) is False
-
-    def test_ordered_project_modules_deepest_first(self, creat_app, tmp_path):
-        shallow = types.ModuleType('pkg')
-        shallow.__file__ = str(tmp_path / 'pkg' / '__init__.py')
-        deep = types.ModuleType('pkg.views')
-        deep.__file__ = str(tmp_path / 'pkg' / 'views.py')
-        sys.modules['pkg'] = shallow
-        sys.modules['pkg.views'] = deep
-
-        with patch.object(CreatApp, 'project_path', tmp_path):
-            ordered = creat_app._ordered_project_modules()
-
-        assert [name for name, _ in ordered] == ['pkg.views', 'pkg']
-
-        sys.modules.pop('pkg', None)
-        sys.modules.pop('pkg.views', None)

@@ -99,6 +99,44 @@ class TestReloadHandler:
         handler.on_modified(event)
         handler.reload_server.http_reload.assert_not_called()
 
+    @patch('pyweber.connection.reload.asyncio.run')
+    @patch('pyweber.connection.reload.PrintLine')
+    def test_reload_error_does_not_escape_handler(self, _print, mock_run, handler, tmp_path):
+        file_path = tmp_path / 'routes.py'
+        file_path.write_text('x = 1', encoding='utf-8')
+        path = handler._normalize_path(str(file_path))
+        handler.hash_files[path] = handler.get_hash_file(path)
+        file_path.write_text('x = (', encoding='utf-8')
+        handler.reload_server.http_reload.side_effect = SyntaxError('bad code')
+
+        event = Mock()
+        event.is_directory = False
+        event.src_path = str(file_path)
+
+        handler.on_modified(event)
+
+        mock_run.assert_not_called()
+        assert any(call.kwargs.get('level') == 'ERROR' for call in _print.call_args_list)
+
+    @patch('pyweber.connection.reload.asyncio.run')
+    @patch('pyweber.connection.reload.PrintLine')
+    def test_atomic_save_via_move_triggers_reload(self, _print, mock_run, handler, tmp_path):
+        file_path = tmp_path / 'routes.py'
+        file_path.write_text('x = 1', encoding='utf-8')
+        path = handler._normalize_path(str(file_path))
+        handler.hash_files[path] = handler.get_hash_file(path)
+        file_path.write_text('x = 2', encoding='utf-8')
+
+        event = Mock()
+        event.is_directory = False
+        event.src_path = str(tmp_path / 'routes.py.tmp')
+        event.dest_path = str(file_path)
+
+        handler.on_moved(event)
+
+        handler.reload_server.http_reload.assert_called_once_with(path)
+        mock_run.assert_called_once()
+
     @patch('pyweber.connection.reload.PrintLine')
     def test_first_seen_file_establishes_baseline_without_reload(self, _print, handler, tmp_path):
         file_path = tmp_path / 'new.py'

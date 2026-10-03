@@ -99,13 +99,30 @@ class ReloadHandler(FileSystemEventHandler):
             return None
 
     def on_modified(self, event):
+        self._handle_change(event, event.src_path)
+
+    def on_created(self, event):
+        self._handle_change(event, event.src_path)
+
+    def on_moved(self, event):
+        # Editors with atomic save write a temp file and rename it over the original.
+        self._handle_change(event, getattr(event, 'dest_path', None) or event.src_path)
+
+    def _handle_change(self, event, src_path: str):
         if getattr(event, 'is_directory', False):
             return
 
         if time() - self.start_server_time < self.reload_server.ignore_reload_time:
             return
 
-        path = self._normalize_path(event.src_path)
+        # An exception escaping a watchdog handler kills the observer thread for good.
+        try:
+            self._process_change(src_path)
+        except Exception as exc:
+            PrintLine(text=f'♻  Reload failed: {exc}', level='ERROR')
+
+    def _process_change(self, src_path: str):
+        path = self._normalize_path(src_path)
 
         if not any(path.endswith(ext) for ext in self.reload_server.watch_file_extensions):
             return
