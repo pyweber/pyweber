@@ -1,10 +1,9 @@
-import os
 import pytest
 
-from pyweber.pyweber.pyweber import Pyweber
-from pyweber.core.template import Template
-from pyweber.utils.types import ContentTypes
 from pyweber.connection.websocket import WebsocketManager
+from pyweber.core.template import Template
+from pyweber.pyweber.pyweber import Pyweber
+from pyweber.utils.types import ContentTypes
 
 
 @pytest.fixture(autouse=True)

@@ -36,7 +36,7 @@ class CookieManager:
             if samesite not in ['Strict', 'Lax']:
                 raise ValueError("SameSite is not valid. Please use one of: ['Strict', 'Lax']")
 
-            cookie += f' SameSite={str(samesite)}'
+            cookie += f' SameSite={str(samesite)};'
 
         expires_after_days = expires_after_days if isinstance(
             expires_after_days, (int, float)
@@ -79,5 +79,5 @@ class CookieManager:
         if secure:
             cookie += ' Secure;'
         if samesite:
-            cookie += f' SameSite={samesite}'
+            cookie += f' SameSite={samesite};'
         self.__cookies[cookie_name] = cookie

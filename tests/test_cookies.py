@@ -17,6 +17,20 @@ def test_set_cookies(cookies):
 
     assert "name=Alex" in cookies.cookies['name']
 
+def test_set_cookie_attributes_are_separated(cookies):
+    cookies.set_cookie(
+        cookie_name='name',
+        cookie_value='Alex',
+        expires_after_hours=10,
+        max_age=36000
+    )
+
+    attributes = [a.strip() for a in cookies.cookies['name'].split(';') if a.strip()]
+
+    assert 'SameSite=Strict' in attributes
+    assert 'Max-Age=36000' in attributes
+    assert any(a.startswith('Expires=') for a in attributes)
+
 def test_raise_attributeerror(cookies):
     with pytest.raises(ValueError, match=r"SameSite is not valid. Please use one of: \['Strict', 'Lax']"):
         raise cookies.set_cookie(cookie_name='name', cookie_value='Alex', samesite='Match')

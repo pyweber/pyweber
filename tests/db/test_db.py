@@ -69,6 +69,15 @@ def test_load_settings_env(monkeypatch):
     assert 'sqlite' in settings.url
 
 
+def test_create_engine_without_greenlet_raises_clear_error(monkeypatch):
+    import sys
+    from pyweber.db.engine import create_engine
+
+    monkeypatch.setitem(sys.modules, 'greenlet', None)
+    with pytest.raises(ImportError, match="requires 'greenlet'"):
+        create_engine(url='sqlite+aiosqlite:///:memory:')
+
+
 def test_model_repr(database):
     item = Item(name='x')
     assert 'Item' in repr(item)

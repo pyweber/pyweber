@@ -10,6 +10,9 @@ pip install 'pyweber[db]' 'pyweber[db-sqlite]'   # local / CI
 pip install 'pyweber[db]' 'pyweber[db-pg]'        # PostgreSQL
 ```
 
+!!! note "`greenlet` (1.8.0+)"
+    SQLAlchemy's async layer needs `greenlet`, which SQLAlchemy 2.1+ no longer installs by default. Since 1.8.0, `pyweber[db]` depends on `sqlalchemy[asyncio]` so it is always present. On older PyWeber versions, run `pip install greenlet` if you see *"the greenlet library is required"*.
+
 ## Design decisions (ADR)
 
 

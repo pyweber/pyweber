@@ -1,5 +1,15 @@
 # PyWeber Changelog
 
+## [1.8.0] - 2026-10-03
+
+### Changed
+
+- **`pyweber[db]` pulls `sqlalchemy[asyncio]`** — SQLAlchemy 2.1+ no longer installs `greenlet` by default, so upgrading could break every async DB call. The extra now brings it in. `create_engine` / `db.init` fail fast with a clear `ImportError` when `greenlet` is missing instead of erroring on the first query.
+
+### Fixed
+
+- **`Set-Cookie` missing `;` after `SameSite`** — `CookieManager.set_cookie` emitted `SameSite=Strict Expires=…` / `SameSite=Strict Max-Age=…`, so browsers dropped the expiry and turned every cookie (including the login session) into a browser-session cookie. Attributes are now separated correctly; `delete_cookie` gets the same terminator.
+
 ## [1.7.0] - 2026-09-07
 
 ### Added

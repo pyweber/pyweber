@@ -20,6 +20,14 @@ def _require_sqlalchemy():
             "Database support requires the 'db' extra. "
             "Install with: pip install 'pyweber[db]' (and a driver extra, e.g. pyweber[db-sqlite])"
         ) from exc
+    # sqlalchemy.ext.asyncio imports fine without greenlet but fails on first query.
+    try:
+        import greenlet  # noqa: F401
+    except ImportError as exc:
+        raise ImportError(
+            "SQLAlchemy asyncio support requires 'greenlet'. "
+            "Reinstall with: pip install -U 'pyweber[db]' (or: pip install greenlet)"
+        ) from exc
     return AsyncEngine, async_sessionmaker, create_async_engine
 
 

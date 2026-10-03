@@ -26,7 +26,7 @@ This installs a current stable version and its dependencies. Do **not** pin `==1
 
 | Extra | Purpose |
 |-------|---------|
-| `pyweber[db]` | SQLAlchemy 2 (async) + Alembic |
+| `pyweber[db]` | SQLAlchemy 2 (async, incl. `greenlet`) + Alembic |
 | `pyweber[db-sqlite]` / `[db-pg]` / `[db-mysql]` / `[db-mssql]` | Async DB drivers |
 | `pyweber[redis]` | Redis-backed WebSocket session store |
 | `pyweber[fast-html]` | Faster HTML parsing via lxml |

@@ -6,6 +6,16 @@ Feature pages also use **Added in X.Y** tips — see [Doc conventions](guides/do
 
 ---
 
+## 1.8.0 — 2026-10-03
+
+### Changed
+
+- `pyweber[db]` now installs `greenlet` (via `sqlalchemy[asyncio]`), so SQLAlchemy upgrades no longer break async DB apps; a missing `greenlet` gives a clear error at startup ([Database](guides/database.md))
+
+### Fixed
+
+- Cookies keep their `Expires` / `Max-Age` — a missing `;` after `SameSite` made browsers treat login and other cookies as session-only
+
 ## 1.7.0 — 2026-09-07
 
 ### New

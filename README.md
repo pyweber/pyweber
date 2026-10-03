@@ -233,7 +233,7 @@ pyweber add-section --section-name database
 pyweber --update
 ```
 
-Visit [Pyweber Docs](https://pyweber.dev/) for complete documentation. See [CHANGELOG.md](CHANGELOG.md) for release notes (latest: **1.7.0** — `${VAR}` in config.toml, textarea content, Alembic logs).
+Visit [Pyweber Docs](https://pyweber.dev/) for complete documentation. See [CHANGELOG.md](CHANGELOG.md) for release notes (latest: **1.8.0** — cookie expiry fix, `greenlet` bundled with `pyweber[db]`).
 
 ## License
 
