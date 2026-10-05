@@ -1,3 +1,4 @@
+import sys
 from datetime import datetime
 from typing import Literal
 from pyweber.utils.types import Colors
@@ -16,7 +17,15 @@ def PrintLine(
         with open(file_path, 'a', encoding='utf-8') as file:
             file.write(f"{final_value}\n")
     else:
-        print(final_value)
+        safe_print(final_value)
+
+def safe_print(value: str):
+    # cp1252 consoles (Windows services, CI, redirected output) cannot encode emojis.
+    try:
+        print(value)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, 'encoding', None) or 'ascii'
+        print(value.encode(encoding, errors='replace').decode(encoding, errors='replace'))
 
 def WriteLine(text: str = '', with_hour: bool = True, with_date: bool = False, splitter: str = '-'):
     return input(f'{format_text(text, with_hour, with_date, splitter)}')

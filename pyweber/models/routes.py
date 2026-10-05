@@ -85,6 +85,7 @@ class Route:
         deprecated: bool = False,
         include_in_schema: bool = True,
         operation_id: str = None,
+        csrf_exempt: bool = False,
         **kwargs
     ):
         self.group = group
@@ -106,6 +107,7 @@ class Route:
         self.deprecated = bool(deprecated)
         self.include_in_schema = include_in_schema if include_in_schema is not None else True
         self.operation_id = operation_id
+        self.csrf_exempt = bool(csrf_exempt)
         self.kwargs = kwargs
 
     @property
@@ -503,6 +505,7 @@ class RouteManager:
         deprecated: bool = False,
         include_in_schema: bool = True,
         operation_id: str = None,
+        csrf_exempt: bool = False,
     ):
         def decorator(handler: Callable[..., Union[Template, Element, str, dict, list]]):
             async def wrapper(**kwargs):
@@ -534,6 +537,7 @@ class RouteManager:
                 deprecated=deprecated,
                 include_in_schema=include_in_schema,
                 operation_id=operation_id,
+                csrf_exempt=csrf_exempt,
             )
             return wrapper
         return decorator
@@ -558,6 +562,7 @@ class RouteManager:
         deprecated: bool = False,
         include_in_schema: bool = True,
         operation_id: str = None,
+        csrf_exempt: bool = False,
         **kwargs
     ):
 
@@ -590,6 +595,7 @@ class RouteManager:
             deprecated=deprecated,
             include_in_schema=include_in_schema,
             operation_id=operation_id,
+            csrf_exempt=csrf_exempt,
         )
 
         overlap = self._method_overlap(existing, _route.methods)
@@ -642,7 +648,7 @@ class RouteManager:
             'template', 'methods', 'name', 'middlewares', 'status_code', 'content_type',
             'title', 'process_response', 'callback', 'tags', 'description', 'responses',
             'response_model', 'security', 'deprecated', 'include_in_schema', 'operation_id',
-            'group', 'route',
+            'csrf_exempt', 'group', 'route',
         }
         extra = {}
         for key, value in kwargs.items():
@@ -856,14 +862,14 @@ class RouteManager:
         ]
 
     @staticmethod
-    def build_route(route: str, **kwargs):
+    def build_route(route: str, /, **kwargs):
         for name in kwargs:
             pattern = "{" + name + "}"
             route = route.replace(pattern, str(kwargs[name]))
         return route
 
     @staticmethod
-    def validate_callable_args(callback: Callable, **kwargs):
+    def validate_callable_args(callback: Callable, /, **kwargs):
         sig = inspect.signature(callback)
         bound_args = {}
         extra_args = []

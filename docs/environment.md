@@ -63,6 +63,7 @@ DATABASE_URL=postgresql+asyncpg://app:secret@db:5432/app
 | `PYWEBER_ALLOWED_ORIGINS` | Comma-separated CORS allowlist | empty (no CORS) | `PYWEBER_ALLOWED_ORIGINS=https://app.example` |
 | `PYWEBER_MAX_BODY_SIZE` | Max request body size in bytes | `10485760` | `PYWEBER_MAX_BODY_SIZE=2097152` |
 | `PYWEBER_CSRF_ENABLED` | Enable CSRF checks on mutating HTTP methods | `true` | `PYWEBER_CSRF_ENABLED=false` |
+| `PYWEBER_CSRF_EXEMPT_PATHS` | Comma-separated path prefixes skipped by CSRF (webhooks, OAuth `/token`) *(1.8.3+)* | empty | `/oauth/token,/api/v1/` |
 | `PYWEBER_CSP` | Override `Content-Security-Policy` (`off` to disable) | CDN-friendly default | `PYWEBER_CSP=off` |
 | `PYWEBER_VALIDATE_UPLOADS` | Sniff MIME magic bytes on multipart uploads | `false` | `PYWEBER_VALIDATE_UPLOADS=1` |
 | `PYWEBER_DATABASE_URL` | SQLAlchemy async URL (`pyweber[db]`) | from `[database]` | `postgresql+asyncpg://…` |
@@ -95,6 +96,7 @@ backend = 'memory'    # or 'redis' with pyweber[redis]
 allowed_origins = []  # e.g. ['https://app.example']
 max_body_size = 10485760
 csrf_enabled = true
+# csrf_exempt_paths = ['/oauth/token', '/api/v1/']  # prefixes; PYWEBER_CSRF_EXEMPT_PATHS adds more
 # csp = 'off'  # or a full policy string; PYWEBER_CSP env overrides this
 ```
 

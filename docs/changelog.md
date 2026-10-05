@@ -6,6 +6,26 @@ Feature pages also use **Added in X.Y** tips — see [Doc conventions](guides/do
 
 ---
 
+## 1.8.3 — 2026-10-05
+
+### Security
+
+- JSON and other dynamic responses are no longer sent with `Cache-Control: public` — only static files are cached, and a route's own `Cache-Control` is respected
+- Returning a `Response` from a route keeps the session / CSRF cookies and anything set with `app.set_cookie`
+
+### New
+
+- `csrf_exempt=True` on routes, plus `csrf_exempt_paths` / `PYWEBER_CSRF_EXEMPT_PATHS` for webhooks and OAuth endpoints ([details](guides/authentication.md#exempting-server-to-server-endpoints))
+- Swagger groups routes by section, shows readable summaries, marks `@login_required` routes with a lock, and "Try it out" works with CSRF ([guide](documentation.md#organising-the-swagger-page))
+
+### Fixed
+
+- Redirects no longer fail with 500 when the URL has `state` (OAuth) — or `route` / `method` / `callback` on any page
+- Cookie values containing `=` (base64, JWT) are read correctly
+- `Template(status_code=400)` returned by a route is sent as 400
+- The CLI starts on Windows consoles that are not UTF-8
+- The development secret key survives restarts (stored in `.pyweber/dev_secret_key`) and its warning is shown once
+
 ## 1.8.2 — 2026-10-03
 
 ### Fixed

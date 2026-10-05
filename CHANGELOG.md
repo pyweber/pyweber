@@ -1,5 +1,29 @@
 # PyWeber Changelog
 
+## [1.8.3] - 2026-10-05
+
+### Security
+
+- **Dynamic responses were publicly cacheable** — `apply_static_etag` gave every non-HTML 200 an `ETag` and `Cache-Control: public, max-age=3600`, overriding the route's header. JSON APIs with tokens or personal data could sit in shared caches for an hour. Only files from registered static roots / `/_pyweber/static/` are cached now, and a `Cache-Control` set by the route is never replaced.
+- **`Response` returned by a route dropped `app.set_cookie` cookies** — including `pyweber_sid` and `pyweber_csrf`, so hand-built redirects / JSON responses did not persist the session or CSRF token. App cookies are merged in; cookies set on the `Response` win.
+
+### Added
+
+- **CSRF exemptions** — `@app.route(..., csrf_exempt=True)`, `[security].csrf_exempt_paths` / `PYWEBER_CSRF_EXEMPT_PATHS` (prefixes). Requests with `Authorization` and no cookies are exempt automatically.
+- **Swagger / OpenAPI**
+  - Untagged routes are grouped by their first path segment (`OpenAPIConfig.auto_tags`, default on).
+  - Summaries fall back to the docstring's first line, then the readable function name, instead of "Pyweber Route".
+  - `@login_required` / `role_required` / `permission_required` routes are documented with a `PyweberSession` cookie scheme (lock icon) and a note listing required roles/permissions (`OpenAPIConfig.session_auth_scheme`).
+  - `/docs` honours `openapi_url` and `title`, persists authorization, adds tag filter / request duration / deep links, accepts `OpenAPIConfig.swagger_ui_parameters`, and sends `X-CSRF-Token` on "Try it out".
+
+### Fixed
+
+- **500 on redirects when the request had `state`** (every OAuth flow) — request fields were spread as keyword arguments into internal helpers. The same collision affected `route`, `method` and `callback` on *any* route. Request data now travels as a single dict and internal parameters are positional-only.
+- **`request.cookies` truncated values containing `=`** (base64, JWT padding, `a=b`). Values are split on the first `=` and surrounding quotes are removed.
+- **`Template(status_code=…)` returned by a route was ignored** — the response used the route status (200). A non-default template status now wins.
+- **CLI crashed on non-UTF-8 Windows consoles** (`UnicodeEncodeError` on emoji) — `PrintLine` falls back to replacement characters and the CLI reconfigures stdout/stderr with `errors='replace'`.
+- **Development secret key** — the "ephemeral secret_key" warning was logged on every call, and the key changed on every restart, invalidating CSRF/session cookies. The key is now generated once into `.pyweber/dev_secret_key` (git-ignored) and the warning is logged once per process.
+
 ## [1.8.2] - 2026-10-03
 
 ### Fixed

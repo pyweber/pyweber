@@ -4,10 +4,11 @@
 
 | Versions | Status |
 |----------|--------|
-| **1.8.x (latest)** | Recommended |
-| **1.7.x** | Supported; prefer upgrading to 1.8 (cookie expiry fix) |
-| **1.6.x** | Supported; prefer upgrading to 1.8 |
-| **1.5.x** | Supported; prefer upgrading to 1.8 |
+| **1.8.3 (latest)** | Recommended |
+| **1.8.0 – 1.8.2** | Upgrade to 1.8.3 — dynamic responses could be cached publicly |
+| **1.7.x** | Supported; prefer upgrading to 1.8.3 |
+| **1.6.x** | Supported; prefer upgrading to 1.8.3 |
+| **1.5.x** | Supported; prefer upgrading to 1.8.3 |
 | **1.4.x** | Use only if you cannot upgrade yet; prefer latest patch |
 | **≤ 1.3.1** | **Not recommended** — treat as insecure for internet-facing apps |
 

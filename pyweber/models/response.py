@@ -28,6 +28,8 @@ INTERNAL_RESPONSE_HEADERS = frozenset({
     'code',
 })
 
+DEFAULT_CACHE_CONTROL = "no-store, no-cache, must-revalidate, max-age=0"
+
 
 def _coerce_body_and_type(
     content: Any,
@@ -104,7 +106,7 @@ class Response:
             "Content-Type": f"{resolved_type.value}; charset=UTF-8",
             "Content-Length": len(body),
             "Connection": 'Close',
-            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Cache-Control": DEFAULT_CACHE_CONTROL,
             "Pragma": "no-cache",
             "Vary": "Accept-Encoding",
             "Method": request.method,

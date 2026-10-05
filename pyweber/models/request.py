@@ -127,7 +127,15 @@ class Request:
 
     @property
     def cookies(self):
-        return {cookie.split('=')[0].strip(): cookie.split('=')[-1].strip() for cookie in self.headers.get('cookie', '').split(';') if cookie}
+        out: dict[str, str] = {}
+        for part in self.headers.get('cookie', '').split(';'):
+            name, sep, value = part.strip().partition('=')
+            if sep and name:
+                value = value.strip()
+                if len(value) >= 2 and value[0] == value[-1] == '"':
+                    value = value[1:-1]
+                out[name.strip()] = value
+        return out
 
     @property
     def accept_control_request_headers(self):

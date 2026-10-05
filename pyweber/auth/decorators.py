@@ -68,6 +68,33 @@ def _wrap_handler(
     permissions: list[str] | None,
     permissions_all: list[str] | None,
 ):
+    wrapper = _build_wrapper(
+        func,
+        redirect=redirect,
+        roles=roles,
+        roles_all=roles_all,
+        permissions=permissions,
+        permissions_all=permissions_all,
+    )
+    # Read by the OpenAPI builder to document the session requirement.
+    wrapper.__pyweber_auth__ = {
+        'roles': list(roles or []),
+        'roles_all': list(roles_all or []),
+        'permissions': list(permissions or []),
+        'permissions_all': list(permissions_all or []),
+    }
+    return wrapper
+
+
+def _build_wrapper(
+    func: Callable,
+    *,
+    redirect: str | None,
+    roles: list[str] | None,
+    roles_all: list[str] | None,
+    permissions: list[str] | None,
+    permissions_all: list[str] | None,
+):
     if inspect.iscoroutinefunction(func):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):

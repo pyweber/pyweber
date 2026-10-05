@@ -144,6 +144,8 @@ def get_user(user_id: int, request: pw.Request) -> UserOut:
 
 Schemas are generated from route signatures, type hints, `response_model` / return annotations, and `OpenAPIConfig`. Declared security schemes are enforced at runtime (missing/invalid credentials → 401; `ForbiddenError` from `verify` → 403).
 
+Grouping, summaries, `@login_required` locks and Swagger UI options: see [OpenAPI / Swagger](../documentation.md#organising-the-swagger-page). Server-to-server endpoints can opt out of CSRF with `csrf_exempt=True` ([details](authentication.md#exempting-server-to-server-endpoints)).
+
 ## Next steps
 
 - [Route class reference](../routing/route.md) — full API

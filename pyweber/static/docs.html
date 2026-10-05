@@ -1,19 +1,34 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Swagger UI</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{{TITLE}}</title>
         <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css">
     </head>
     <body>
         <div id="swagger-ui"></div>
         <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
         <script>
-            SwaggerUIBundle({
-                url: '/openapi.json',
-                dom_id: '#swagger-ui',
-                presets: [SwaggerUIBundle.presets.apis],
-                layout: 'BaseLayout'
-            });
+            function readCookie(name) {
+                const match = document.cookie.split('; ').find(row => row.startsWith(name + '='));
+                return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+            }
+
+            const options = {{CONFIG}};
+            options.dom_id = '#swagger-ui';
+            options.presets = [SwaggerUIBundle.presets.apis];
+            options.layout = 'BaseLayout';
+            // Same-origin "Try it out" requests carry the session cookie, so they need the CSRF token too.
+            options.requestInterceptor = function (request) {
+                const token = readCookie('{{CSRF_COOKIE}}');
+                if (token && !request.headers['{{CSRF_HEADER}}']) {
+                    request.headers['{{CSRF_HEADER}}'] = token;
+                }
+                return request;
+            };
+
+            window.ui = SwaggerUIBundle(options);
         </script>
     </body>
 </html>

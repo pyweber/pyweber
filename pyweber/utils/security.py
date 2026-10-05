@@ -45,16 +45,60 @@ def get_secret_key() -> str:
                 "session.secret_key is unset or still the placeholder 'TOKEN_HEX'. "
                 "Set a strong secret via config or PYWEBER_SECRET_KEY before running in production."
             )
-        logger.warning(
-            "Using ephemeral development secret_key; set session.secret_key or PYWEBER_SECRET_KEY."
-        )
         return _ephemeral_dev_secret()
     return key
 
 
+DEV_SECRET_FILE = 'dev_secret_key'
+
+
+def _dev_secret_path():
+    from pathlib import Path
+
+    config_path = getattr(_config(), 'path', None)
+    if not isinstance(config_path, (str, Path)):
+        return None
+    return Path(config_path).parent / DEV_SECRET_FILE
+
+
 @lru_cache(maxsize=1)
 def _ephemeral_dev_secret() -> str:
-    return secrets.token_hex(32)
+    """Development-only key, persisted under ``.pyweber/`` so restarts keep cookies valid."""
+    path = None
+    try:
+        path = _dev_secret_path()
+    except Exception:
+        path = None
+
+    if path is not None:
+        try:
+            stored = path.read_text(encoding='utf-8').strip()
+            if len(stored) >= 32:
+                logger.warning(
+                    "Using development secret_key from %s; set session.secret_key or "
+                    "PYWEBER_SECRET_KEY before deploying.", path,
+                )
+                return stored
+        except OSError:
+            pass
+
+    secret = secrets.token_hex(32)
+    if path is not None:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(secret, encoding='utf-8')
+            gitignore = path.parent / '.gitignore'
+            lines = gitignore.read_text(encoding='utf-8').splitlines() if gitignore.exists() else []
+            if DEV_SECRET_FILE not in lines:
+                gitignore.write_text('\n'.join([*lines, DEV_SECRET_FILE]) + '\n', encoding='utf-8')
+        except OSError:
+            path = None
+
+    logger.warning(
+        "Using %s development secret_key; set session.secret_key or PYWEBER_SECRET_KEY.",
+        f'generated (saved to {path})' if path is not None else 'ephemeral',
+    )
+    return secret
 
 
 def sign_value(value: str, *, key: str | None = None) -> str:
@@ -187,6 +231,20 @@ def get_allowed_origins() -> set[str]:
     if env_origins:
         origins = list(origins) + [o.strip() for o in env_origins.split(',') if o.strip()]
     return {str(o).rstrip('/') for o in origins if o}
+
+
+def get_csrf_exempt_paths() -> list[str]:
+    """Path prefixes skipped by CSRF checks (webhooks, OAuth ``/token``, Bearer APIs).
+
+    Config: ``[security].csrf_exempt_paths`` or ``PYWEBER_CSRF_EXEMPT_PATHS`` (comma-separated).
+    """
+    paths = _config().get('security', 'csrf_exempt_paths', default=None) or []
+    if isinstance(paths, str):
+        paths = [p.strip() for p in paths.split(',') if p.strip()]
+    env_paths = os.environ.get('PYWEBER_CSRF_EXEMPT_PATHS')
+    if env_paths:
+        paths = list(paths) + [p.strip() for p in env_paths.split(',') if p.strip()]
+    return [str(p) for p in paths if p]
 
 
 def get_allowed_redirect_hosts() -> set[str]:

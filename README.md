@@ -233,7 +233,7 @@ pyweber add-section --section-name database
 pyweber --update
 ```
 
-Visit [Pyweber Docs](https://pyweber.dev/) for complete documentation. See [CHANGELOG.md](CHANGELOG.md) for release notes (latest: **1.8.2** — reliable hot reload across all modules; 1.8.1: no spurious `HTTP Error` from idle preconnect sockets; 1.8.0: cookie expiry fix, `greenlet` bundled with `pyweber[db]`).
+Visit [Pyweber Docs](https://pyweber.dev/) for complete documentation. See [CHANGELOG.md](CHANGELOG.md) for release notes (latest: **1.8.3** — security fixes for response caching and cookies, OAuth `state` redirects, CSRF exemptions, grouped Swagger with auth; 1.8.2: reliable hot reload across all modules).
 
 ## License
 

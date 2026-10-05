@@ -131,6 +131,32 @@ def login(request):
 
 JSON APIs: send header `X-CSRF-Token` (and the cookie). Or disable with `PYWEBER_CSRF_ENABLED=false` / `[security] csrf_enabled = false` (not for browser form apps in production).
 
+### Exempting server-to-server endpoints
+
+!!! tip "Added in 1.8.3"
+
+Endpoints called by other servers (OAuth `/token`, webhooks, Bearer / `client_secret` APIs) carry no browser cookies, so CSRF does not apply. Exempt them in one of three ways:
+
+```python
+@app.route('/oauth/token', methods=['POST'], csrf_exempt=True)
+def token(request): ...
+```
+
+```toml
+[security]
+csrf_exempt_paths = ['/oauth/token', '/api/v1/']   # path prefixes
+```
+
+```bash
+PYWEBER_CSRF_EXEMPT_PATHS=/oauth/token,/api/v1/
+```
+
+Requests that send an `Authorization` header and **no cookies at all** are exempt automatically — without ambient cookies there is nothing for a cross-site request to abuse.
+
+### Development secret key
+
+Without `session.secret_key` / `PYWEBER_SECRET_KEY` (and outside production), PyWeber generates a key once and stores it in `.pyweber/dev_secret_key` (added to `.pyweber/.gitignore`). Restarts and hot reloads reuse it, so `pyweber_csrf` / session cookies stay valid. The warning is logged once per process. Production still refuses to start without a real key.
+
 > **Note:** browsers often send `Content-Type: application/x-www-form-urlencoded; charset=UTF-8`. PyWeber strips parameters via `request.media_type` / `request.is_media(...)` so form fields (including `_csrf`) still parse.
 
 ## API

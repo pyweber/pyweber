@@ -315,10 +315,10 @@ class Pyweber(
                 )
 
             else:
-                template_result = await self.get_template(
-                    route=request.path,
-                    method=request.method,
-                    **request.query_params
+                template_result = await self._get_template_with_params(
+                    request.path,
+                    request.method,
+                    dict(request.query_params),
                 )
 
             if self._should_register_handoff(template_result):
@@ -354,6 +354,10 @@ class Pyweber(
             for key, value in template_result.response_headers.items():
                 response.set_header(key, value)
 
+        if isinstance(content_result, Response) and self.cookies:
+            # Cookies set explicitly on the Response win over app.set_cookie ones.
+            response.set_header('Set-Cookie', {**self.cookies, **(response.cookies or {})})
+
         response = self._apply_static_etag(request, response, template_result)
 
         after_request_response = await self.process_middleware(
@@ -373,8 +377,8 @@ class Pyweber(
     def _apply_gzip(self, request: Request, response: Response) -> Response:
         return self._pipeline.apply_gzip(request, response)
 
-    def _csrf_exempt(self, path: str) -> bool:
-        return self._pipeline.csrf_exempt(path)
+    def _csrf_exempt(self, path: str, method: str | None = None) -> bool:
+        return self._pipeline.csrf_exempt(path, method)
 
     def _enforce_csrf(self, request: Request) -> Response | None:
         return self._pipeline.enforce_csrf(request)
@@ -457,20 +461,24 @@ class Pyweber(
         return ContentTypes.html
 
     async def get_template(self, route: str, method: str = 'GET', **kwargs):
+        return await self._get_template_with_params(route, method, kwargs)
+
+    async def _get_template_with_params(self, route: str, method: str, params: dict):
+        """Request params travel as a dict so names like ``route``/``method`` cannot collide."""
         if get_current_request() is None:
-            stub = Request.stub(method=method, path=route, query_params=kwargs)
+            stub = Request.stub(method=method, path=route, query_params=params)
             token = set_current_request(stub)
             try:
-                return await self._get_template(route=route, method=method, **kwargs)
+                return await self._get_template(route, method, params)
             finally:
                 reset_current_request(token)
 
-        return await self._get_template(route=route, method=method, **kwargs)
+        return await self._get_template(route, method, params)
 
-    async def _get_template(self, route: str, method: str = 'GET', **kwargs):
+    async def _get_template(self, route: str, method: str = 'GET', params: dict | None = None):
         path, kwd = self.resolve_path(route=route)
 
-        kwargs = {**kwargs, **kwd}
+        kwargs = {**(params or {}), **kwd}
 
         state_result = StateResult(
             template=None,
@@ -650,7 +658,7 @@ class Pyweber(
         state: StateResult,
         redirect_route: RedirectRoute,
         redirect_path: str,
-        **kwargs
+        route_kwargs: dict | None = None,
     ):
         if redirect_route.route.middlewares:
             middleware_result = await self.process_route_middleware(
@@ -673,7 +681,7 @@ class Pyweber(
             redirect_path=redirect_path,
             process_response=redirect_route.route.process_response,
             callback=redirect_route.route.callback,
-            kwargs=redirect_route.kwargs or kwargs
+            kwargs=redirect_route.kwargs or route_kwargs or {}
         )
 
     async def _process_templates(self, state_result: StateResult):
@@ -692,21 +700,21 @@ class Pyweber(
                 if callable(template):
                     kwargs = {
                         **kwargs,
-                        **OpenApiProcessor.prepare_callback_kwargs(callback=state_result.callback, **kwargs)
+                        **OpenApiProcessor.prepare_callback_kwargs(state_result.callback, **kwargs)
                     }
 
                     template = await template(**kwargs) if inspect.iscoroutinefunction(template) else template(**kwargs)
 
                 if isinstance(template, RedirectRoute):
                     kwargs = {**kwargs, **template.kwargs}
-                    redirect_path = self.build_route(route=template.route.full_route_with_params, **kwargs)
+                    redirect_path = self.build_route(template.route.full_route_with_params, **kwargs)
 
                     self._check_recursion(route=redirect_path)
                     state_result = await self._process_redirect_route(
                         state=state_result,
                         redirect_route=template,
                         redirect_path=redirect_path,
-                        **kwargs
+                        route_kwargs=kwargs,
                     )
 
                     template = state_result.template
@@ -746,6 +754,9 @@ class Pyweber(
             )
             state_result.status_code = HTTPStatusCode.INTERNAL_SERVER_ERROR.code
             state_result.content_type = ContentTypes.html
+
+        if isinstance(template, Template) and template.status_code not in (None, 200):
+            state_result.status_code = template.status_code
 
         if isinstance(template, Response):
             return TemplateResult(

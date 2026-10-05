@@ -125,9 +125,75 @@ Auto-generates:
 ## Accessing Documentation
 
 - **Swagger UI**: `http://localhost:8800/docs`
-- **Raw JSON**: `http://localhost:8800/_pyweber/{uuid}/openapi.json`
+- **Raw JSON**: `http://localhost:8800/openapi.json` (or `OpenAPIConfig.openapi_url`)
+- **Cache-busting alias**: `http://localhost:8800/_pyweber/{uuid}/openapi.json`
 
-> UUID is used to avoid caching issues.
+## Organising the Swagger page
+
+!!! tip "Added in 1.8.3"
+
+### Groups (tags)
+
+Routes without `tags=` are grouped by their **first path segment**, so `/admin/estrutura/departamentos` lands under **admin** and `/entrar/senha` under **entrar** — no more single *default* list. Explicit tags or route groups always win:
+
+```python
+@app.route('/users', tags=['Utilizadores'])
+def users(): ...
+```
+
+Add descriptions (and an order) for groups with `OpenAPIConfig(tags=[...])`, or turn automatic grouping off with `auto_tags=False`:
+
+```python
+app = pw.Pyweber(openapi=pw.OpenAPIConfig(
+    tags=[
+        {'name': 'admin', 'description': 'Back-office da organização'},
+        {'name': 'entrar', 'description': 'Login, SSO e recuperação de senha'},
+    ],
+))
+```
+
+### Summaries and descriptions
+
+Each operation's summary is `title=` → first line of the docstring → the function name made readable (`listar_departamentos` → *Listar departamentos*). The full docstring becomes the description.
+
+```python
+@app.route('/admin/estrutura/departamentos')
+def listar_departamentos():
+    """Lista os departamentos.
+
+    Devolve apenas departamentos ativos da organização atual.
+    """
+```
+
+### Authentication
+
+**Login cookie (`pyweber.auth`).** Routes decorated with `@login_required` (or `role_required` / `permission_required`) show a lock and a *Requires login* note listing the required roles/permissions. The signed `pyweber_user` cookie is documented as the `PyweberSession` scheme. Sign in through your app in the same browser and **Try it out** sends the cookie automatically. Put `@app.route` *above* `@login_required` so the docs can see it. Rename the scheme with `session_auth_scheme='Sessao'` or disable it with `session_auth_scheme=None`.
+
+**Tokens and API keys.** Declare schemes once and Swagger shows the **Authorize** button; credentials persist across page reloads:
+
+```python
+app = pw.Pyweber(openapi=pw.OpenAPIConfig(
+    security_schemes={
+        'BearerAuth': pw.HTTPBearer(verify=verify_token),
+        'ApiKeyAuth': pw.APIKeyHeader(name='X-API-Key', verify=check_key),
+    },
+    security=['BearerAuth'],        # global default; security=[] on a route makes it public
+))
+```
+
+A route that uses both a scheme and `@login_required` is documented as accepting **either**.
+
+**CSRF.** "Try it out" requests automatically send the `X-CSRF-Token` header from the `pyweber_csrf` cookie, so POST/PUT/DELETE calls from `/docs` are not rejected with 403.
+
+### Swagger UI options
+
+Defaults: deep links, persistent authorization, tag filter, request duration, operations listed (collapsed), alphabetical sorting, "Try it out" off until clicked. Override any [Swagger UI option](https://swagger.io/docs/open-source-tools/swagger-ui/usage/configuration/):
+
+```python
+pw.OpenAPIConfig(swagger_ui_parameters={'docExpansion': 'none', 'tryItOutEnabled': True})
+```
+
+The `/docs` page also honours a custom `openapi_url` and uses `OpenAPIConfig.title` as page title.
 
 ## Best Practices
 

@@ -865,6 +865,11 @@ class ConfigManagerCLI:
         return walk(config.config)
 
 def app():
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors='replace')
+        except (AttributeError, ValueError):
+            pass
     cli = CLI()
     cli.run()
 

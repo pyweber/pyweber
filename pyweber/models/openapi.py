@@ -57,6 +57,12 @@ class OpenAPIConfig:
     tags: list[dict[str, str]] | None = None
     expose_in_production: bool = False
     docs_security: list[str] | list[dict[str, list[str]]] | None = None
+    # Group untagged routes by their first path segment (``/admin/x`` → ``admin``).
+    auto_tags: bool = True
+    # Documents ``@login_required`` routes with the signed login cookie; None disables.
+    session_auth_scheme: str | None = 'PyweberSession'
+    # Extra SwaggerUIBundle options, e.g. {'docExpansion': 'none'}.
+    swagger_ui_parameters: dict[str, Any] | None = None
 
     def normalized_security(self) -> list[dict[str, list[str]]] | None:
         return normalize_security_requirements(self.security)
@@ -570,7 +576,7 @@ class OpenApiProcessor:
         return request_body
 
     @classmethod
-    def prepare_callback_kwargs(cls, callback: Callable, **kwargs):
+    def prepare_callback_kwargs(cls, callback: Callable, /, **kwargs):
         assert callable(callback)
 
         kwargs = dict(kwargs)
@@ -786,6 +792,7 @@ class OpenAPIBuilder:
         registry = SchemaRegistry()
         paths: dict[str, Any] = {}
         tag_names: set[str] = set()
+        self._uses_session_auth = False
 
         for path in list(self.app.list_routes):
             if path in self.SKIP_PATHS:
@@ -825,6 +832,18 @@ class OpenAPIBuilder:
         if registry.schemas:
             components['schemas'] = registry.schemas
         sec_schemes = self.config.security_schemes_openapi()
+        if self._uses_session_auth and self.config.session_auth_scheme not in sec_schemes:
+            from pyweber.auth.session import USER_COOKIE_NAME
+
+            sec_schemes[self.config.session_auth_scheme] = {
+                'type': 'apiKey',
+                'in': 'cookie',
+                'name': USER_COOKIE_NAME,
+                'description': (
+                    'Signed login cookie set by `pyweber.auth.login_user`. Sign in through the '
+                    'app in this browser and "Try it out" sends it automatically.'
+                ),
+            }
         if sec_schemes:
             components['securitySchemes'] = sec_schemes
         if components:
@@ -843,6 +862,36 @@ class OpenAPIBuilder:
             schema['tags'] = tags
 
         return schema
+
+    @staticmethod
+    def _auto_tag(path: str) -> str:
+        for segment in path.split('?', 1)[0].strip('/').split('/'):
+            if segment and not segment.startswith('{'):
+                return segment
+        return 'default'
+
+    @staticmethod
+    def _auto_summary(callback: Any) -> str:
+        doc = inspect.getdoc(callback) if callback else None
+        if doc:
+            return doc.strip().splitlines()[0].strip()
+        name = getattr(callback, '__name__', '') or ''
+        if not name or name == '<lambda>':
+            return 'Pyweber Route'
+        words = name.replace('_', ' ').strip()
+        return words[:1].upper() + words[1:]
+
+    @staticmethod
+    def _auth_description(marker: dict[str, list[str]]) -> str:
+        lines = ['**Requires login.**']
+        labels = {
+            'roles': 'Any role', 'roles_all': 'All roles',
+            'permissions': 'Any permission', 'permissions_all': 'All permissions',
+        }
+        for key, label in labels.items():
+            if marker.get(key):
+                lines.append(f'{label}: ' + ', '.join(f'`{v}`' for v in marker[key]))
+        return '  \n'.join(lines)
 
     def _add_route(
         self,
@@ -865,11 +914,18 @@ class OpenAPIBuilder:
             group = route.group
             if group and group != Route.default_group() and not str(group).startswith('__'):
                 tags = [str(group).removeprefix('__')]
+        if not tags and self.config.auto_tags:
+            tags = [self._auto_tag(path_key)]
         tag_names.update(tags)
 
         description = getattr(route, 'description', None)
         if not description and route.callback and route.callback.__doc__:
             description = inspect.cleandoc(route.callback.__doc__)
+
+        auth_marker = getattr(route.callback, '__pyweber_auth__', None)
+        if auth_marker is not None and self.config.session_auth_scheme:
+            auth_note = self._auth_description(auth_marker)
+            description = f'{description}\n\n{auth_note}' if description else auth_note
 
         response_model = getattr(route, 'response_model', None)
         if response_model is None and route.callback:
@@ -888,12 +944,17 @@ class OpenAPIBuilder:
         route_security = normalize_security_requirements(getattr(route, 'security', None))
         if route_security is None:
             route_security = self.config.normalized_security()
+        if auth_marker is not None and self.config.session_auth_scheme:
+            # login_required accepts the cookie OR any declared scheme → OR-list.
+            session_requirement = {self.config.session_auth_scheme: []}
+            route_security = [*(route_security or []), session_requirement]
+            self._uses_session_auth = True
 
         content_type = route.content_type.value if hasattr(route.content_type, 'value') else str(route.content_type)
 
         for method in route.methods:
             operation: dict[str, Any] = {
-                'summary': route.title or 'Pyweber Route',
+                'summary': route.title or self._auto_summary(route.callback),
                 'parameters': [
                     v for _, v in OpenApiProcessor.get_route_spec(route_params_source, route.callback).items()
                 ],

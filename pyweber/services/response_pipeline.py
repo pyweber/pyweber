@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from pyweber.models.rate_limit import get_rate_limiter, rate_limit_enabled
 from pyweber.models.request import Request
-from pyweber.models.response import Response
+from pyweber.models.response import DEFAULT_CACHE_CONTROL, Response
 from pyweber.utils.security import (
     CSRF_COOKIE_NAME,
     CSRF_FORM_FIELD,
@@ -17,6 +17,7 @@ from pyweber.utils.security import (
     generate_csrf_token,
     generate_session_id,
     get_allowed_origins,
+    get_csrf_exempt_paths,
     https_enabled,
     sign_value,
     unsign_value,
@@ -61,18 +62,18 @@ class ResponsePipeline:
 
         if response.status_code != 200:
             return response
-        ctype = str(response.response_type or '')
-        if 'html' in ctype and 'text/html' in ctype:
-            if getattr(template_result, 'process_response', False):
-                return response
+
+        # Only files from registered static roots are cacheable: dynamic routes
+        # (JSON APIs included) may carry tokens or personal data.
+        route = request.path or ''
+        if not (route.startswith('/_pyweber/static/') or self.app.is_static_file(route)):
+            return response
+
+        if response.headers.get('Cache-Control') not in (None, DEFAULT_CACHE_CONTROL):
+            return response
 
         body = response.response_content or b''
         if not isinstance(body, (bytes, bytearray)) or len(body) == 0:
-            return response
-
-        is_html = 'text/html' in ctype
-        route = request.path or ''
-        if is_html and not self.app.is_static_file(route) and not route.startswith('/_pyweber/static/'):
             return response
 
         etag = '"' + hashlib.sha256(bytes(body)).hexdigest()[:32] + '"'
@@ -135,14 +136,27 @@ class ResponsePipeline:
             response.set_header('Vary', f'{vary}, Accept-Encoding'.strip(', '))
         return response
 
-    def csrf_exempt(self, path: str) -> bool:
-        return path.startswith('/_pyweber/')
+    def csrf_exempt(self, path: str, method: str | None = None) -> bool:
+        if path.startswith('/_pyweber/'):
+            return True
+        if any(path.startswith(prefix) for prefix in get_csrf_exempt_paths()):
+            return True
+        try:
+            resolved, _ = self.app.resolve_path(route=path)
+            route = self.app.get_route_by_path(route=resolved, method=method)
+        except Exception:
+            route = None
+        return bool(getattr(route, 'csrf_exempt', False))
 
     def enforce_csrf(self, request: Request) -> Response | None:
         method = (request.method or 'GET').upper()
         if not csrf_enabled() or method in {'GET', 'HEAD', 'OPTIONS', 'TRACE'}:
             return None
-        if self.csrf_exempt(request.path or ''):
+        if self.csrf_exempt(request.path or '', method):
+            return None
+        # Without cookies the browser sends no ambient credentials, so there is
+        # nothing for a cross-site request to ride on (server-to-server / Bearer).
+        if not request.headers.get('cookie') and request.headers.get('authorization'):
             return None
 
         header_token = None
