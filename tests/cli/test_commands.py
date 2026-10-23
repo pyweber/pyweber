@@ -131,6 +131,7 @@ class TestCommandFunctions:
             mobile=False,
         )
         assert mock_run.called
+        assert mock_run.call_args.kwargs.get('shell', False) is False
         assert cfg.read_text(encoding='utf-8') == original
 
     @patch('subprocess.run', side_effect=__import__('subprocess').CalledProcessError(1, 'python'))

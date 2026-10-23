@@ -43,6 +43,7 @@ from pyweber.core.events import WindowBookEvents
 
 from pyweber.utils.utils import PrintLine
 from pyweber.utils.exceptions import ParameterConversionError
+from pyweber.utils.mime import UploadValidationError, enforce_upload_policy
 from pyweber.utils.security import is_production
 from pyweber.models.file import File
 from pyweber.models.strem_stats import AdaptiveController
@@ -227,6 +228,13 @@ class Pyweber(
             chunk, elapsed_ms = await self._receive_chunk(file_id=file_id, timeout=timeout)
             if not chunk: break
 
+            if offset == 0:
+                enforce_upload_policy(
+                    chunk if isinstance(chunk, (bytes, bytearray)) else b'',
+                    filename=getattr(file, 'filename', None),
+                    declared_type=getattr(file, 'content_type', None),
+                )
+
             yield chunk
 
             received = len(chunk)
@@ -275,6 +283,15 @@ class Pyweber(
                     return self._finalize_response(request, result.content)
 
             return await produce_response()
+        except UploadValidationError:
+            return Response(
+                request=request,
+                response_content=b'{"detail":"Upload rejected"}',
+                code=400,
+                cookies=dict(self.cookies),
+                response_type=ContentTypes.json,
+                route=request.path or '/',
+            )
         finally:
             self.cookies.clear()
             reset_current_request(req_token)
@@ -329,6 +346,7 @@ class Pyweber(
                 token = handoff_registry.create(
                     template=template_result.template,
                     route=_route,
+                    session_id=self._ensure_session_cookie(request),
                 )
                 inject_handoff_token(template_result.template, token)
 
@@ -726,6 +744,12 @@ class Pyweber(
                         'status': template.status,
                         'message': template.data if template.code != 200 else 'OK'
                     }
+
+        except UploadValidationError:
+            template = {'detail': 'Upload rejected'}
+            state_result.status_code = HTTPStatusCode.BAD_REQUEST.code
+            state_result.content_type = ContentTypes.json
+            state_result.process_response = False
 
         except ParameterConversionError as error:
             template = {'detail': str(error)}

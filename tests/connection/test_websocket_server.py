@@ -36,6 +36,15 @@ class TestWebsocketFrames:
         assert fin == 1
 
     @pytest.mark.asyncio
+    async def test_receive_rejects_oversized_frame(self, monkeypatch):
+        monkeypatch.setenv('PYWEBER_MAX_BODY_SIZE', '32')
+        payload = b'x' * 64
+        ws = WebsocketServer(RecvSocket(make_masked_frame(payload)))
+        opcode, message, fin = await ws.receive_frame()
+        assert opcode is None
+        assert message is None
+
+    @pytest.mark.asyncio
     async def test_receive_rejects_unmasked_client_frame(self):
         # Frame sem bit de mask — servidor deve ignorar
         raw = bytes([0x81, 5]) + b'hello'

@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pyweber.pyweber.pyweber import Pyweber
 from pyweber.utils.async_utils import async_timeout
 from pyweber.utils.utils import Colors, PrintLine
-from pyweber.utils.security import get_max_body_size
+from pyweber.utils.security import assert_runtime_binding, decode_cookie_value, get_max_body_size
 from pyweber.models.request import Request, ClientInfo
 from pyweber.connection.websocket import WebsocketUpgrade, WebsocketServer
 from pyweber.connection.selector import IOSelector
@@ -59,7 +59,7 @@ class HttpServer:
             if '=' not in part:
                 continue
             name, value = part.split('=', 1)
-            cookies[name.strip()] = value.strip()
+            cookies[name.strip()] = decode_cookie_value(value.strip())
         return cookies
 
     async def _send_simple_error(self, client, code: int, body: bytes, content_type: str = 'text/plain'):
@@ -322,6 +322,7 @@ class HttpServer:
                 break
 
     def start_server(self):
+        assert_runtime_binding(self.host)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_server:
             client_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             client_server.settimeout(self.timeout)

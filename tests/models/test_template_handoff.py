@@ -42,6 +42,14 @@ class TestTemplateHandoffRegistry:
         token = registry.create(_html_page(), '/expected')
 
         assert registry.consume(token, '/other') is None
+        assert registry.consume(token, '/expected') is not None
+
+    def test_consume_keeps_entry_when_session_does_not_match(self):
+        registry = TemplateHandoffRegistry()
+        token = registry.create(_html_page(), '/page', session_id='owner')
+
+        assert registry.consume(token, '/page', session_id='other') is None
+        assert registry.consume(token, '/page', session_id='owner') is not None
 
     def test_inject_handoff_token_adds_meta_tag(self):
         template = _html_page()

@@ -10,6 +10,7 @@ import re
 import secrets
 from functools import lru_cache
 from typing import Iterable
+from urllib.parse import quote, unquote
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -351,6 +352,118 @@ def https_enabled() -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {'1', 'true', 'yes', 'on'}
     return bool(value)
+
+
+def trust_proxy_enabled() -> bool:
+    """True when TLS is terminated by a reverse proxy this process trusts."""
+    env = os.environ.get('PYWEBER_TRUST_PROXY')
+    if env is not None:
+        return env.strip().lower() in {'1', 'true', 'yes', 'on'}
+    value = _config().get('security', 'trust_proxy', default=False)
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+    return bool(value)
+
+
+def cookies_are_secure() -> bool:
+    """Whether session cookies must carry the Secure attribute."""
+    return https_enabled() or trust_proxy_enabled()
+
+
+_LOOPBACK_HOSTS = frozenset({'localhost', '127.0.0.1', '::1'})
+
+
+def is_loopback_host(host: str | None) -> bool:
+    return str(host or '').strip().lower() in _LOOPBACK_HOSTS
+
+
+def assert_runtime_binding(host: str | None) -> None:
+    """Refuse a public development bind, and production without Secure cookies.
+
+    Loopback (``127.0.0.1``, ``localhost``, ``::1``) is always allowed.
+    ``0.0.0.0`` in development raises: set ``PYWEBER_ENV=production`` and a
+    real secret, or bind the loopback address.
+    Production on a public address also requires ``server.https_enabled`` or
+    ``security.trust_proxy`` / ``PYWEBER_TRUST_PROXY``.
+    """
+    public = not is_loopback_host(host)
+    if is_production():
+        get_secret_key()
+        if public and not cookies_are_secure():
+            raise RuntimeError(
+                f"Refusing to listen on {host!r} in production without HTTPS. "
+                "Set server.https_enabled, or security.trust_proxy / "
+                "PYWEBER_TRUST_PROXY when TLS ends at a reverse proxy, so "
+                "session cookies are marked Secure."
+            )
+        return
+    if public:
+        raise RuntimeError(
+            f"Refusing to listen on {host!r} while the environment is development. "
+            "Bind 127.0.0.1 for local work, or set PYWEBER_ENV=production and a "
+            "real session.secret_key before exposing the process."
+        )
+
+
+def assert_asgi_runtime() -> None:
+    """Production ASGI must be able to mark session cookies Secure.
+
+    The listen address belongs to the ASGI server, so a public bind cannot be
+    checked here. Development is unchanged.
+    """
+    if not is_production():
+        return
+    get_secret_key()
+    if not cookies_are_secure():
+        raise RuntimeError(
+            "Refusing to start in production without HTTPS. "
+            "Set server.https_enabled, or security.trust_proxy / "
+            "PYWEBER_TRUST_PROXY when TLS ends at a reverse proxy."
+        )
+
+
+# RFC 6265 cookie-name token. Excludes CTL, space, separators and quotes.
+_COOKIE_NAME_RE = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
+# cookie-octet extras. Alphanumerics are left alone by quote().
+# '%' is encoded so a literal %3B cannot become ';' on read. '=' stays so
+# existing base64 / signed values still round-trip. ';' space and '"' are encoded.
+_COOKIE_VALUE_SAFE = "!#$&'()*+-./:<=>?@[]^_`{|}~"
+
+
+def validate_cookie_name(name: str) -> str:
+    if not isinstance(name, str) or not _COOKIE_NAME_RE.fullmatch(name):
+        raise ValueError(f'Invalid cookie name: {name!r}')
+    return name
+
+
+def encode_cookie_value(value: str) -> str:
+    """Percent-encode a cookie value so ``;`` and CRLF cannot break Set-Cookie."""
+    text = '' if value is None else str(value)
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in text):
+        raise ValueError('Cookie value must not contain control characters')
+    return quote(text, safe=_COOKIE_VALUE_SAFE)
+
+
+def decode_cookie_value(value: str) -> str:
+    return unquote(value or '')
+
+
+def get_allowed_upload_types() -> list[str]:
+    """MIME allowlist used when ``validate_uploads`` is on.
+
+    Config: ``[security].allowed_upload_types`` or ``PYWEBER_ALLOWED_UPLOAD_TYPES``
+    (comma-separated). Empty means validation fails closed.
+    """
+    raw = os.environ.get('PYWEBER_ALLOWED_UPLOAD_TYPES')
+    if raw is None:
+        raw = _config().get('security', 'allowed_upload_types', default=None)
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        parts = raw.split(',')
+    else:
+        parts = list(raw)
+    return [str(part).strip().lower() for part in parts if str(part).strip()]
 
 
 def secure_filename(filename: str | None) -> str:

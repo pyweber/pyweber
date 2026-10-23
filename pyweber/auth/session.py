@@ -7,7 +7,7 @@ import time
 from typing import Any
 
 from pyweber.models.context import get_cookie_manager, get_current_request
-from pyweber.utils.security import https_enabled, sign_value, unsign_value
+from pyweber.utils.security import cookies_are_secure, sign_value, unsign_value
 
 USER_COOKIE_NAME = 'pyweber_user'
 DEFAULT_MAX_AGE = 60 * 60 * 24 * 14  # 14 days
@@ -122,7 +122,7 @@ def login_user(
         cookie_name=USER_COOKIE_NAME,
         cookie_value=signed,
         httponly=True,
-        secure=https_enabled(),
+        secure=cookies_are_secure(),
         samesite='Strict',
         max_age=max_age if max_age and max_age > 0 else None,
     )
@@ -141,6 +141,6 @@ def logout_user() -> None:
     cm.delete_cookie(
         cookie_name=USER_COOKIE_NAME,
         httponly=True,
-        secure=https_enabled(),
+        secure=cookies_are_secure(),
         samesite='Strict',
     )

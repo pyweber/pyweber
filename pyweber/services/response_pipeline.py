@@ -18,7 +18,7 @@ from pyweber.utils.security import (
     generate_session_id,
     get_allowed_origins,
     get_csrf_exempt_paths,
-    https_enabled,
+    cookies_are_secure,
     sign_value,
     unsign_value,
     verify_csrf_token,
@@ -197,7 +197,7 @@ class ResponsePipeline:
                 cookie_name=SESSION_COOKIE_NAME,
                 cookie_value=signed,
                 httponly=True,
-                secure=https_enabled(),
+                secure=cookies_are_secure(),
                 samesite='Strict',
             )
         elif SESSION_COOKIE_NAME not in self.app.cookies:
@@ -205,7 +205,7 @@ class ResponsePipeline:
                 cookie_name=SESSION_COOKIE_NAME,
                 cookie_value=signed,
                 httponly=True,
-                secure=https_enabled(),
+                secure=cookies_are_secure(),
                 samesite='Strict',
             )
         return sid
@@ -222,7 +222,7 @@ class ResponsePipeline:
             cookie_name=CSRF_COOKIE_NAME,
             cookie_value=token,
             httponly=False,
-            secure=https_enabled(),
+            secure=cookies_are_secure(),
             samesite='Strict',
         )
         return token

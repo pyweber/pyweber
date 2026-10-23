@@ -41,6 +41,58 @@ def sniff_mime(content: bytes | None) -> str | None:
         return None
 
 
+def enforce_upload_policy(
+    content: bytes,
+    *,
+    filename: str | None = None,
+    declared_type: str | None = None,
+) -> str:
+    """Sniff and allowlist an upload when validation is enabled.
+
+    With validation off, returns the declared type (or a sniff / octet-stream)
+    and does not raise. With validation on, an empty allowlist rejects every
+    upload.
+    """
+    from pyweber.utils.security import get_allowed_upload_types, validate_uploads_enabled
+
+    if not validate_uploads_enabled():
+        return declared_type or sniff_mime(content) or 'application/octet-stream'
+
+    allowed = get_allowed_upload_types()
+    if not allowed:
+        raise UploadValidationError(
+            'Upload rejected: validate_uploads is enabled but '
+            'security.allowed_upload_types / PYWEBER_ALLOWED_UPLOAD_TYPES is empty'
+        )
+    return validate_upload(
+        content,
+        filename=filename,
+        declared_type=declared_type,
+        allowed=allowed,
+    )
+
+
+def guard_upload_metadata(filename: str | None, declared_type: str | None) -> str:
+    """Return a storage name for a browser file, rejecting types outside the allowlist."""
+    from pyweber.utils.security import (
+        get_allowed_upload_types,
+        secure_filename,
+        validate_uploads_enabled,
+    )
+
+    safe_name = secure_filename(filename)
+    if not validate_uploads_enabled():
+        return safe_name
+
+    allowed = {item.lower() for item in get_allowed_upload_types()}
+    media = (declared_type or '').split(';', 1)[0].strip().lower()
+    if not allowed or media not in allowed:
+        raise UploadValidationError(
+            f'Upload rejected: declared={declared_type!r}, allowed={sorted(allowed)}'
+        )
+    return safe_name
+
+
 def validate_upload(
     content: bytes,
     *,

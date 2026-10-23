@@ -235,6 +235,25 @@ class TestSecurityEnforcement:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
+    async def test_scheme_without_verify_rejects_any_token(self):
+        app = Pyweber(
+            openapi=OpenAPIConfig(
+                security_schemes={'BearerAuth': HTTPBearer()},
+            )
+        )
+        app.add_route(
+            route='/secure',
+            template=lambda **kw: {'ok': True},
+            methods=['GET'],
+            content_type=ContentTypes.json,
+            security=['BearerAuth'],
+        )
+        resp = await app.get_response(
+            _request('GET', '/secure', extra_headers='Authorization: Bearer anything\r\n')
+        )
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
     async def test_empty_security_ignores_global(self):
         app = Pyweber(
             openapi=OpenAPIConfig(

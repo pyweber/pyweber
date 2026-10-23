@@ -523,3 +523,42 @@ class TestResolveUnderRootsAndSecrets:
         # Force the basename-prefix branch: path starts with root folder name
         found = resolve_under_roots('public/x.js', [str(root)])
         assert found is not None
+
+
+class TestRuntimeBindingAndUploads:
+    def test_development_refuses_public_bind(self, monkeypatch):
+        from pyweber.utils.security import assert_runtime_binding
+
+        monkeypatch.setenv('PYWEBER_ENV', 'development')
+        assert_runtime_binding('127.0.0.1')
+        with pytest.raises(RuntimeError, match='development'):
+            assert_runtime_binding('0.0.0.0')
+
+    def test_production_public_bind_requires_secure_cookies(self, monkeypatch):
+        from pyweber.utils.security import assert_runtime_binding
+
+        monkeypatch.setenv('PYWEBER_ENV', 'production')
+        monkeypatch.setenv('PYWEBER_SECRET_KEY', 'production-secret-key-value')
+        monkeypatch.delenv('PYWEBER_TRUST_PROXY', raising=False)
+        with pytest.raises(RuntimeError, match='HTTPS'):
+            assert_runtime_binding('0.0.0.0')
+        monkeypatch.setenv('PYWEBER_TRUST_PROXY', '1')
+        assert_runtime_binding('0.0.0.0')
+
+    def test_validate_uploads_fails_closed_without_allowlist(self, monkeypatch):
+        from pyweber.utils.mime import UploadValidationError, enforce_upload_policy
+
+        monkeypatch.setenv('PYWEBER_VALIDATE_UPLOADS', '1')
+        monkeypatch.setenv('PYWEBER_ALLOWED_UPLOAD_TYPES', '')
+        with pytest.raises(UploadValidationError, match='empty'):
+            enforce_upload_policy(b'\x89PNG\r\n\x1a\nxxxx', declared_type='image/png')
+
+    def test_validate_uploads_allowlist_accepts_png(self, monkeypatch):
+        from pyweber.utils.mime import enforce_upload_policy
+
+        monkeypatch.setenv('PYWEBER_VALIDATE_UPLOADS', '1')
+        monkeypatch.setenv('PYWEBER_ALLOWED_UPLOAD_TYPES', 'image/png')
+        assert enforce_upload_policy(
+            b'\x89PNG\r\n\x1a\nxxxx',
+            declared_type='image/png',
+        ) == 'image/png'

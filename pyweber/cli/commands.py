@@ -82,7 +82,7 @@ class CLI:
         parser.add_argument(
             '--host',
             type=str,
-            default='0.0.0.0',
+            default='127.0.0.1',
             help='Hostname to server run'
         )
 
@@ -250,7 +250,7 @@ class CLI:
                     'key_file': getattr(args, 'key_file', None),
                     'auto_cert': getattr(args, 'auto_cert', False),
                     'port': getattr(args, 'port', 8800),
-                    'host': getattr(args, 'host', '0.0.0.0'),
+                    'host': getattr(args, 'host', '127.0.0.1'),
                     'route': getattr(args, 'route', '/'),
                     'disable_ws': getattr(args, 'disable_ws', False),
                     'mobile': getattr(args, 'mobile', False)
@@ -455,10 +455,7 @@ class CommandFunctions:
             self.set_eviron_variables(reload, port, host, route, disable_ws, mobile)
             self.check_https_context(auto_cert, cert_file, key_file)
 
-            if sys.platform == 'win32':
-                subprocess.run(['python', file], check=True, shell=True)
-            else:
-                subprocess.run(['python3', file], check=True)
+            subprocess.run([sys.executable, file], check=True)
         
         except subprocess.CalledProcessError as e:
             self.log_message(
@@ -485,12 +482,10 @@ class CommandFunctions:
 
             # Executar o script em uma nova janela
             if sys.platform == 'win32':
-                # No Windows, abrir em uma nova janela
-                subprocess.Popen(['start', 'python', temp_script], shell=True)
+                subprocess.Popen(['cmd', '/c', 'start', '', sys.executable, temp_script])
             else:
-                # No Linux/Mac, executar em segundo plano
                 subprocess.Popen(
-                    ['python3', temp_script],
+                    [sys.executable, temp_script],
                     start_new_session=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
@@ -532,7 +527,11 @@ class CommandFunctions:
         try:
             for require in requires:
                 print(f'Installing {Colors.GREEN}{require}{Colors.RESET}, please waiting...')
-                subprocess.run(['pip', 'install', require], check=True, capture_output=True, shell=True)
+                subprocess.run(
+                    [sys.executable, '-m', 'pip', 'install', require],
+                    check=True,
+                    capture_output=True,
+                )
             
             print(f'All done...')
 

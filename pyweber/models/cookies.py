@@ -1,5 +1,7 @@
 from datetime import datetime, timezone, timedelta
 
+from pyweber.utils.security import encode_cookie_value, validate_cookie_name
+
 class CookieManager:
     def __init__(self):
         self.__cookies: dict[str, str] = {}
@@ -24,6 +26,8 @@ class CookieManager:
         expires_after_days: int = None,
         max_age: int = None
     ):
+        cookie_name = validate_cookie_name(cookie_name)
+        cookie_value = encode_cookie_value(cookie_value)
         cookie = f'{cookie_name}={cookie_value}; Path={path};'
 
         if httponly:
@@ -73,6 +77,7 @@ class CookieManager:
         secure: bool = True,
     ):
         """Expire a cookie immediately (logout)."""
+        cookie_name = validate_cookie_name(cookie_name)
         cookie = f'{cookie_name}=; Path={path}; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT;'
         if httponly:
             cookie += ' HttpOnly;'

@@ -302,6 +302,14 @@ class SecurityEnforcer:
                     www_authenticate=scheme.www_authenticate(),
                 )
 
+            if scheme.verify is None:
+                return SecurityChallenge(
+                    ok=False,
+                    status_code=401,
+                    detail='Security scheme is not configured with a verify callback',
+                    www_authenticate=scheme.www_authenticate(),
+                )
+
             user = None
             if scheme.verify is not None:
                 try:

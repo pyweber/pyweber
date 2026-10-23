@@ -195,7 +195,7 @@ app = pw.Pyweber(
 
 ## Upload MIME validation
 
-Optional: set `PYWEBER_VALIDATE_UPLOADS=1` or `[security] validate_uploads = true` to sniff magic bytes on multipart files (raises `UploadValidationError` when invalid).
+Optional: set `PYWEBER_VALIDATE_UPLOADS=1` or `[security] validate_uploads = true` together with `allowed_upload_types` (or `PYWEBER_ALLOWED_UPLOAD_TYPES`) to sniff magic bytes. An empty allowlist rejects every upload. WebSocket file inputs use the same list and `secure_filename`.
 
 ## SQLAlchemy User model
 

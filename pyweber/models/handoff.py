@@ -15,6 +15,7 @@ class HandoffEntry:
     template: Template
     route: str
     created_at: float
+    session_id: str | None = None
 
 
 class TemplateHandoffRegistry:
@@ -30,7 +31,7 @@ class TemplateHandoffRegistry:
         self._entries: dict[str, HandoffEntry] = {}
         self._lock = Lock()
 
-    def create(self, template: Template, route: str) -> str:
+    def create(self, template: Template, route: str, session_id: str | None = None) -> str:
         token = str(uuid4())
         with self._lock:
             self._purge_expired()
@@ -38,24 +39,32 @@ class TemplateHandoffRegistry:
                 template=template,
                 route=route,
                 created_at=time(),
+                session_id=session_id,
             )
         return token
 
-    def consume(self, token: str, route: str) -> Template | None:
+    def consume(self, token: str, route: str, session_id: str | None = None) -> Template | None:
+        """Move the template only after route, TTL and session id match.
+
+        A wrong route or a different session leaves the entry in place.
+        Entries created without ``session_id`` stay consumable by any caller
+        (tests and older tokens).
+        """
         if not token:
             return None
 
         with self._lock:
-            entry = self._entries.pop(token, None)
-
-        if not entry:
-            return None
-
-        if entry.route != route:
-            return None
-
-        if time() - entry.created_at > self._ttl:
-            return None
+            entry = self._entries.get(token)
+            if entry is None:
+                return None
+            if time() - entry.created_at > self._ttl:
+                self._entries.pop(token, None)
+                return None
+            if entry.route != route:
+                return None
+            if entry.session_id and session_id != entry.session_id:
+                return None
+            self._entries.pop(token, None)
 
         return entry.template
 

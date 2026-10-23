@@ -65,9 +65,9 @@ class FieldStorage:
                 field.value = v
                 field.size = len(field.value)
                 if validate:
-                    from pyweber.utils.mime import validate_upload
+                    from pyweber.utils.mime import enforce_upload_policy
 
-                    validate_upload(
+                    field.content_type = enforce_upload_policy(
                         field.value if isinstance(field.value, bytes) else b'',
                         filename=field.filename,
                         declared_type=declared,

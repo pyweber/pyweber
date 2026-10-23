@@ -4,6 +4,7 @@ from pyweber.connection.session import sessions
 from pyweber.core.element import Element
 from pyweber.models.file import File
 from pyweber.models.file import Field
+from pyweber.utils.mime import guard_upload_metadata
 from pyweber.models.handoff import handoff_registry
 
 if TYPE_CHECKING:
@@ -59,6 +60,7 @@ class wsMessage:
             session_template = handoff_registry.consume(
                 token=self.get_value(key='handoffToken'),
                 route=self.route or '',
+                session_id=self.session_id,
             )
             if session_template is not None:
                 used_handoff = True
@@ -154,20 +156,28 @@ class wsMessage:
 
         if values:
             if element.tag == 'input' and element.attrs.get('type') == 'file':
-
-                element.files.extend([
-                    File(
-                        field=Field(
-                            name=None,
-                            filename=value.get('name'),
-                            content_type=value.get('content_type'),
-                            field_id=value.get('file_id'),
-                            size=int(value.get('size'))
+                safe_names: list[str] = []
+                for value in values.get('value', []):
+                    if not isinstance(value, dict):
+                        continue
+                    safe_name = guard_upload_metadata(
+                        value.get('name'),
+                        value.get('content_type'),
+                    )
+                    safe_names.append(safe_name)
+                    element.files.append(
+                        File(
+                            field=Field(
+                                name=None,
+                                filename=safe_name,
+                                content_type=value.get('content_type'),
+                                field_id=value.get('file_id'),
+                                size=int(value.get('size')),
+                            )
                         )
-                    ) for value in values.get('value', []) if isinstance(value, dict)
-                ])
+                    )
 
-                element.value = ';'.join([value.get('name') for value in values.get('value', []) if isinstance(value, dict)]) or None
+                element.value = ';'.join(safe_names) or None
 
             else:
                 element.value = values.get('value', None)

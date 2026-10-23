@@ -159,7 +159,7 @@ class TestBindSessionAndEnsure:
     def manager(self, pyweber_app):
         return pyweber_app.ws_server
 
-    def test_bind_reuses_client_session(self, manager):
+    def test_bind_ignores_client_session_without_cookie(self, manager):
         _clear_sessions()
         sessions.add_session(
             'client-sid',
@@ -171,8 +171,8 @@ class TestBindSessionAndEnsure:
                 connection_id=None,
                 cookies={},
             )
-            assert sid == 'client-sid'
-            assert is_new is False
+            assert sid != 'client-sid'
+            assert is_new is True
         finally:
             _clear_sessions()
 

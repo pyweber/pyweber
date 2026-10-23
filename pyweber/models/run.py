@@ -105,6 +105,26 @@ async def run_as_asgi(scope, receive, send, app: 'Pyweber', target: Callable = N
     global WS_RUNNING
     global ws_server
 
+    from pyweber.utils.security import assert_asgi_runtime
+
+    if scope.get('type') == 'lifespan':
+        while True:
+            message = await receive()
+            kind = message.get('type')
+            if kind == 'lifespan.startup':
+                try:
+                    assert_asgi_runtime()
+                except Exception as exc:
+                    await send({'type': 'lifespan.startup.failed', 'message': str(exc)})
+                    return
+                await send({'type': 'lifespan.startup.complete'})
+            elif kind == 'lifespan.shutdown':
+                await send({'type': 'lifespan.shutdown.complete'})
+                return
+        return
+
+    assert_asgi_runtime()
+
     body = b""
     if scope["type"] == "http":
         more_body = True

@@ -31,6 +31,14 @@ def test_set_cookie_attributes_are_separated(cookies):
     assert 'Max-Age=36000' in attributes
     assert any(a.startswith('Expires=') for a in attributes)
 
+def test_cookie_value_encodes_header_separators(cookies):
+    cookies.set_cookie(cookie_name='name', cookie_value='a; b')
+    assert cookies.cookies['name'].startswith('name=a%3B%20b;')
+
+def test_cookie_value_rejects_crlf(cookies):
+    with pytest.raises(ValueError, match='control characters'):
+        cookies.set_cookie(cookie_name='name', cookie_value='a\r\nSet-Cookie: evil=1')
+
 def test_raise_attributeerror(cookies):
     with pytest.raises(ValueError, match=r"SameSite is not valid. Please use one of: \['Strict', 'Lax']"):
         raise cookies.set_cookie(cookie_name='name', cookie_value='Alex', samesite='Match')

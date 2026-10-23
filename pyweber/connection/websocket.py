@@ -15,6 +15,7 @@ from pyweber.utils.utils import PrintLine
 from pyweber.utils.security import (
     SESSION_COOKIE_NAME,
     generate_session_id,
+    get_max_body_size,
     unsign_value,
 )
 from pyweber.connection.session import sessions, Session
@@ -194,6 +195,12 @@ class WebsocketServer:
                         current_opcode = opcode
 
                     self.__all_message += message
+                    if len(self.__all_message) > get_max_body_size():
+                        PrintLine(
+                            f'Connection {self.id} exceeded the WebSocket message limit',
+                            level='WARNING',
+                        )
+                        break
 
                     if fin:
                         if current_opcode in [1, 2]:
@@ -271,6 +278,9 @@ class WebsocketServer:
         elif payload_len == 127:
             extended_payload = await self.read_exact(8)
             payload_len = int.from_bytes(extended_payload, byteorder='big')
+
+        if payload_len > get_max_body_size():
+            return None, None, None
 
         masking_key = await self.read_exact(4)
         payload = await self.read_exact(payload_len)
@@ -649,9 +659,8 @@ class WebsocketManager(BaseWebsockets):
         if connection_id and connection_id in sessions.all_sessions:
             return connection_id, False
 
-        if client_session_id and client_session_id in sessions.all_sessions:
-            return client_session_id, False
-
+        # Client-supplied ids are not a credential. Only the signed cookie
+        # (via get_session_id) or this socket's already-bound id may resume.
         resolved = self.get_session_id(
             session_id=client_session_id,
             cookies=cookies or {},

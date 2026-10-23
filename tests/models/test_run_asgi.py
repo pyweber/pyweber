@@ -120,9 +120,25 @@ class TestRunAsAsgiHttp:
         assert any(b'token=secret' in h[1] for h in cookie_headers)
 
     @pytest.mark.asyncio
-    async def test_lifespan_is_noop(self, asgi_app):
+    async def test_lifespan_startup_and_shutdown(self, asgi_app):
         scope = {'type': 'lifespan'}
-        await run_as_asgi(scope, lambda: None, lambda m: None, app=asgi_app)
+        pending = [
+            {'type': 'lifespan.startup'},
+            {'type': 'lifespan.shutdown'},
+        ]
+        sent = []
+
+        async def receive():
+            return pending.pop(0)
+
+        async def send(message):
+            sent.append(message)
+
+        await run_as_asgi(scope, receive, send, app=asgi_app)
+        assert [message['type'] for message in sent] == [
+            'lifespan.startup.complete',
+            'lifespan.shutdown.complete',
+        ]
 
     @pytest.mark.asyncio
     async def test_cors_headers_on_asgi_wire(self, asgi_app, monkeypatch):

@@ -4,6 +4,7 @@ from typing import Union
 from urllib.parse import parse_qs
 from dataclasses import dataclass
 
+from pyweber.utils.security import decode_cookie_value
 from pyweber.utils.types import ContentTypes
 from pyweber.models.field_storage import FieldStorage
 from pyweber.models.headers import Headers
@@ -134,7 +135,7 @@ class Request:
                 value = value.strip()
                 if len(value) >= 2 and value[0] == value[-1] == '"':
                     value = value[1:-1]
-                out[name.strip()] = value
+                out[name.strip()] = decode_cookie_value(value)
         return out
 
     @property

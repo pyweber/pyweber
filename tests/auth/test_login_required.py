@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import unquote
+
 import pytest
 
 from pyweber.auth import (
@@ -96,7 +98,7 @@ async def test_login_user_sets_cookie_and_allows_access():
             signed = part.split('=', 1)[1]
             break
     assert signed
-    payload = _decode_payload(signed)
+    payload = _decode_payload(unquote(signed))
     assert payload['id'] == 'alice'
 
     dash_resp = await app.get_response(

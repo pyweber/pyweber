@@ -6,6 +6,19 @@ Feature pages also use **Added in X.Y** tips — see [Doc conventions](guides/do
 
 ---
 
+## 1.8.5 — 2026-10-22
+
+### Security
+
+- Built-in WebSocket frames cannot exceed `max_body_size`
+- A reactive session resumes only from the signed `pyweber_sid` cookie, or from the socket that already owns it
+- Cookie values are percent-encoded; names and values cannot inject extra `Set-Cookie` headers
+- `validate_uploads` requires `allowed_upload_types`. An empty list rejects every upload, including WebSocket file inputs
+- An OpenAPI security scheme without a `verify` callback no longer authenticates
+- Listening on a public address in development is refused. Production on a public address requires HTTPS or `trust_proxy`. New projects bind `127.0.0.1`
+- Handoff tokens are checked (route, expiry, session) before they are consumed
+- The CLI no longer runs child processes with `shell=True`
+
 ## 1.8.3 — 2026-10-05
 
 ### Security
